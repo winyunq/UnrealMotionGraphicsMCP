@@ -1,0 +1,31 @@
+# Unreal Engine generated files
+Binaries/
+Build/
+Intermediate/
+Saved/
+DerivedDataCache/
+
+# Visual Studio files
+.vs/
+*.VC.db
+*.opensdf
+*.sdf
+*.sln
+*.suo
+*.user
+*.vcxproj
+*.vcxproj.filters
+*.pdb
+*.obj
+*.exe
+*.dll
+*.lib
+*.exp
+*.ilk
+*.ipch
+*.log
+*.tmp
+*.bak
+
+# Other
+*.DS_Store
