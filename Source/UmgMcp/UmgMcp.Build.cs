@@ -37,7 +37,8 @@ public class UmgMcp : ModuleRules
 				"DeveloperSettings",
 				"PhysicsCore",
 				"UnrealEd",
-				"UMGEditor"
+				"UMGEditor",
+				"UMG" // Add this line
 			}
 		);
 		

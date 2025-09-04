@@ -63,6 +63,7 @@ UUmgMcpBridge::UUmgMcpBridge()
     EditorCommands = MakeShared<FUmgMcpEditorCommands>();
     BlueprintCommands = MakeShared<FUmgMcpBlueprintCommands>();
     AttentionCommands = MakeShared<FUmgMcpAttentionCommands>();
+    WidgetCommands = MakeShared<FUmgMcpWidgetCommands>(); // Add this line
 }
 
 UUmgMcpBridge::~UUmgMcpBridge()
@@ -70,6 +71,7 @@ UUmgMcpBridge::~UUmgMcpBridge()
     EditorCommands.Reset();
     BlueprintCommands.Reset();
     AttentionCommands.Reset();
+    WidgetCommands.Reset(); // Add this line
 }
 
 // Initialize subsystem
@@ -241,9 +243,17 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
             }
             // Attention Commands
             else if (CommandType == TEXT("get_last_edited_umg_asset") ||
-                     CommandType == TEXT("get_recently_edited_umg_assets"))
+                     CommandType == TEXT("get_recently_edited_umg_assets") ||
+                     CommandType == TEXT("get_active_umg_context") ||
+                     CommandType == TEXT("is_umg_editor_active") ||
+                     CommandType == TEXT("set_attention_target"))
             {
                 ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
+            }
+            // Widget Commands
+            else if (CommandType == TEXT("get_widget_tree"))
+            {
+                ResultJson = WidgetCommands->HandleCommand(CommandType, Params);
             }
             else
             {

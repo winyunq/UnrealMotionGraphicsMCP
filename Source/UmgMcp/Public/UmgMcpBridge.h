@@ -10,11 +10,15 @@
 #include "Interfaces/IPv4/IPv4Endpoint.h"
 #include "Commands/UmgMcpEditorCommands.h"
 #include "Commands/UmgMcpBlueprintCommands.h"
-#include "Commands/UmgMcpAttentionCommands.h" // Added for Attention Commands
+#include "Commands/UmgMcpAttentionCommands.h"
+// Include the new WidgetCommands header
+#include "Commands/UmgMcpWidgetCommands.h" // This line was added/moved
+
 #include "UmgMcpBridge.generated.h"
 
 class FMCPServerRunnable;
-class FUmgMcpAttentionCommands; // Forward declaration for Attention Commands
+class FUmgMcpAttentionCommands;
+class FUmgMcpWidgetCommands; // Forward declaration for Widget Commands
 
 /**
  * Editor subsystem for MCP Bridge
@@ -44,18 +48,16 @@ public:
 	FString ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
 
 private:
-	// Server state
-	bool bIsRunning;
-	TSharedPtr<FSocket> ListenerSocket;
-	TSharedPtr<FSocket> ConnectionSocket;
-	FRunnableThread* ServerThread;
+    TSharedPtr<FUmgMcpEditorCommands> EditorCommands;
+    TSharedPtr<FUmgMcpBlueprintCommands> BlueprintCommands;
+    TSharedPtr<FUmgMcpAttentionCommands> AttentionCommands;
+    TSharedPtr<FUmgMcpWidgetCommands> WidgetCommands; // This line was added
 
-	// Server configuration
-	FIPv4Address ServerAddress;
-	uint16 Port;
-
-	// Command handler instances
-	TSharedPtr<FUmgMcpEditorCommands> EditorCommands;
-	TSharedPtr<FUmgMcpBlueprintCommands> BlueprintCommands;
-	TSharedPtr<FUmgMcpAttentionCommands> AttentionCommands; // Attention Commands
+    // Server state variables
+    bool bIsRunning;
+    TSharedPtr<FSocket> ListenerSocket;
+    TSharedPtr<FSocket> ConnectionSocket;
+    FRunnableThread* ServerThread;
+    int32 Port;
+    FIPv4Address ServerAddress;
 };

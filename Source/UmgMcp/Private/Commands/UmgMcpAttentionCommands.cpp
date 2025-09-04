@@ -46,6 +46,31 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         Response->SetStringField(TEXT("status"), TEXT("success"));
         Response->SetArrayField(TEXT("assets"), JsonAssets);
 	}
+	else if (Command == TEXT("get_active_umg_context"))
+	{
+        FString AssetPath = AttentionSubsystem->GetActiveUMGContext();
+        Response->SetStringField(TEXT("status"), TEXT("success"));
+        Response->SetStringField(TEXT("asset_path"), AssetPath);
+	}
+	else if (Command == TEXT("is_umg_editor_active"))
+	{
+        bool bIsActive = AttentionSubsystem->IsUMGEditorActive();
+        Response->SetStringField(TEXT("status"), TEXT("success"));
+        Response->SetBoolField(TEXT("is_active"), bIsActive);
+	}
+    else if (Command == TEXT("set_attention_target"))
+    {
+        if (Params && Params->HasField(TEXT("asset_path")))
+        {
+            FString AssetPath = Params->GetStringField(TEXT("asset_path"));
+            AttentionSubsystem->SetAttentionTarget(AssetPath);
+            Response->SetStringField(TEXT("status"), TEXT("success"));
+        }
+        else
+        {
+            Response->SetStringField(TEXT("message"), TEXT("Missing 'asset_path' parameter for set_attention_target."));
+        }
+    }
 	else
 	{
 		Response->SetStringField(TEXT("message"), TEXT("Unknown attention command"));

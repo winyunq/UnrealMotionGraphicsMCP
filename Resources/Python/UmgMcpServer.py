@@ -141,6 +141,8 @@ def compare_ui_snapshots(snapshot_id_before: str, snapshot_id_after: str) -> Dic
     unreal = get_unreal_connection()
     return unreal.send_command("compare_ui_snapshots", {"snapshot_id_before": snapshot_id_before, "snapshot_id_after": snapshot_id_after})
 
+import UMGAttention
+
 # ==============================================================================
 #  Category: Attention
 #  AI Hint: When the user's request is ambiguous, use these tools first to find their focus.
@@ -152,8 +154,7 @@ def get_active_umg_context() -> Dict[str, Any]:
     "What UMG is the user editing right now?" - Gets the asset path of the UMG Editor the user is currently focused on.
     AI HINT: This is your PRIMARY tool for understanding ambiguous commands like "change this button".
     """
-    unreal = get_unreal_connection()
-    return unreal.send_command("get_active_umg_context")
+    return UMGAttention.get_active_umg_context()
 
 @mcp.tool()
 def get_last_edited_umg_asset() -> Dict[str, Any]:
@@ -161,8 +162,7 @@ def get_last_edited_umg_asset() -> Dict[str, Any]:
     "What was the user just working on?" - Gets the asset path of the last UMG asset that was opened or saved.
     AI HINT: Use this as a fallback if 'get_active_umg_context' returns null (e.g., user switched to their code editor).
     """
-    unreal = get_unreal_connection()
-    return unreal.send_command("get_last_edited_umg_asset")
+    return UMGAttention.get_last_edited_umg_asset()
 
 @mcp.tool()
 def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
@@ -170,8 +170,7 @@ def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
     "What has the user been working on recently?" - Gets a list of recently edited UMG assets.
     AI HINT: Use this to offer suggestions if the context is completely lost.
     """
-    unreal = get_unreal_connection()
-    return unreal.send_command("get_recently_edited_umg_assets", {"max_count": max_count})
+    return UMGAttention.get_recently_edited_umg_assets(max_count)
 
 @mcp.tool()
 def is_umg_editor_active(asset_path: Optional[str] = None) -> Dict[str, Any]:
@@ -179,9 +178,17 @@ def is_umg_editor_active(asset_path: Optional[str] = None) -> Dict[str, Any]:
     "Is the user looking at a UMG editor?" - Checks if a UMG editor is the active window.
     AI HINT: Use this to decide if you need to refresh your data. If false, you might not need to poll for layout changes.
     """
-    unreal = get_unreal_connection()
-    params = {"asset_path": asset_path} if asset_path else {}
-    return unreal.send_command("is_umg_editor_active", params)
+    return UMGAttention.is_umg_editor_active(asset_path)
+
+@mcp.tool()
+def set_attention_target(asset_path: str) -> Dict[str, Any]:
+    """
+    Sets the UMG asset that should be considered the current attention target.
+    This allows programmatically setting the active UMG context.
+    """
+    return UMGAttention.set_attention_target(asset_path)
+
+import UMGGet
 
 # ==============================================================================
 #  Category: Sensing & Insight
@@ -191,21 +198,17 @@ def is_umg_editor_active(asset_path: Optional[str] = None) -> Dict[str, Any]:
 @mcp.tool()
 def get_widget_tree(asset_path: str) -> Dict[str, Any]:
     """Retrieves the full widget hierarchy for a UMG asset as a nested JSON object."""
-    unreal = get_unreal_connection()
-    return unreal.send_command("get_widget_tree", {"asset_path": asset_path})
+    return UMGGet.get_widget_tree(asset_path)
 
 @mcp.tool()
 def query_widget_properties(widget_id: str, properties: List[str]) -> Dict[str, Any]:
     """Queries a list of specific properties from a single widget (e.g., 'Slot.Size')."""
-    unreal = get_unreal_connection()
-    return unreal.send_command("query_widget_properties", {"widget_id": widget_id, "properties": properties})
+    return UMGGet.query_widget_properties(widget_id, properties)
 
 @mcp.tool()
 def get_layout_data(asset_path: str, resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
     """Gets screen-space bounding boxes for all widgets at a given resolution."""
-    unreal = get_unreal_connection()
-    resolution = {"width": resolution_width, "height": resolution_height}
-    return unreal.send_command("get_layout_data", {"asset_path": asset_path, "resolution": resolution})
+    return UMGGet.get_layout_data(asset_path, resolution_width, resolution_height)
 
 @mcp.tool()
 def check_widget_overlap(asset_path: str, widget_ids: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -213,11 +216,14 @@ def check_widget_overlap(asset_path: str, widget_ids: Optional[List[str]] = None
     "Are any widgets overlapping?" - Efficiently checks for layout overlap between widgets.
     AI HINT: PREFER this server-side check over fetching all layout data and calculating it yourself. It's much faster.
     """
-    unreal = get_unreal_connection()
-    params = {"asset_path": asset_path}
-    if widget_ids:
-        params["widget_ids"] = widget_ids
-    return unreal.send_command("check_widget_overlap", params)
+    return UMGGet.check_widget_overlap(asset_path, widget_ids)
+
+@mcp.tool()
+def get_asset_file_system_path(asset_path: str) -> Dict[str, Any]:
+    """
+    Converts an Unreal Engine asset path to an absolute file system path.
+    """
+    return UMGGet.get_asset_file_system_path(asset_path)
 
 # ==============================================================================
 #  Category: Action
