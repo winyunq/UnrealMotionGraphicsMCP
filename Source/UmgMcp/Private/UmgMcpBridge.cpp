@@ -239,7 +239,12 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
             {
                 ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }
-
+            // Attention Commands
+            else if (CommandType == TEXT("get_last_edited_umg_asset") ||
+                     CommandType == TEXT("get_recently_edited_umg_assets"))
+            {
+                ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
+            }
             else
             {
                 ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
