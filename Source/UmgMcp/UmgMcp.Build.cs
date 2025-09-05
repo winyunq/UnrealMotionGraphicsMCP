@@ -19,6 +19,7 @@ public class UmgMcp : ModuleRules
 		PrivateIncludePaths.AddRange(
 			new string[] {
 				// ... add other private include paths required here ...
+				"Editor/UMGEditor/Public"
 			}
 		);
 		
@@ -37,7 +38,6 @@ public class UmgMcp : ModuleRules
 				"DeveloperSettings",
 				"PhysicsCore",
 				"UnrealEd",
-				"UMGEditor",
 				"UMG" // Add this line
 			}
 		);
@@ -53,7 +53,8 @@ public class UmgMcp : ModuleRules
 				"KismetCompiler",
 				"BlueprintGraph",
 				"Projects",
-				"AssetRegistry"
+				"AssetRegistry",
+				"UMGEditor" // Moved from PublicDependencyModuleNames
 			}
 		);
 		

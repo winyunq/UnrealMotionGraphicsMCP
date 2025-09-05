@@ -55,6 +55,7 @@
 #include "Commands/UmgMcpEditorCommands.h"
 #include "Commands/UmgMcpBlueprintCommands.h"
 #include "Commands/UmgMcpCommonUtils.h"
+#include "Commands/UmgMcpFileTransformationCommands.h" // Add this line
 
 
 
@@ -63,7 +64,8 @@ UUmgMcpBridge::UUmgMcpBridge()
     EditorCommands = MakeShared<FUmgMcpEditorCommands>();
     BlueprintCommands = MakeShared<FUmgMcpBlueprintCommands>();
     AttentionCommands = MakeShared<FUmgMcpAttentionCommands>();
-    WidgetCommands = MakeShared<FUmgMcpWidgetCommands>(); // Add this line
+    WidgetCommands = MakeShared<FUmgMcpWidgetCommands>();
+    FileTransformationCommands = MakeShared<FUmgMcpFileTransformationCommands>(); // Add this line
 }
 
 UUmgMcpBridge::~UUmgMcpBridge()
@@ -71,7 +73,8 @@ UUmgMcpBridge::~UUmgMcpBridge()
     EditorCommands.Reset();
     BlueprintCommands.Reset();
     AttentionCommands.Reset();
-    WidgetCommands.Reset(); // Add this line
+    WidgetCommands.Reset();
+    FileTransformationCommands.Reset(); // Add this line
 }
 
 // Initialize subsystem
@@ -254,6 +257,12 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
             else if (CommandType == TEXT("get_widget_tree"))
             {
                 ResultJson = WidgetCommands->HandleCommand(CommandType, Params);
+            }
+            // File Transformation Commands
+            else if (CommandType == TEXT("export_umg_to_json") ||
+                     CommandType == TEXT("apply_json_to_umg"))
+            {
+                ResultJson = FileTransformationCommands->HandleCommand(CommandType, Params);
             }
             else
             {

@@ -13,12 +13,14 @@
 #include "Commands/UmgMcpAttentionCommands.h"
 // Include the new WidgetCommands header
 #include "Commands/UmgMcpWidgetCommands.h" // This line was added/moved
+#include "Commands/UmgMcpFileTransformationCommands.h" // Add this line
 
 #include "UmgMcpBridge.generated.h"
 
 class FMCPServerRunnable;
 class FUmgMcpAttentionCommands;
 class FUmgMcpWidgetCommands; // Forward declaration for Widget Commands
+class FUmgMcpFileTransformationCommands; // Forward declaration for File Transformation Commands
 
 /**
  * Editor subsystem for MCP Bridge
@@ -51,7 +53,8 @@ private:
     TSharedPtr<FUmgMcpEditorCommands> EditorCommands;
     TSharedPtr<FUmgMcpBlueprintCommands> BlueprintCommands;
     TSharedPtr<FUmgMcpAttentionCommands> AttentionCommands;
-    TSharedPtr<FUmgMcpWidgetCommands> WidgetCommands; // This line was added
+    TSharedPtr<FUmgMcpWidgetCommands> WidgetCommands;
+    TSharedPtr<FUmgMcpFileTransformationCommands> FileTransformationCommands; // Add this line
 
     // Server state variables
     bool bIsRunning;

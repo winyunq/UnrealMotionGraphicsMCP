@@ -143,6 +143,9 @@ def compare_ui_snapshots(snapshot_id_before: str, snapshot_id_after: str) -> Dic
 
 import UMGAttention
 
+# Create an instance of the UMGAttention class, passing the client connection
+umg_attention_client = UMGAttention.UMGAttention(get_unreal_connection())
+
 # ==============================================================================
 #  Category: Attention
 #  AI Hint: When the user's request is ambiguous, use these tools first to find their focus.
@@ -154,7 +157,7 @@ def get_active_umg_context() -> Dict[str, Any]:
     "What UMG is the user editing right now?" - Gets the asset path of the UMG Editor the user is currently focused on.
     AI HINT: This is your PRIMARY tool for understanding ambiguous commands like "change this button".
     """
-    return UMGAttention.get_active_umg_context()
+    return umg_attention_client.get_active_umg_context()
 
 @mcp.tool()
 def get_last_edited_umg_asset() -> Dict[str, Any]:
@@ -162,7 +165,7 @@ def get_last_edited_umg_asset() -> Dict[str, Any]:
     "What was the user just working on?" - Gets the asset path of the last UMG asset that was opened or saved.
     AI HINT: Use this as a fallback if 'get_active_umg_context' returns null (e.g., user switched to their code editor).
     """
-    return UMGAttention.get_last_edited_umg_asset()
+    return umg_attention_client.get_last_edited_umg_asset()
 
 @mcp.tool()
 def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
@@ -170,7 +173,7 @@ def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
     "What has the user been working on recently?" - Gets a list of recently edited UMG assets.
     AI HINT: Use this to offer suggestions if the context is completely lost.
     """
-    return UMGAttention.get_recently_edited_umg_assets(max_count)
+    return umg_attention_client.get_recently_edited_umg_assets(max_count)
 
 @mcp.tool()
 def is_umg_editor_active(asset_path: Optional[str] = None) -> Dict[str, Any]:
@@ -178,7 +181,7 @@ def is_umg_editor_active(asset_path: Optional[str] = None) -> Dict[str, Any]:
     "Is the user looking at a UMG editor?" - Checks if a UMG editor is the active window.
     AI HINT: Use this to decide if you need to refresh your data. If false, you might not need to poll for layout changes.
     """
-    return UMGAttention.is_umg_editor_active(asset_path)
+    return umg_attention_client.is_umg_editor_active(asset_path)
 
 @mcp.tool()
 def set_attention_target(asset_path: str) -> Dict[str, Any]:
@@ -186,29 +189,33 @@ def set_attention_target(asset_path: str) -> Dict[str, Any]:
     Sets the UMG asset that should be considered the current attention target.
     This allows programmatically setting the active UMG context.
     """
-    return UMGAttention.set_attention_target(asset_path)
+    return umg_attention_client.set_attention_target(asset_path)
 
 import UMGGet
+import UMGSet
 
 # ==============================================================================
 #  Category: Sensing & Insight
 #  AI Hint: Once you have context, use these tools to understand the details.
 # ==============================================================================
 
+# Create an instance of the UMGGet class, passing the client connection
+umg_get_client = UMGGet.UMGGet(get_unreal_connection())
+
 @mcp.tool()
 def get_widget_tree(asset_path: str) -> Dict[str, Any]:
     """Retrieves the full widget hierarchy for a UMG asset as a nested JSON object."""
-    return UMGGet.get_widget_tree(asset_path)
+    return umg_get_client.get_widget_tree(asset_path)
 
 @mcp.tool()
 def query_widget_properties(widget_id: str, properties: List[str]) -> Dict[str, Any]:
     """Queries a list of specific properties from a single widget (e.g., 'Slot.Size')."""
-    return UMGGet.query_widget_properties(widget_id, properties)
+    return umg_get_client.query_widget_properties(widget_id, properties)
 
 @mcp.tool()
 def get_layout_data(asset_path: str, resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
     """Gets screen-space bounding boxes for all widgets at a given resolution."""
-    return UMGGet.get_layout_data(asset_path, resolution_width, resolution_height)
+    return umg_get_client.get_layout_data(asset_path, resolution_width, resolution_height)
 
 @mcp.tool()
 def check_widget_overlap(asset_path: str, widget_ids: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -216,38 +223,37 @@ def check_widget_overlap(asset_path: str, widget_ids: Optional[List[str]] = None
     "Are any widgets overlapping?" - Efficiently checks for layout overlap between widgets.
     AI HINT: PREFER this server-side check over fetching all layout data and calculating it yourself. It's much faster.
     """
-    return UMGGet.check_widget_overlap(asset_path, widget_ids)
+    return umg_get_client.check_widget_overlap(asset_path, widget_ids)
 
 @mcp.tool()
 def get_asset_file_system_path(asset_path: str) -> Dict[str, Any]:
     """
     Converts an Unreal Engine asset path to an absolute file system path.
     """
-    return UMGGet.get_asset_file_system_path(asset_path)
+    return umg_get_client.get_asset_file_system_path(asset_path)
 
 # ==============================================================================
 #  Category: Action
 #  AI Hint: These are the tools you use to change the world (the UMG asset).
 # ==============================================================================
 
+# Create an instance of the UMGSet class, passing the client connection
+umg_set_client = UMGSet.UMGSet(get_unreal_connection())
+
 @mcp.tool()
 def create_widget(asset_path: str, parent_id: str, widget_type: str, widget_name: str) -> Dict[str, Any]:
     """Creates a new widget and attaches it to a parent."""
-    unreal = get_unreal_connection()
-    params = {"asset_path": asset_path, "parent_id": parent_id, "widget_type": widget_type, "widget_name": widget_name}
-    return unreal.send_command("create_widget", params)
+    return umg_set_client.create_widget(asset_path, parent_id, widget_type, widget_name)
 
 @mcp.tool()
 def set_widget_properties(widget_id: str, properties: Dict[str, Any]) -> Dict[str, Any]:
     """Sets one or more properties on a specific widget. This is your primary modification tool."""
-    unreal = get_unreal_connection()
-    return unreal.send_command("set_widget_properties", {"widget_id": widget_id, "properties": properties})
+    return umg_set_client.set_widget_properties(widget_id, properties)
 
 @mcp.tool()
 def delete_widget(widget_id: str) -> Dict[str, Any]:
     """Deletes a widget from the UMG asset."""
-    unreal = get_unreal_connection()
-    return unreal.send_command("delete_widget", {"widget_id": widget_id})
+    return umg_set_client.delete_widget(widget_id)
 
 @mcp.tool()
 def reparent_widget(widget_id: str, new_parent_id: str) -> Dict[str, Any]:
@@ -255,8 +261,7 @@ def reparent_widget(widget_id: str, new_parent_id: str) -> Dict[str, Any]:
     Moves a widget to be a child of a different parent.
     AI HINT: Use this to restructure the UI, for example, to group items in a VerticalBox for automatic alignment.
     """
-    unreal = get_unreal_connection()
-    return unreal.send_command("reparent_widget", {"widget_id": widget_id, "new_parent_id": new_parent_id})
+    return umg_set_client.reparent_widget(widget_id, new_parent_id)
 
 # ==============================================================================
 #  Category: File Workflow
@@ -270,10 +275,13 @@ def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
     return unreal.send_command("export_umg_to_json", {"asset_path": asset_path})
 
 @mcp.tool()
-def apply_json_to_umg(asset_path: str, json_data: str) -> Dict[str, Any]:
+def apply_json_to_umg(asset_path: str, json_data: Dict[str, Any]) -> Dict[str, Any]:
     """'Compiles' a JSON string into a UMG .uasset file, creating or overwriting it."""
     unreal = get_unreal_connection()
-    return unreal.send_command("apply_json_to_umg", {"asset_path": asset_path, "json_data": json_data})
+    # The MCP framework deserializes the incoming JSON argument into a Python dict.
+    # We need to re-serialize it back into a JSON string before sending it to the Unreal C++ backend.
+    json_string_for_cpp = json.dumps(json_data)
+    return unreal.send_command("apply_json_to_umg", {"asset_path": asset_path, "json_data": json_string_for_cpp})
 
 # ==============================================================================
 
