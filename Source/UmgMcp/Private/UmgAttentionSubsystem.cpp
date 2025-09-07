@@ -101,13 +101,13 @@ FString UUmgAttentionSubsystem::GetLastEditedUMGAsset() const
     if (UmgAssetHistory.Num() > 0)
     {
         FString AssetPath = UmgAssetHistory[0];
-        FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT("")); // Pass empty extension
-        if (!FileSystemPath.IsEmpty()) // Check if conversion was successful
-        {
-            return FileSystemPath;
-        }
-        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for: %s"), *AssetPath);
-        return FString(); // Return empty string on failure
+        // FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT("")); // Pass empty extension
+        // if (!FileSystemPath.IsEmpty()) // Check if conversion was successful
+        // {
+            return AssetPath;
+        // }
+        // UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for: %s"), *AssetPath);
+        // return FString(); // Return empty string on failure
     }
     return FString();
 }
@@ -179,13 +179,13 @@ FString UUmgAttentionSubsystem::GetActiveUMGContext() const
                         if (EditorOwnerTab.IsValid() && EditorOwnerTab == ActiveTab)
                         {
                             FString AssetPath = WidgetBlueprint->GetPathName();
-                            FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT("")); // Pass empty extension
-                            if (!FileSystemPath.IsEmpty()) // Check if conversion was successful
-                            {
-                                return FileSystemPath;
-                            }
-                            UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for active UMG context: %s"), *AssetPath);
-                            return FString(); // Return empty string on failure
+                            // FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT("")); // Pass empty extension
+                            // if (!FileSystemPath.IsEmpty()) // Check if conversion was successful
+                            // {
+                                return AssetPath;
+                            // }
+                            // UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for active UMG context: %s"), *AssetPath);
+                            // return FString(); // Return empty string on failure
                         }
                     }
                 }

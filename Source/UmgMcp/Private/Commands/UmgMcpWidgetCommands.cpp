@@ -33,6 +33,31 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("message"), TEXT("Missing 'asset_path' parameter."));
         }
     }
+    // else if (Command == TEXT("set_widget_properties"))
+    // {
+    //     FString WidgetId;
+    //     const TSharedPtr<FJsonObject>* PropertiesJsonObj;
+    //     if (Params && Params->TryGetStringField(TEXT("widget_id"), WidgetId) && Params->TryGetObjectField(TEXT("properties"), PropertiesJsonObj))
+    //     {
+    //         FString PropertiesJsonString;
+    //         TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&PropertiesJsonString);
+    //         FJsonSerializer::Serialize(PropertiesJsonObj->ToSharedRef(), Writer);
+
+    //         UUmgSetSubsystem* UmgSetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
+    //         if (UmgSetSubsystem && UmgSetSubsystem->SetWidgetProperties(WidgetId, PropertiesJsonString))
+    //         {
+    //             Response->SetStringField(TEXT("status"), TEXT("success"));
+    //         }
+    //         else
+    //         {
+    //             Response->SetStringField(TEXT("message"), TEXT("Failed to set widget properties."));
+    //         }
+    //     }
+    //     else
+    //     {
+    //         Response->SetStringField(TEXT("message"), TEXT("Missing 'widget_id' or 'properties' parameter."));
+    //     }
+    // }
     // ... other commands
     return Response;
 }

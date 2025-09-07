@@ -88,7 +88,6 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
 
 mcp = FastMCP(
     "UmgMcp",
-    description="A dedicated MCP server for AI-driven UMG design in Unreal Engine 5.",
     lifespan=server_lifespan
 )
 

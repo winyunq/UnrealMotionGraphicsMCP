@@ -29,3 +29,9 @@ DerivedDataCache/
 
 # Other
 *.DS_Store
+
+# Python generated files
+__pycache__/
+
+# Configuration files (if not meant to be tracked)
+Config/

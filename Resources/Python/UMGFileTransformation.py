@@ -17,7 +17,7 @@ class UMGFileTransformation:
         Returns:
             A dictionary containing the result of the operation.
         '''
-        return self.client.execute_command('export_umg_to_json', {'asset_path': asset_path})
+        return self.client.send_command('export_umg_to_json', {'asset_path': asset_path})
 
     def apply_json_to_umg(self, asset_path: str, json_data: str) -> dict:
         '''
@@ -30,4 +30,4 @@ class UMGFileTransformation:
         Returns:
             A dictionary containing the result of the operation.
         '''
-        return self.client.execute_command('apply_json_to_umg', {'asset_path': asset_path, 'json_data': json_data})
+        return self.client.send_command('apply_json_to_umg', {'asset_path': asset_path, 'json_data': json_data})
