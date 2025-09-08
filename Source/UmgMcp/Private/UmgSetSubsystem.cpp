@@ -1,12 +1,38 @@
 #include "UmgSetSubsystem.h"
+#include "UmgAttentionSubsystem.h"
+#include "Editor.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
 #include "JsonObjectConverter.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonReader.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
+
+// Helper function to get the cached blueprint from the attention subsystem
+static UWidgetBlueprint* GetCachedWidgetBlueprintForSet(FString& OutError)
+{
+    if (!GEditor)
+    {
+        OutError = TEXT("GEditor is not available.");
+        return nullptr;
+    }
+    UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+    if (!AttentionSubsystem)
+    {
+        OutError = TEXT("UmgAttentionSubsystem is not available.");
+        return nullptr;
+    }
+    UWidgetBlueprint* WidgetBlueprint = AttentionSubsystem->GetCachedTargetWidgetBlueprint();
+    if (!WidgetBlueprint)
+    {
+        OutError = TEXT("No cached target UMG asset found. Please set a target first.");
+        return nullptr;
+    }
+    return WidgetBlueprint;
+}
 
 void UUmgSetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -20,27 +46,26 @@ void UUmgSetSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
-bool UUmgSetSubsystem::SetWidgetProperties(const FString& WidgetId, const FString& PropertiesJson)
+bool UUmgSetSubsystem::SetWidgetProperties(const FString& WidgetName, const FString& PropertiesJson)
 {
-    FString AssetPath;
-    FString WidgetName;
-    if (!WidgetId.Split(TEXT(":"), &AssetPath, &WidgetName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Invalid WidgetId format. Expected AssetPath:WidgetName. Received: %s"), *WidgetId);
+        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: %s"), *ErrorMessage);
         return false;
     }
 
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    if (!WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return false;
     }
 
     UWidget* FoundWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
     if (!FoundWidget)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Failed to find widget '%s' in asset '%s'."), *WidgetName, *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Failed to find widget '%s' in asset '%s'."), *WidgetName, *WidgetBlueprint->GetPathName());
         return false;
     }
 
@@ -65,25 +90,29 @@ bool UUmgSetSubsystem::SetWidgetProperties(const FString& WidgetId, const FStrin
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
-
     return true;
 }
 
-#include "Components/PanelWidget.h"
-
-FString UUmgSetSubsystem::CreateWidget(const FString& AssetPath, const FString& ParentId, const FString& WidgetType, const FString& WidgetName)
+FString UUmgSetSubsystem::CreateWidget(const FString& ParentName, const FString& WidgetType, const FString& WidgetName)
 {
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: %s"), *ErrorMessage);
         return FString();
     }
 
-    UPanelWidget* ParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ParentId)));
+    if (!WidgetBlueprint->WidgetTree)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
+        return FString();
+    }
+
+    UPanelWidget* ParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ParentName)));
     if (!ParentWidget)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find ParentWidget with name '%s' in asset '%s'."), *ParentId, *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find ParentWidget with name '%s' in asset '%s'."), *ParentName, *WidgetBlueprint->GetPathName());
         return FString();
     }
 
@@ -106,31 +135,29 @@ FString UUmgSetSubsystem::CreateWidget(const FString& AssetPath, const FString& 
     ParentWidget->AddChild(NewWidget);
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
-
     return NewWidget->GetPathName();
 }
 
-bool UUmgSetSubsystem::DeleteWidget(const FString& WidgetId)
+bool UUmgSetSubsystem::DeleteWidget(const FString& WidgetName)
 {
-    FString AssetPath;
-    FString WidgetName;
-    if (!WidgetId.Split(TEXT(":"), &AssetPath, &WidgetName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: Invalid WidgetId format. Expected AssetPath:WidgetName. Received: %s"), *WidgetId);
+        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: %s"), *ErrorMessage);
         return false;
     }
 
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    if (!WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return false;
     }
 
     UWidget* FoundWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
     if (!FoundWidget)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: Failed to find widget '%s' in asset '%s'."), *WidgetName, *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: Failed to find widget '%s' in asset '%s'."), *WidgetName, *WidgetBlueprint->GetPathName());
         return false;
     }
 
@@ -145,35 +172,19 @@ bool UUmgSetSubsystem::DeleteWidget(const FString& WidgetId)
     return false;
 }
 
-bool UUmgSetSubsystem::ReparentWidget(const FString& WidgetId, const FString& NewParentId)
+bool UUmgSetSubsystem::ReparentWidget(const FString& WidgetName, const FString& NewParentName)
 {
-    FString AssetPath;
-    FString WidgetName;
-    if (!WidgetId.Split(TEXT(":"), &AssetPath, &WidgetName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Invalid WidgetId format. Received: %s"), *WidgetId);
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: %s"), *ErrorMessage);
         return false;
     }
 
-    FString NewParentAssetPath;
-    FString NewParentName;
-    if (!NewParentId.Split(TEXT(":"), &NewParentAssetPath, &NewParentName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+    if (!WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Invalid NewParentId format. Received: %s"), *NewParentId);
-        return false;
-    }
-
-    // For now, we only support reparenting within the same asset
-    if (AssetPath != NewParentAssetPath)
-    {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Cross-asset reparenting is not supported."));
-        return false;
-    }
-
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
-    {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return false;
     }
 

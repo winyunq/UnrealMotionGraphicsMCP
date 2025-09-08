@@ -16,14 +16,14 @@ public:
     virtual void Deinitialize() override;
 
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
-    bool SetWidgetProperties(const FString& WidgetId, const FString& PropertiesJson);
+    bool SetWidgetProperties(const FString& WidgetName, const FString& PropertiesJson);
 
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
-    FString CreateWidget(const FString& AssetPath, const FString& ParentId, const FString& WidgetType, const FString& WidgetName);
+    FString CreateWidget(const FString& ParentName, const FString& WidgetType, const FString& WidgetName);
 
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
-    bool DeleteWidget(const FString& WidgetId);
+    bool DeleteWidget(const FString& WidgetName);
 
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
-    bool ReparentWidget(const FString& WidgetId, const FString& NewParentId);
+    bool ReparentWidget(const FString& WidgetName, const FString& NewParentName);
 };

@@ -4,20 +4,10 @@
 #include "EditorSubsystem.h"
 #include "UmgAttentionSubsystem.generated.h"
 
-// Desired Logic for UmgAttentionSubsystem (as per user's detailed explanation):
-// 1. Track ALL editor focus changes, not just asset opening.
-// 2. If focus is a UMG asset, add it to a UMG-specific history/queue (UmgAssetHistory).
-// 3. GetActiveUMGContext:
-//    a. If current editor focus IS a UMG asset, return that asset.
-//    b. ELSE (if current editor focus is NOT a UMG asset), return the most recent UMG asset from UmgAssetHistory.
-// 4. Introduce an "Operational Target UMG": A UMG asset explicitly set by the AI (e.g., via SetAttentionTarget).
-//    This target should override the "active UMG" for subsequent operations if set.
-// 5. All UMG operations (GetWidgetTree, QueryWidgetProperties, etc.) should ideally use this "Operational Target UMG"
-//    as their default target if not explicitly provided in the function call.
-// This aims for a more robust and controllable "attention" mechanism.
+class UWidgetBlueprint;
 
 /**
- * An editor subsystem to monitor asset opening events.
+ * An editor subsystem to manage the AI's attention towards UMG assets.
  */
 UCLASS()
 class UMGMCP_API UUmgAttentionSubsystem : public UEditorSubsystem
@@ -43,25 +33,35 @@ public:
 	TArray<FString> GetRecentlyEditedUMGAssets(int32 MaxCount = 5) const;
 
 	/**
-	 * Gets the asset path of the currently active UMG editor.
-	 * @return FString The asset path. Returns empty string if no UMG editor is active.
+	 * Gets the asset path of the current target UMG asset.
+	 * If a target is explicitly set via SetTargetUmgAsset, it returns that target.
+	 * Otherwise, it falls back to returning the last edited UMG asset.
+	 * @return FString The asset path of the target UMG asset.
 	 */
-	FString GetActiveUMGContext() const;
+	FString GetTargetUmgAsset() const;
 
 	/**
-	 * Checks if a UMG editor is currently active.
-	 * @return bool True if a UMG editor is active, false otherwise.
+	 * Explicitly sets the UMG asset to be the target for subsequent operations.
+     * This updates both the path cache for conversation and the object cache for performance.
+	 * @param AssetPath The path of the asset to set as the target.
 	 */
-	bool IsUMGEditorActive() const;
+	void SetTargetUmgAsset(const FString& AssetPath);
 
-public: // Moved from private
-	// Attention Set Functions
-	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
-	void SetAttentionTarget(const FString& AssetPath);
+    /**
+     * Gets the cached UWidgetBlueprint object.
+     * @return A pointer to the UWidgetBlueprint, or nullptr if not valid or not set.
+     */
+    UWidgetBlueprint* GetCachedTargetWidgetBlueprint() const;
 
 private:
 	void HandleAssetOpened(UObject* Asset, class IAssetEditorInstance* EditorInstance);
 
-protected: // UmgAssetHistory is now explicitly protected
+	// The asset path of the UMG widget blueprint that is the current focus of attention (for conversation context).
+	FString AttentionTargetAssetPath;
+
+    // A weak pointer to the actual loaded UMG asset (for performance).
+    TWeakObjectPtr<UWidgetBlueprint> CachedTargetWidgetBlueprint;
+
+protected:
 	TArray<FString> UmgAssetHistory;
 };

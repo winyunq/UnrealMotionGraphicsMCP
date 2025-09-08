@@ -1,57 +1,108 @@
+#include "Commands/UmgMcpWidgetCommands.h"
 #include "UmgGetSubsystem.h"
 #include "UmgSetSubsystem.h"
-#include "Commands/UmgMcpWidgetCommands.h"
-#include "Blueprint/WidgetTree.h"
-#include "Blueprint/UserWidget.h"
-#include "Components/PanelWidget.h"
-#include "WidgetBlueprint.h"
-#include "UObject/UObjectGlobals.h"
+#include "UmgAttentionSubsystem.h"
+#include "Editor.h"
 #include "Serialization/JsonSerializer.h"
+#include "Dom/JsonObject.h"
 
 TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Command, const TSharedPtr<FJsonObject>& Params)
 {
     TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-    Response->SetStringField(TEXT("status"), TEXT("error"));
+    Response->SetStringField(TEXT("status"), TEXT("error")); // Default to error
 
-    if (Command == TEXT("get_widget_tree"))
+    if (!GEditor)
     {
-        FString AssetPath;
-        if (Params && Params->TryGetStringField(TEXT("asset_path"), AssetPath))
+        Response->SetStringField(TEXT("message"), TEXT("GEditor not available."));
+        return Response;
+    }
+
+    // Helper lambda to set attention and get subsystems
+    auto SetAttentionAndGetSubsystems = [&](const FString& PathParameterName, FString& OutWidgetName) -> TPair<UUmgAttentionSubsystem*, UObject*> 
+    {
+        UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+        
+        if (!AttentionSubsystem)
         {
-            UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(StaticLoadObject(UWidgetBlueprint::StaticClass(), nullptr, *AssetPath));
-            if (WidgetBlueprint && WidgetBlueprint->WidgetTree)
+            Response->SetStringField(TEXT("message"), TEXT("Could not find Attention Subsystem."));
+            return {nullptr, nullptr};
+        }
+
+        FString PathValue;
+        if (!Params || !Params->TryGetStringField(PathParameterName, PathValue) || PathValue.IsEmpty())
+        {
+            Response->SetStringField(TEXT("message"), FString::Printf(TEXT("Missing or empty '%s' parameter."), *PathParameterName));
+            return {nullptr, nullptr};
+        }
+
+        FString AssetPath = PathValue;
+        if (PathParameterName == TEXT("widget_id"))
+        {
+            if (!PathValue.Split(TEXT(":"), &AssetPath, &OutWidgetName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
             {
-                TSharedPtr<FJsonObject> RootWidgetJson = BuildWidgetJson(WidgetBlueprint->WidgetTree->RootWidget);
-                Response->SetStringField(TEXT("status"), TEXT("success"));
-                Response->SetObjectField(TEXT("widget_tree"), RootWidgetJson);
+                Response->SetStringField(TEXT("message"), TEXT("Invalid WidgetId format. Expected AssetPath:WidgetName."));
+                return {nullptr, nullptr};
+            }
+        }
+
+        AttentionSubsystem->SetTargetUmgAsset(AssetPath);
+        
+        // Determine which subsystem to return based on the command
+        if (Command.StartsWith(TEXT("get_")) || Command.StartsWith(TEXT("check_")) || Command.StartsWith(TEXT("query_")))
+        {
+            return {AttentionSubsystem, GEditor->GetEditorSubsystem<UUmgGetSubsystem>()};
         }
         else
         {
-            Response->SetStringField(TEXT("message"), TEXT("Failed to load Widget Blueprint or WidgetTree is null."));
+            return {AttentionSubsystem, GEditor->GetEditorSubsystem<UUmgSetSubsystem>()};
+        }
+    };
+
+    if (Command == TEXT("get_widget_tree"))
+    {
+        FString DummyWidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("asset_path"), DummyWidgetName);
+        if (Subsystems.Key && Subsystems.Value)
+        {
+            UUmgGetSubsystem* GetSubsystem = Cast<UUmgGetSubsystem>(Subsystems.Value);
+            FString WidgetTreeJsonString = GetSubsystem->GetWidgetTree();
+            if (!WidgetTreeJsonString.IsEmpty())
+            {
+                TSharedPtr<FJsonObject> WidgetTreeJson = MakeShareable(new FJsonObject());
+                TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(WidgetTreeJsonString);
+                if (FJsonSerializer::Deserialize(Reader, WidgetTreeJson) && WidgetTreeJson.IsValid())
+                {
+                    Response->SetStringField(TEXT("status"), TEXT("success"));
+                    Response->SetObjectField(TEXT("widget_tree"), WidgetTreeJson);
+                }
+                else
+                {
+                    Response->SetStringField(TEXT("message"), TEXT("Failed to parse widget tree JSON from subsystem."));
+                }
+            }
+            else
+            {
+                Response->SetStringField(TEXT("message"), TEXT("GetWidgetTree from subsystem returned empty string. Check logs for details."));
+            }
         }
     }
-    else
-    {
-        Response->SetStringField(TEXT("message"), TEXT("Missing 'asset_path' parameter."));
-    }
-}
     else if (Command == TEXT("query_widget_properties"))
     {
-        FString WidgetId;
-        const TArray<TSharedPtr<FJsonValue>>* PropertiesJsonArray;
-        if (Params && Params->TryGetStringField(TEXT("widget_id"), WidgetId) &&
-            Params->TryGetArrayField(TEXT("properties"), PropertiesJsonArray))
+        FString WidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("widget_id"), WidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
-            TArray<FString> PropertiesToQuery;
-            for (const TSharedPtr<FJsonValue>& JsonValue : *PropertiesJsonArray)
+            UUmgGetSubsystem* GetSubsystem = Cast<UUmgGetSubsystem>(Subsystems.Value);
+            const TArray<TSharedPtr<FJsonValue>>* PropertiesJsonArray;
+            if (Params->TryGetArrayField(TEXT("properties"), PropertiesJsonArray))
             {
-                PropertiesToQuery.Add(JsonValue->AsString());
-            }
+                TArray<FString> PropertiesToQuery;
+                for (const TSharedPtr<FJsonValue>& JsonValue : *PropertiesJsonArray)
+                {
+                    PropertiesToQuery.Add(JsonValue->AsString());
+                }
 
-            UUmgGetSubsystem* UmgGetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
-            if (UmgGetSubsystem)
-            {
-                FString QueriedPropertiesString = UmgGetSubsystem->QueryWidgetProperties(WidgetId, PropertiesToQuery);
+                FString QueriedPropertiesString = GetSubsystem->QueryWidgetProperties(WidgetName, PropertiesToQuery);
                 TSharedPtr<FJsonObject> QueriedProperties;
                 TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(QueriedPropertiesString);
                 if (FJsonSerializer::Deserialize(Reader, QueriedProperties) && QueriedProperties.IsValid())
@@ -66,22 +117,19 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             }
             else
             {
-                Response->SetStringField(TEXT("message"), TEXT("UmgGetSubsystem not found."));
+                Response->SetStringField(TEXT("message"), TEXT("Missing 'properties' parameter."));
             }
-        }
-        else
-        {
-            Response->SetStringField(TEXT("message"), TEXT("Missing widget_id or properties parameter."));
         }
     }
     else if (Command == TEXT("get_layout_data"))
     {
-        FString AssetPath;
-        int32 ResolutionWidth = 1920;
-        int32 ResolutionHeight = 1080;
-
-        if (Params && Params->TryGetStringField(TEXT("asset_path"), AssetPath))
+        FString DummyWidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("asset_path"), DummyWidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
+            UUmgGetSubsystem* GetSubsystem = Cast<UUmgGetSubsystem>(Subsystems.Value);
+            int32 ResolutionWidth = 1920;
+            int32 ResolutionHeight = 1080;
             if (Params->HasField(TEXT("resolution")))
             {
                 const TSharedPtr<FJsonObject>* ResolutionObject;
@@ -92,40 +140,29 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 }
             }
 
-            UUmgGetSubsystem* UmgGetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
-            if (UmgGetSubsystem)
+            FString LayoutDataString = GetSubsystem->GetLayoutData(ResolutionWidth, ResolutionHeight);
+            TArray<TSharedPtr<FJsonValue>> LayoutDataArray;
+            TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(LayoutDataString);
+            if (FJsonSerializer::Deserialize(Reader, LayoutDataArray))
             {
-                FString LayoutDataString = UmgGetSubsystem->GetLayoutData(AssetPath, ResolutionWidth, ResolutionHeight);
-                TSharedPtr<FJsonObject> LayoutData;
-                TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(LayoutDataString);
-                if (FJsonSerializer::Deserialize(Reader, LayoutData) && LayoutData.IsValid())
-                {
-                    Response->SetStringField(TEXT("status"), TEXT("success"));
-                    Response->SetObjectField(TEXT("layout_data"), LayoutData.ToSharedRef());
-                }
-                else
-                {
-                    Response->SetStringField(TEXT("message"), TEXT("Failed to get layout data."));
-                }
+                Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetArrayField(TEXT("layout_data"), LayoutDataArray);
             }
             else
             {
-                Response->SetStringField(TEXT("message"), TEXT("UmgGetSubsystem not found."));
+                Response->SetStringField(TEXT("message"), TEXT("Failed to get layout data."));
             }
-        }
-        else
-        {
-            Response->SetStringField(TEXT("message"), TEXT("Missing asset_path parameter."));
         }
     }
     else if (Command == TEXT("check_widget_overlap"))
     {
-        FString AssetPath;
-        const TArray<TSharedPtr<FJsonValue>>* WidgetIdsJsonArray = nullptr; // Optional
-        TArray<FString> WidgetIds;
-
-        if (Params && Params->TryGetStringField(TEXT("asset_path"), AssetPath))
+        FString DummyWidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("asset_path"), DummyWidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
+            UUmgGetSubsystem* GetSubsystem = Cast<UUmgGetSubsystem>(Subsystems.Value);
+            const TArray<TSharedPtr<FJsonValue>>* WidgetIdsJsonArray = nullptr;
+            TArray<FString> WidgetIds;
             if (Params->TryGetArrayField(TEXT("widget_ids"), WidgetIdsJsonArray))
             {
                 for (const TSharedPtr<FJsonValue>& JsonValue : *WidgetIdsJsonArray)
@@ -134,35 +171,28 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 }
             }
 
-            UUmgGetSubsystem* UmgGetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
-            if (UmgGetSubsystem)
-            {
-                bool bOverlapExists = UmgGetSubsystem->CheckWidgetOverlap(AssetPath, WidgetIds);
-                Response->SetStringField(TEXT("status"), TEXT("success"));
-                Response->SetBoolField(TEXT("overlap_exists"), bOverlapExists);
-            }
-            else
-            {
-                Response->SetStringField(TEXT("message"), TEXT("UmgGetSubsystem not found."));
-            }
-        }
-        else
-        {
-            Response->SetStringField(TEXT("message"), TEXT("Missing asset_path parameter."));
+            bool bOverlapExists = GetSubsystem->CheckWidgetOverlap(WidgetIds);
+            Response->SetStringField(TEXT("status"), TEXT("success"));
+            Response->SetBoolField(TEXT("overlap_exists"), bOverlapExists);
         }
     }
     else if (Command == TEXT("create_widget"))
+    {
+        FString DummyWidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("asset_path"), DummyWidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
-            FString AssetPath, ParentId, WidgetType, WidgetName;
-            if (Params && Params->TryGetStringField(TEXT("asset_path"), AssetPath) &&
-                Params->TryGetStringField(TEXT("parent_id"), ParentId) &&
+            UUmgSetSubsystem* SetSubsystem = Cast<UUmgSetSubsystem>(Subsystems.Value);
+            FString ParentId, WidgetType, WidgetName;
+            if (Params->TryGetStringField(TEXT("parent_id"), ParentId) &&
                 Params->TryGetStringField(TEXT("widget_type"), WidgetType) &&
                 Params->TryGetStringField(TEXT("widget_name"), WidgetName))
             {
-                UUmgSetSubsystem* UmgSetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-                if (UmgSetSubsystem && !UmgSetSubsystem->CreateWidget(AssetPath, ParentId, WidgetType, WidgetName).IsEmpty())
+                FString NewWidgetId = SetSubsystem->CreateWidget(ParentId, WidgetType, WidgetName);
+                if (!NewWidgetId.IsEmpty())
                 {
                     Response->SetStringField(TEXT("status"), TEXT("success"));
+                    Response->SetStringField(TEXT("new_widget_id"), NewWidgetId);
                 }
                 else
                 {
@@ -174,43 +204,40 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 Response->SetStringField(TEXT("message"), TEXT("Missing parameters for create_widget."));
             }
         }
+    }
     else if (Command == TEXT("set_widget_properties"))
     {
-        FString WidgetId;
-        FString PropertiesJsonString;
-        bool bHasWidgetId = false;
-        bool bHasPropertiesJson = false;
-
-        if (Params)
+        FString WidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("widget_id"), WidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
-            bHasWidgetId = Params->TryGetStringField(TEXT("widget_id"), WidgetId);
-            bHasPropertiesJson = Params->TryGetStringField(TEXT("properties_json"), PropertiesJsonString);
-        }
-
-        if (bHasWidgetId && bHasPropertiesJson)
-        {
-            UUmgSetSubsystem* UmgSetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-            if (UmgSetSubsystem && UmgSetSubsystem->SetWidgetProperties(WidgetId, PropertiesJsonString))
+            UUmgSetSubsystem* SetSubsystem = Cast<UUmgSetSubsystem>(Subsystems.Value);
+            FString PropertiesJsonString;
+            if (Params->TryGetStringField(TEXT("properties_json"), PropertiesJsonString))
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
+                if (SetSubsystem->SetWidgetProperties(WidgetName, PropertiesJsonString))
+                {
+                    Response->SetStringField(TEXT("status"), TEXT("success"));
+                }
+                else
+                {
+                    Response->SetStringField(TEXT("message"), TEXT("Failed to set widget properties."));
+                }
             }
             else
             {
-                Response->SetStringField(TEXT("message"), TEXT("Failed to set widget properties."));
+                Response->SetStringField(TEXT("message"), TEXT("Missing properties_json parameter."));
             }
-        }
-        else
-        {
-            Response->SetStringField(TEXT("message"), TEXT("Missing widget_id or properties_json parameter."));
         }
     }
     else if (Command == TEXT("delete_widget"))
     {
-        FString WidgetId;
-        if (Params && Params->TryGetStringField(TEXT("widget_id"), WidgetId))
+        FString WidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("widget_id"), WidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
-            UUmgSetSubsystem* UmgSetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-            if (UmgSetSubsystem && UmgSetSubsystem->DeleteWidget(WidgetId))
+            UUmgSetSubsystem* SetSubsystem = Cast<UUmgSetSubsystem>(Subsystems.Value);
+            if (SetSubsystem->DeleteWidget(WidgetName))
             {
                 Response->SetStringField(TEXT("status"), TEXT("success"));
             }
@@ -219,58 +246,38 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 Response->SetStringField(TEXT("message"), TEXT("Failed to delete widget."));
             }
         }
-        else
-        {
-            Response->SetStringField(TEXT("message"), TEXT("Missing widget_id parameter."));
-        }
     }
     else if (Command == TEXT("reparent_widget"))
     {
-        FString WidgetId, NewParentId;
-        if (Params && Params->TryGetStringField(TEXT("widget_id"), WidgetId) &&
-            Params->TryGetStringField(TEXT("new_parent_id"), NewParentId))
+        FString WidgetName;
+        auto Subsystems = SetAttentionAndGetSubsystems(TEXT("widget_id"), WidgetName);
+        if (Subsystems.Key && Subsystems.Value)
         {
-            UUmgSetSubsystem* UmgSetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-            if (UmgSetSubsystem && UmgSetSubsystem->ReparentWidget(WidgetId, NewParentId))
+            UUmgSetSubsystem* SetSubsystem = Cast<UUmgSetSubsystem>(Subsystems.Value);
+            FString NewParentId, NewParentName;
+            if (Params->TryGetStringField(TEXT("new_parent_id"), NewParentId))
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
+                // We assume the new parent is in the same asset, so we only need its name.
+                if (!NewParentId.Split(TEXT(":"), nullptr, &NewParentName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+                {
+                    NewParentName = NewParentId; // Assume it's just the name if split fails
+                }
+
+                if (SetSubsystem->ReparentWidget(WidgetName, NewParentName))
+                {
+                    Response->SetStringField(TEXT("status"), TEXT("success"));
+                }
+                else
+                {
+                    Response->SetStringField(TEXT("message"), TEXT("Failed to reparent widget."));
+                }
             }
             else
             {
-                Response->SetStringField(TEXT("message"), TEXT("Failed to reparent widget."));
+                Response->SetStringField(TEXT("message"), TEXT("Missing new_parent_id parameter."));
             }
         }
-        else
-        {
-            Response->SetStringField(TEXT("message"), TEXT("Missing widget_id or new_parent_id parameter."));
-        }
     }
+
     return Response;
-}
-
-TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::BuildWidgetJson(UWidget* CurrentWidget)
-{
-    TSharedPtr<FJsonObject> WidgetJson = MakeShareable(new FJsonObject);
-
-    if (!CurrentWidget)
-    {
-        return WidgetJson; // Return empty object for null widget
-    }
-
-    WidgetJson->SetStringField(TEXT("WidgetId"), CurrentWidget->GetPathName()); // Using PathName for unique ID
-    WidgetJson->SetStringField(TEXT("WidgetName"), CurrentWidget->GetName());
-    WidgetJson->SetStringField(TEXT("WidgetType"), CurrentWidget->GetClass()->GetName());
-
-    TArray<TSharedPtr<FJsonValue>> ChildrenArray;
-    UPanelWidget* PanelWidget = Cast<UPanelWidget>(CurrentWidget);
-    if (PanelWidget)
-    {
-        for (UWidget* ChildWidget : PanelWidget->GetAllChildren()) // Use GetAllChildren()
-        {
-            ChildrenArray.Add(MakeShareable(new FJsonValueObject(BuildWidgetJson(ChildWidget))));
-        }
-    }
-    WidgetJson->SetArrayField(TEXT("Children"), ChildrenArray);
-
-    return WidgetJson;
 }

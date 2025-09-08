@@ -1,6 +1,8 @@
 #include "UmgGetSubsystem.h"
+#include "UmgAttentionSubsystem.h"
+#include "Editor.h"
 
-// --- Necessary Includes for GetWidgetTree ---
+// --- Necessary Includes ---
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
@@ -11,11 +13,37 @@
 #include "Dom/JsonValue.h"
 #include "UObject/UnrealType.h"
 #include "Misc/PackageName.h"
+#include "Widgets/SWidget.h"
+#include "Layout/Geometry.h"
 // --- End Includes ---
 
 DEFINE_LOG_CATEGORY(LogUmgGet);
 
-// --- Helper function for GetWidgetTree ---
+// Helper function to get the cached blueprint from the attention subsystem
+static UWidgetBlueprint* GetCachedWidgetBlueprint(FString& OutError)
+{
+    if (!GEditor)
+    {
+        OutError = TEXT("GEditor is not available.");
+        return nullptr;
+    }
+    UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+    if (!AttentionSubsystem)
+    {
+        OutError = TEXT("UmgAttentionSubsystem is not available.");
+        return nullptr;
+    }
+    UWidgetBlueprint* WidgetBlueprint = AttentionSubsystem->GetCachedTargetWidgetBlueprint();
+    if (!WidgetBlueprint)
+    {
+        OutError = TEXT("No cached target UMG asset found. Please set a target first.");
+        return nullptr;
+    }
+    return WidgetBlueprint;
+}
+
+
+// --- Helper function for recursive JSON export ---
 static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
 {
     if (!Widget)
@@ -28,7 +56,6 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
 
     WidgetJson->SetStringField(TEXT("widget_name"), Widget->GetName());
     WidgetJson->SetStringField(TEXT("widget_class"), Widget->GetClass()->GetPathName());
-    // Add a unique ID for easy reference by other tools
     WidgetJson->SetStringField(TEXT("widget_id"), Widget->GetPathName());
 
     TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
@@ -36,7 +63,6 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
     for (TFieldIterator<FProperty> PropIt(Widget->GetClass()); PropIt; ++PropIt)
     {
         FProperty* Property = *PropIt;
-
         bool bIsEditorOnly = false;
 #if WITH_EDITOR
         bIsEditorOnly = Property->HasAnyPropertyFlags(CPF_EditorOnly);
@@ -59,18 +85,10 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
                         for (TFieldIterator<FProperty> SlotPropIt(SlotObject->GetClass()); SlotPropIt; ++SlotPropIt)
                         {
                             FProperty* SlotProperty = *SlotPropIt;
-                            FName SlotPropertyName = SlotProperty->GetFName();
-
-                            if (SlotPropertyName == TEXT("Content") || SlotPropertyName == TEXT("Parent"))
-                            {
-                                continue;
-                            }
-
-                            if (SlotProperty->HasAnyPropertyFlags(CPF_Edit) && !SlotProperty->HasAnyPropertyFlags(CPF_Transient))
+                            if ((SlotProperty->GetFName() != TEXT("Content")) && (SlotProperty->GetFName() != TEXT("Parent")) && SlotProperty->HasAnyPropertyFlags(CPF_Edit) && !SlotProperty->HasAnyPropertyFlags(CPF_Transient))
                             {
                                 void* SlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(SlotObject);
                                 void* DefaultSlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(DefaultSlotObject);
-
                                 if (!SlotProperty->Identical(SlotValuePtr, DefaultSlotValuePtr))
                                 {
                                     TSharedPtr<FJsonValue> SlotPropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(SlotProperty, SlotValuePtr);
@@ -81,7 +99,6 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
                                 }
                             }
                         }
-                        
                         if(SlotPropertiesJson->Values.Num() > 0)
                         {
                            PropertiesJson->SetObjectField(TEXT("Slot"), SlotPropertiesJson);
@@ -144,42 +161,38 @@ void UUmgGetSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-FString UUmgGetSubsystem::GetWidgetTree(const FString& AssetPath)
+FString UUmgGetSubsystem::GetWidgetTree()
 {
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to load UWidgetBlueprint from path '%s'."), *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: %s"), *ErrorMessage);
         return FString();
     }
     
     if (!WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: WidgetTree is null in UWidgetBlueprint '%s'."), *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: WidgetTree is null in UWidgetBlueprint '%s'."), *WidgetBlueprint->GetPathName());
         return FString();
     }
 
     UWidget* RootWidget = WidgetBlueprint->WidgetTree->RootWidget;
-
     if (!RootWidget)
     {
-        UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'."), *AssetPath);
-        // Return an empty JSON object for a valid but empty UI
+        UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'."), *WidgetBlueprint->GetPathName());
         return TEXT("{}");
     }
 
     TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToJson(RootWidget);
-
     if (!RootJsonObject.IsValid())
     {
-        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to convert root widget of '%s' to FJsonObject."), *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to convert root widget of '%s' to FJsonObject."), *WidgetBlueprint->GetPathName());
         return FString();
     }
 
     FString JsonString;
     TSharedRef<TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&JsonString);
-    
     if (FJsonSerializer::Serialize(RootJsonObject.ToSharedRef(), JsonWriter))
     {
         JsonWriter->Close();
@@ -187,31 +200,30 @@ FString UUmgGetSubsystem::GetWidgetTree(const FString& AssetPath)
     }
     
     JsonWriter->Close();
-    UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to serialize FJsonObject to string for asset '%s'."), *AssetPath);
+    UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to serialize FJsonObject to string for asset '%s'."), *WidgetBlueprint->GetPathName());
     return FString();
 }
 
-FString UUmgGetSubsystem::QueryWidgetProperties(const FString& WidgetId, const TArray<FString>& Properties)
+FString UUmgGetSubsystem::QueryWidgetProperties(const FString& WidgetName, const TArray<FString>& Properties)
 {
-    FString AssetPath;
-    FString WidgetName;
-    if (!WidgetId.Split(TEXT(":"), &AssetPath, &WidgetName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: Invalid WidgetId format. Expected AssetPath:WidgetName. Received: %s"), *WidgetId);
+        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: %s"), *ErrorMessage);
         return FString();
     }
 
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    if (!WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return FString();
     }
 
     UWidget* FoundWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
     if (!FoundWidget)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: Failed to find widget '%s' in asset '%s'."), *WidgetName, *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: Failed to find widget '%s' in asset '%s'."), *WidgetName, *WidgetBlueprint->GetPathName());
         return FString();
     }
 
@@ -236,15 +248,19 @@ FString UUmgGetSubsystem::QueryWidgetProperties(const FString& WidgetId, const T
     return JsonString;
 }
 
-#include "Widgets/SWidget.h"
-#include "Layout/Geometry.h"
-
-FString UUmgGetSubsystem::GetLayoutData(const FString& AssetPath, int32 ResolutionWidth, int32 ResolutionHeight)
+FString UUmgGetSubsystem::GetLayoutData(int32 ResolutionWidth, int32 ResolutionHeight)
 {
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("GetLayoutData: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("GetLayoutData: %s"), *ErrorMessage);
+        return FString();
+    }
+
+    if (!WidgetBlueprint->WidgetTree)
+    {
+        UE_LOG(LogUmgGet, Error, TEXT("GetLayoutData: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return FString();
     }
 
@@ -277,12 +293,19 @@ FString UUmgGetSubsystem::GetLayoutData(const FString& AssetPath, int32 Resoluti
     return JsonString;
 }
 
-bool UUmgGetSubsystem::CheckWidgetOverlap(const FString& AssetPath, const TArray<FString>& WidgetIds)
+bool UUmgGetSubsystem::CheckWidgetOverlap(const TArray<FString>& WidgetIds)
 {
-    UWidgetBlueprint* WidgetBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    FString ErrorMessage;
+    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
+    if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("CheckWidgetOverlap: Failed to load WidgetBlueprint or its WidgetTree for AssetPath: %s"), *AssetPath);
+        UE_LOG(LogUmgGet, Error, TEXT("CheckWidgetOverlap: %s"), *ErrorMessage);
+        return false;
+    }
+
+    if (!WidgetBlueprint->WidgetTree)
+    {
+        UE_LOG(LogUmgGet, Error, TEXT("CheckWidgetOverlap: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return false;
     }
 
@@ -304,7 +327,7 @@ bool UUmgGetSubsystem::CheckWidgetOverlap(const FString& AssetPath, const TArray
         {
             if (FSlateRect::DoRectanglesIntersect(BoundingBoxes[i], BoundingBoxes[j]))
             {
-                UE_LOG(LogUmgGet, Warning, TEXT("CheckWidgetOverlap: Overlap detected in %s."), *AssetPath);
+                UE_LOG(LogUmgGet, Warning, TEXT("CheckWidgetOverlap: Overlap detected in %s."), *WidgetBlueprint->GetPathName());
                 return true; // Found an overlap
             }
         }
@@ -322,7 +345,6 @@ FString UUmgGetSubsystem::GetAssetFileSystemPath(const FString& AssetPath)
     }
 
     FString FileSystemPath;
-    // Use a more robust method that handles various asset path formats
     if (FPackageName::TryConvertLongPackageNameToFilename(AssetPath, FileSystemPath, FPackageName::GetAssetPackageExtension()))
     {
         UE_LOG(LogUmgGet, Log, TEXT("Converted AssetPath '%s' to FileSystemPath '%s'"), *AssetPath, *FileSystemPath);

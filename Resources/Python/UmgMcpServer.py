@@ -151,18 +151,18 @@ umg_attention_client = UMGAttention.UMGAttention(get_unreal_connection())
 # ==============================================================================
 
 @mcp.tool()
-def get_active_umg_context() -> Dict[str, Any]:
+def get_target_umg_asset() -> Dict[str, Any]:
     """
     "What UMG is the user editing right now?" - Gets the asset path of the UMG Editor the user is currently focused on.
     AI HINT: This is your PRIMARY tool for understanding ambiguous commands like "change this button".
     """
-    return umg_attention_client.get_active_umg_context()
+    return umg_attention_client.get_target_umg_asset()
 
 @mcp.tool()
 def get_last_edited_umg_asset() -> Dict[str, Any]:
     """
     "What was the user just working on?" - Gets the asset path of the last UMG asset that was opened or saved.
-    AI HINT: Use this as a fallback if 'get_active_umg_context' returns null (e.g., user switched to their code editor).
+    AI HINT: Use this as a fallback if 'get_target_umg_asset' returns null (e.g., user switched to their code editor).
     """
     return umg_attention_client.get_last_edited_umg_asset()
 
@@ -175,20 +175,12 @@ def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
     return umg_attention_client.get_recently_edited_umg_assets(max_count)
 
 @mcp.tool()
-def is_umg_editor_active(asset_path: Optional[str] = None) -> Dict[str, Any]:
-    """
-    "Is the user looking at a UMG editor?" - Checks if a UMG editor is the active window.
-    AI HINT: Use this to decide if you need to refresh your data. If false, you might not need to poll for layout changes.
-    """
-    return umg_attention_client.is_umg_editor_active(asset_path)
-
-@mcp.tool()
-def set_attention_target(asset_path: str) -> Dict[str, Any]:
+def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
     """
     Sets the UMG asset that should be considered the current attention target.
     This allows programmatically setting the active UMG context.
     """
-    return umg_attention_client.set_attention_target(asset_path)
+    return umg_attention_client.set_target_umg_asset(asset_path)
 
 import UMGGet
 import UMGSet

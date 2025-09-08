@@ -3,9 +3,6 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "WidgetBlueprint.h"
 #include "Logging/LogMacros.h"
-#include "WidgetBlueprintEditor.h" // For FWidgetBlueprintEditor
-#include "Framework/Docking/TabManager.h" // For FGlobalTabmanager
-#include "Misc/PackageName.h" // Add this line
 
 // Define a log category for easy debugging.
 DEFINE_LOG_CATEGORY_STATIC(LogUmgAttention, Log, All);
@@ -13,6 +10,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogUmgAttention, Log, All);
 void UUmgAttentionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+    CachedTargetWidgetBlueprint = nullptr;
 
 	// Register the delegate to be called when an asset is opened.
 	if (GEditor)
@@ -24,8 +22,7 @@ void UUmgAttentionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		}
 	}
 
-	// Use a Warning level to make sure this log is visible.
-	UE_LOG(LogUmgAttention, Warning, TEXT("UmgAttentionSubsystem Initialized and is monitoring assets."));
+	UE_LOG(LogUmgAttention, Log, TEXT("UmgAttentionSubsystem Initialized."));
 }
 
 void UUmgAttentionSubsystem::Deinitialize()
@@ -52,62 +49,122 @@ void UUmgAttentionSubsystem::HandleAssetOpened(UObject* Asset, class IAssetEdito
 		return;
 	}
 
-	UE_LOG(LogUmgAttention, Log, TEXT("Asset Opened: %s"), *Asset->GetPathName());
-
-	if (UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(Asset))
+	if (UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(Asset))
 	{
-		FString AssetPath = Asset->GetPathName();
-		UE_LOG(LogUmgAttention, Log, TEXT("UMG Asset Detected: %s"), *AssetPath);
+		FString AssetPath = WidgetBP->GetPathName();
+		UE_LOG(LogUmgAttention, Log, TEXT("UMG Asset Opened: %s"), *AssetPath);
 
-		// Remove if it exists to avoid duplicates and then add to the front.
+		// Update history
 		UmgAssetHistory.Remove(AssetPath);
 		UmgAssetHistory.Insert(AssetPath, 0);
 
-		// Log the current history.
-		UE_LOG(LogUmgAttention, Log, TEXT("--- UmgAttention History ---"));
-		for (int32 i = 0; i < UmgAssetHistory.Num(); ++i)
-		{
-			UE_LOG(LogUmgAttention, Log, TEXT("[%d] %s"), i, *UmgAssetHistory[i]);
-		}
-		UE_LOG(LogUmgAttention, Log, TEXT("---------------------------"));
+        // If the opened asset is our current target, update the cached object pointer for free.
+        if (AssetPath == AttentionTargetAssetPath)
+        {
+            UE_LOG(LogUmgAttention, Log, TEXT("Opened asset matches current attention target. Updating cached object."));
+            CachedTargetWidgetBlueprint = WidgetBP;
+        }
 	}
 }
 
-void UUmgAttentionSubsystem::SetAttentionTarget(const FString& AssetPath)
+void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
 {
     if (AssetPath.IsEmpty())
     {
-        UE_LOG(LogUmgAttention, Warning, TEXT("SetAttentionTarget called with empty AssetPath. Ignoring."));
+        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset called with empty AssetPath. Clearing target."));
+        AttentionTargetAssetPath.Empty();
+        CachedTargetWidgetBlueprint = nullptr;
         return;
     }
 
-    UE_LOG(LogUmgAttention, Log, TEXT("SetAttentionTarget called for Asset: %s"), *AssetPath);
+    UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *AssetPath);
+    AttentionTargetAssetPath = AssetPath;
 
-    // Remove if it exists to avoid duplicates and then add to the front.
+    // Also treat setting a target as an 'edit' action to update the history
     UmgAssetHistory.Remove(AssetPath);
     UmgAssetHistory.Insert(AssetPath, 0);
 
-    // Log the current history.
-    UE_LOG(LogUmgAttention, Log, TEXT("--- UmgAttention History (after SetAttentionTarget) ---"));
-    for (int32 i = 0; i < UmgAssetHistory.Num(); ++i)
+    // Now, load the object and cache it.
+    UWidgetBlueprint* LoadedBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+    if (LoadedBP)
     {
-        UE_LOG(LogUmgAttention, Log, TEXT("[%d] %s"), i, *UmgAssetHistory[i]);
+        UE_LOG(LogUmgAttention, Log, TEXT("Successfully loaded and cached UMG asset object."));
+        CachedTargetWidgetBlueprint = LoadedBP;
     }
-    UE_LOG(LogUmgAttention, Log, TEXT("----------------------------------------------------"));
+    else
+    {
+        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load UMG asset object from path: %s"), *AssetPath);
+        CachedTargetWidgetBlueprint = nullptr;
+    }
 }
+
+FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
+{
+    // Non-const mutable copy for potential lazy-loading
+    UUmgAttentionSubsystem* MutableThis = const_cast<UUmgAttentionSubsystem*>(this);
+
+    // If we have an explicit target path, but our cached object is invalid, try to reload it.
+    if (!AttentionTargetAssetPath.IsEmpty() && !CachedTargetWidgetBlueprint.IsValid())
+    {
+        UE_LOG(LogUmgAttention, Log, TEXT("Cached target object is invalid. Attempting to reload from path: %s"), *AttentionTargetAssetPath);
+        UWidgetBlueprint* ReloadedBP = LoadObject<UWidgetBlueprint>(nullptr, *AttentionTargetAssetPath);
+        if (ReloadedBP)
+        {
+            UE_LOG(LogUmgAttention, Log, TEXT("Successfully reloaded and re-cached UMG asset object."));
+            MutableThis->CachedTargetWidgetBlueprint = ReloadedBP;
+        }
+        else
+        {
+             UE_LOG(LogUmgAttention, Warning, TEXT("Failed to reload UMG asset object."));
+        }
+    }
+
+    if (!AttentionTargetAssetPath.IsEmpty())
+    {
+        return AttentionTargetAssetPath;
+    }
+    
+    return GetLastEditedUMGAsset();
+}
+
+UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
+{
+    // Before returning, call GetTargetUmgAsset() to ensure lazy-load/reload logic is triggered.
+    GetTargetUmgAsset(); 
+    
+    if (CachedTargetWidgetBlueprint.IsValid())
+    {
+        return CachedTargetWidgetBlueprint.Get();
+    }
+
+    // If there's no explicit target, maybe the last edited one is what we want.
+    if (AttentionTargetAssetPath.IsEmpty())
+    {
+        FString LastEditedPath = GetLastEditedUMGAsset();
+        if (!LastEditedPath.IsEmpty())
+        {
+            // Non-const mutable copy for lazy-loading
+            UUmgAttentionSubsystem* MutableThis = const_cast<UUmgAttentionSubsystem*>(this);
+            UWidgetBlueprint* LoadedBP = LoadObject<UWidgetBlueprint>(nullptr, *LastEditedPath);
+            if (LoadedBP)
+            {
+                UE_LOG(LogUmgAttention, Log, TEXT("No explicit target. Lazy loading last edited asset: %s"), *LastEditedPath);
+                MutableThis->CachedTargetWidgetBlueprint = LoadedBP;
+                return LoadedBP;
+            }
+        }
+    }
+
+    UE_LOG(LogUmgAttention, Warning, TEXT("Returning nullptr because cached target is not valid and could not be loaded."));
+    return nullptr;
+}
+
 
 FString UUmgAttentionSubsystem::GetLastEditedUMGAsset() const
 {
     if (UmgAssetHistory.Num() > 0)
     {
-        FString AssetPath = UmgAssetHistory[0];
-        // FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT("")); // Pass empty extension
-        // if (!FileSystemPath.IsEmpty()) // Check if conversion was successful
-        // {
-            return AssetPath;
-        // }
-        // UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for: %s"), *AssetPath);
-        // return FString(); // Return empty string on failure
+        return UmgAssetHistory[0];
     }
     return FString();
 }
@@ -118,85 +175,8 @@ TArray<FString> UUmgAttentionSubsystem::GetRecentlyEditedUMGAssets(int32 MaxCoun
     int32 Count = FMath::Min(UmgAssetHistory.Num(), MaxCount);
     for (int32 i = 0; i < Count; ++i)
     {
-        FString AssetPath = UmgAssetHistory[i];
-        FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT(".uasset")); // Pass .uasset extension
-        if (!FileSystemPath.IsEmpty())
-        {
-            Result.Add(FileSystemPath);
-        }
-        else
-        {
-            UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for recently edited asset: %s"), *AssetPath);
-        }
+        // Return the direct asset path, consistent with GetLastEditedUMGAsset
+        Result.Add(UmgAssetHistory[i]);
     }
     return Result;
-}
-
-FString UUmgAttentionSubsystem::GetActiveUMGContext() const
-{
-    if (!GEditor)
-    {
-        return FString();
-    }
-
-    UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
-    if (!AssetEditorSubsystem)
-    {
-        return FString();
-    }
-
-    // Get all currently open assets
-    TArray<UObject*> EditedAssets = AssetEditorSubsystem->GetAllEditedAssets();
-
-    // Get the currently active tab in the editor
-    TSharedPtr<SDockTab> ActiveTab = FGlobalTabmanager::Get()->GetActiveTab();
-
-    if (!ActiveTab.IsValid())
-    {
-        return FString();
-    }
-
-    for (UObject* EditedAsset : EditedAssets)
-    {
-        if (EditedAsset)
-        {
-            // Check if the edited asset is a Widget Blueprint
-            UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(EditedAsset);
-            if (WidgetBlueprint)
-            {
-                // Find the editor instance for this Widget Blueprint
-                IAssetEditorInstance* EditorInstance = AssetEditorSubsystem->FindEditorForAsset(WidgetBlueprint, false);
-                if (EditorInstance)
-                {
-                    // Get the TabManager associated with this editor instance
-                    TSharedPtr<FTabManager> EditorTabManager = EditorInstance->GetAssociatedTabManager();
-                    if (EditorTabManager.IsValid())
-                    {
-                        // Get the owner tab of this editor's TabManager
-                        TSharedPtr<SDockTab> EditorOwnerTab = EditorTabManager->GetOwnerTab();
-                        
-                        // Check if this editor's owner tab is the currently active tab
-                        if (EditorOwnerTab.IsValid() && EditorOwnerTab == ActiveTab)
-                        {
-                            FString AssetPath = WidgetBlueprint->GetPathName();
-                            // FString FileSystemPath = FPackageName::LongPackageNameToFilename(AssetPath, TEXT("")); // Pass empty extension
-                            // if (!FileSystemPath.IsEmpty()) // Check if conversion was successful
-                            // {
-                                return AssetPath;
-                            // }
-                            // UE_LOG(LogUmgAttention, Warning, TEXT("Failed to convert asset path to file system path for active UMG context: %s"), *AssetPath);
-                            // return FString(); // Return empty string on failure
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return GetLastEditedUMGAsset();
-}
-
-bool UUmgAttentionSubsystem::IsUMGEditorActive() const
-{
-    return !GetActiveUMGContext().IsEmpty();
 }

@@ -247,14 +247,20 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
             // Attention Commands
             else if (CommandType == TEXT("get_last_edited_umg_asset") ||
                      CommandType == TEXT("get_recently_edited_umg_assets") ||
-                     CommandType == TEXT("get_active_umg_context") ||
-                     CommandType == TEXT("is_umg_editor_active") ||
-                     CommandType == TEXT("set_attention_target"))
+                     CommandType == TEXT("get_target_umg_asset") ||
+                     CommandType == TEXT("set_target_umg_asset"))
             {
                 ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
             }
             // Widget Commands
-            else if (CommandType == TEXT("get_widget_tree"))
+            else if (CommandType == TEXT("get_widget_tree") ||
+                     CommandType == TEXT("query_widget_properties") ||
+                     CommandType == TEXT("get_layout_data") ||
+                     CommandType == TEXT("check_widget_overlap") ||
+                     CommandType == TEXT("create_widget") ||
+                     CommandType == TEXT("set_widget_properties") ||
+                     CommandType == TEXT("delete_widget") ||
+                     CommandType == TEXT("reparent_widget"))
             {
                 ResultJson = WidgetCommands->HandleCommand(CommandType, Params);
             }
