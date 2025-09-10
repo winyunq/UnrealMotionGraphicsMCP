@@ -113,7 +113,8 @@ The workflow revolves around two core operations, orchestrated by a central mana
 
 ### AI Authorship & Disclaimer
 
-This project has been developed with significant assistance from **Gemini, an AI**. As such:\n*   **Experimental Nature**: This is an experimental project. Its reliability is not guaranteed.\n*   **Commercial Use**: Commercial use is not recommended without thorough independent validation and understanding of its limitations.
+This project has been developed with significant assistance from **Gemini, an AI**. As such:\n*   **Experimental Nature**: This is an experimental project. Its reliability is not guaranteed.
+*   **Commercial Use**: Commercial use is not recommended without thorough independent validation and understanding of its limitations.
 *   **Disclaimer**: Use at your own risk. The developers and AI are not responsible for any consequences arising from its use.
 
 ---
@@ -159,4 +160,27 @@ flowchart TD
     E -- Returns JSON --> C
     F -- Returns JSON --> C
     C -- Sends JSON Response --> B
+```
+```
+
+## API Status
+
+| Category | API Name | Status |
+|---|---|:---:|
+| **Context & Attention** | `get_target_umg_asset` | ✅ |
+| | `set_target_umg_asset` | ✅ |
+| | `get_last_edited_umg_asset` | ✅ |
+| | `get_recently_edited_umg_assets` | ✅ |
+| **Sensing & Querying** | `get_widget_tree` | ✅ |
+| | `query_widget_properties` | ✅ |
+| | `get_creatable_widget_types` | ❌ |
+| | `get_widget_schema` | ❌ |
+| | `get_layout_data` | ❌ |
+| | `check_widget_overlap` | ❌ |
+| **Actions & Modifications** | `create_widget` | ❌ |
+| | `delete_widget` | ❌ |
+| | `set_widget_properties` | ❌ |
+| | `reparent_widget` | ❌ |
+| **File Transformation** | `export_umg_to_json` | ✅ |
+| | `apply_json_to_umg` | ✅ |
 ```

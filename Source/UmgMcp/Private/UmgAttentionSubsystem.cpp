@@ -77,23 +77,26 @@ void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         return;
     }
 
-    UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *AssetPath);
-    AttentionTargetAssetPath = AssetPath;
-
-    // Also treat setting a target as an 'edit' action to update the history
-    UmgAssetHistory.Remove(AssetPath);
-    UmgAssetHistory.Insert(AssetPath, 0);
-
-    // Now, load the object and cache it.
+    // Attempt to load the object from the provided path.
     UWidgetBlueprint* LoadedBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+
     if (LoadedBP)
     {
-        UE_LOG(LogUmgAttention, Log, TEXT("Successfully loaded and cached UMG asset object."));
+        // SUCCESS: The path is valid and the object was loaded.
+        UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *AssetPath);
+        AttentionTargetAssetPath = AssetPath;
         CachedTargetWidgetBlueprint = LoadedBP;
+
+        // Also treat setting a target as an 'edit' action to update the history, ensuring consistency.
+        UmgAssetHistory.Remove(AssetPath);
+        UmgAssetHistory.Insert(AssetPath, 0);
+        UE_LOG(LogUmgAttention, Log, TEXT("Successfully loaded and cached UMG asset object."));
     }
     else
     {
-        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load UMG asset object from path: %s"), *AssetPath);
+        // FAILURE: The path was invalid. Clear any existing target to prevent errors.
+        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load UMG asset from path: %s. Clearing attention target."), *AssetPath);
+        AttentionTargetAssetPath.Empty();
         CachedTargetWidgetBlueprint = nullptr;
     }
 }

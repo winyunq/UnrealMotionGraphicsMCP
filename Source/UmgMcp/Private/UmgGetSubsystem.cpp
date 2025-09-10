@@ -19,30 +19,6 @@
 
 DEFINE_LOG_CATEGORY(LogUmgGet);
 
-// Helper function to get the cached blueprint from the attention subsystem
-static UWidgetBlueprint* GetCachedWidgetBlueprint(FString& OutError)
-{
-    if (!GEditor)
-    {
-        OutError = TEXT("GEditor is not available.");
-        return nullptr;
-    }
-    UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
-    if (!AttentionSubsystem)
-    {
-        OutError = TEXT("UmgAttentionSubsystem is not available.");
-        return nullptr;
-    }
-    UWidgetBlueprint* WidgetBlueprint = AttentionSubsystem->GetCachedTargetWidgetBlueprint();
-    if (!WidgetBlueprint)
-    {
-        OutError = TEXT("No cached target UMG asset found. Please set a target first.");
-        return nullptr;
-    }
-    return WidgetBlueprint;
-}
-
-
 // --- Helper function for recursive JSON export ---
 static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
 {
@@ -56,7 +32,6 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
 
     WidgetJson->SetStringField(TEXT("widget_name"), Widget->GetName());
     WidgetJson->SetStringField(TEXT("widget_class"), Widget->GetClass()->GetPathName());
-    WidgetJson->SetStringField(TEXT("widget_id"), Widget->GetPathName());
 
     TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
     
@@ -161,13 +136,11 @@ void UUmgGetSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-FString UUmgGetSubsystem::GetWidgetTree()
+FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: %s"), *ErrorMessage);
+        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Received a null WidgetBlueprint."));
         return FString();
     }
     
@@ -180,8 +153,9 @@ FString UUmgGetSubsystem::GetWidgetTree()
     UWidget* RootWidget = WidgetBlueprint->WidgetTree->RootWidget;
     if (!RootWidget)
     {
-        UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'."), *WidgetBlueprint->GetPathName());
-        return TEXT("{}");
+        UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'. The UMG asset might be empty."), *WidgetBlueprint->GetPathName());
+        // Return an empty JSON object for an empty tree
+        return TEXT("{\"widget_name\": \"EmptyWidgetTree\", \"widget_class\": \"/Script/UMG.UserWidget\", \"children\": []}");
     }
 
     TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToJson(RootWidget);
@@ -204,13 +178,11 @@ FString UUmgGetSubsystem::GetWidgetTree()
     return FString();
 }
 
-FString UUmgGetSubsystem::QueryWidgetProperties(const FString& WidgetName, const TArray<FString>& Properties)
+FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const TArray<FString>& Properties)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: %s"), *ErrorMessage);
+        UE_LOG(LogUmgGet, Error, TEXT("QueryWidgetProperties: Received a null WidgetBlueprint."));
         return FString();
     }
 
@@ -248,13 +220,11 @@ FString UUmgGetSubsystem::QueryWidgetProperties(const FString& WidgetName, const
     return JsonString;
 }
 
-FString UUmgGetSubsystem::GetLayoutData(int32 ResolutionWidth, int32 ResolutionHeight)
+FString UUmgGetSubsystem::GetLayoutData(UWidgetBlueprint* WidgetBlueprint, int32 ResolutionWidth, int32 ResolutionHeight)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("GetLayoutData: %s"), *ErrorMessage);
+        UE_LOG(LogUmgGet, Error, TEXT("GetLayoutData: Received a null WidgetBlueprint."));
         return FString();
     }
 
@@ -293,13 +263,11 @@ FString UUmgGetSubsystem::GetLayoutData(int32 ResolutionWidth, int32 ResolutionH
     return JsonString;
 }
 
-bool UUmgGetSubsystem::CheckWidgetOverlap(const TArray<FString>& WidgetIds)
+bool UUmgGetSubsystem::CheckWidgetOverlap(UWidgetBlueprint* WidgetBlueprint, const TArray<FString>& WidgetIds)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprint(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgGet, Error, TEXT("CheckWidgetOverlap: %s"), *ErrorMessage);
+        UE_LOG(LogUmgGet, Error, TEXT("CheckWidgetOverlap: Received a null WidgetBlueprint."));
         return false;
     }
 

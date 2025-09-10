@@ -8,31 +8,9 @@
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonReader.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "Kismet2/KismetEditorUtilities.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
-
-// Helper function to get the cached blueprint from the attention subsystem
-static UWidgetBlueprint* GetCachedWidgetBlueprintForSet(FString& OutError)
-{
-    if (!GEditor)
-    {
-        OutError = TEXT("GEditor is not available.");
-        return nullptr;
-    }
-    UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
-    if (!AttentionSubsystem)
-    {
-        OutError = TEXT("UmgAttentionSubsystem is not available.");
-        return nullptr;
-    }
-    UWidgetBlueprint* WidgetBlueprint = AttentionSubsystem->GetCachedTargetWidgetBlueprint();
-    if (!WidgetBlueprint)
-    {
-        OutError = TEXT("No cached target UMG asset found. Please set a target first.");
-        return nullptr;
-    }
-    return WidgetBlueprint;
-}
 
 void UUmgSetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -46,13 +24,11 @@ void UUmgSetSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
-bool UUmgSetSubsystem::SetWidgetProperties(const FString& WidgetName, const FString& PropertiesJson)
+bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& PropertiesJson)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: %s"), *ErrorMessage);
+        UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Received a null WidgetBlueprint."));
         return false;
     }
 
@@ -85,6 +61,11 @@ bool UUmgSetSubsystem::SetWidgetProperties(const FString& WidgetName, const FStr
         FProperty* Property = FindFProperty<FProperty>(FoundWidget->GetClass(), FName(*Pair.Key));
         if (Property)
         {
+            if (Pair.Value.IsValid() && Pair.Value->IsNull())
+            {
+                UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: Received a null JSON value for property '%s' on widget '%s'. Skipping to prevent potential crash."), *Pair.Key, *WidgetName);
+                continue;
+            }
             FJsonObjectConverter::JsonValueToUProperty(Pair.Value, Property, FoundWidget, 0, 0);
         }
     }
@@ -93,13 +74,11 @@ bool UUmgSetSubsystem::SetWidgetProperties(const FString& WidgetName, const FStr
     return true;
 }
 
-FString UUmgSetSubsystem::CreateWidget(const FString& ParentName, const FString& WidgetType, const FString& WidgetName)
+FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const FString& ParentName, const FString& WidgetType, const FString& WidgetName)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: %s"), *ErrorMessage);
+        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Received a null WidgetBlueprint."));
         return FString();
     }
 
@@ -116,35 +95,38 @@ FString UUmgSetSubsystem::CreateWidget(const FString& ParentName, const FString&
         return FString();
     }
 
-    UClass* WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
+    UClass* WidgetClass = FindObject<UClass>(ANY_PACKAGE, *WidgetType);
+    if(!WidgetClass)
+    {
+        WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
+    }
+    
     if (!WidgetClass)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find widget class '%s'."), *WidgetType);
+        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find or load widget class '%s'."), *WidgetType);
         return FString();
     }
 
     WidgetBlueprint->Modify();
 
-    UWidget* NewWidget = NewObject<UWidget>(WidgetBlueprint->WidgetTree, WidgetClass, FName(*WidgetName));
+    UWidget* NewWidget = WidgetBlueprint->WidgetTree->ConstructWidget<UWidget>(WidgetClass, FName(*WidgetName));
     if (!NewWidget)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to create widget of class '%s'."), *WidgetType);
+        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to construct widget of class '%s'."), *WidgetType);
         return FString();
     }
 
     ParentWidget->AddChild(NewWidget);
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
-    return NewWidget->GetPathName();
+    return NewWidget->GetName();
 }
 
-bool UUmgSetSubsystem::DeleteWidget(const FString& WidgetName)
+bool UUmgSetSubsystem::DeleteWidget(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: %s"), *ErrorMessage);
+        UE_LOG(LogUmgSet, Error, TEXT("DeleteWidget: Received a null WidgetBlueprint."));
         return false;
     }
 
@@ -172,13 +154,11 @@ bool UUmgSetSubsystem::DeleteWidget(const FString& WidgetName)
     return false;
 }
 
-bool UUmgSetSubsystem::ReparentWidget(const FString& WidgetName, const FString& NewParentName)
+bool UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& NewParentName)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* WidgetBlueprint = GetCachedWidgetBlueprintForSet(ErrorMessage);
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: %s"), *ErrorMessage);
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Received a null WidgetBlueprint."));
         return false;
     }
 
@@ -204,12 +184,12 @@ bool UUmgSetSubsystem::ReparentWidget(const FString& WidgetName, const FString& 
 
     WidgetBlueprint->Modify();
 
-    if (WidgetBlueprint->WidgetTree->RemoveWidget(WidgetToMove))
+    if (WidgetToMove->GetParent())
     {
-        NewParentWidget->AddChild(WidgetToMove);
-        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
-        return true;
+        WidgetToMove->GetParent()->RemoveChild(WidgetToMove);
     }
 
-    return false;
+    NewParentWidget->AddChild(WidgetToMove);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
+    return true;
 }

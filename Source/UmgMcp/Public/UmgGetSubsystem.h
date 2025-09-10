@@ -22,16 +22,16 @@ public:
 
 	// MCP Get Functions
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
-	FString GetWidgetTree();
+	FString GetWidgetTree(class UWidgetBlueprint* WidgetBlueprint);
 
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
-	FString QueryWidgetProperties(const FString& WidgetName, const TArray<FString>& Properties);
+	FString QueryWidgetProperties(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const TArray<FString>& Properties);
 
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
-	FString GetLayoutData(int32 ResolutionWidth = 1920, int32 ResolutionHeight = 1080);
+	FString GetLayoutData(class UWidgetBlueprint* WidgetBlueprint, int32 ResolutionWidth = 1920, int32 ResolutionHeight = 1080);
 
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
-	bool CheckWidgetOverlap(const TArray<FString>& WidgetIds);
+	bool CheckWidgetOverlap(class UWidgetBlueprint* WidgetBlueprint, const TArray<FString>& WidgetIds);
 
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
 	FString GetAssetFileSystemPath(const FString& AssetPath);

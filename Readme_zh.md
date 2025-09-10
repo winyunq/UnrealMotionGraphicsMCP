@@ -140,3 +140,25 @@ flowchart TD
     F -- Returns JSON --> C
     C -- Sends JSON Response --> B
 ```
+
+## API 实现状态
+
+| 分类 | API 名称 | 状态 | 描述 |
+|---|---|:---:|---|
+| **上下文与注意力** | `get_target_umg_asset` | ✅ | 获取当前操作的UMG资产。 |
+| | `set_target_umg_asset` | ✅ | 设置全局操作的UMG资产目标。 |
+| | `get_last_edited_umg_asset` | ✅ | 获取最后编辑的UMG资产。 |
+| | `get_recently_edited_umg_assets` | ✅ | 获取最近编辑过的UMG资产列表。 |
+| **感知与查询** | `get_widget_tree` | ✅ | 获取资产的完整控件树结构。 |
+| | `query_widget_properties` | ✅ | 查询特定控件的一个或多个属性值。 |
+| | `get_creatable_widget_types` | ❌ | 获取所有可以被创建的控件类型列表。 |
+| | `get_widget_schema` | ❌ | 获取指定控件类型的属性结构信息。 |
+| | `get_layout_data` | ❌ | 获取所有控件在给定分辨率下的屏幕布局数据。 |
+| | `check_widget_overlap` | ❌ | 检查UI布局中是否有控件发生重叠。 |
+| **操作与修改** | `create_widget` | ❌ | 创建一个新的控件并附加到父控件。 |
+| | `delete_widget` | ❌ | 根据名称删除一个控件。 |
+| | `set_widget_properties` | ❌ | 设置一个或多个控件属性。 |
+| | `reparent_widget` | ❌ | 将一个控件移动到新的父控件下。 |
+| **文件转换** | `export_umg_to_json` | ✅ | 将UMG资产导出为JSON字符串。 |
+| | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。
+```

@@ -1,6 +1,4 @@
-README_advanced.md
 pyproject.toml
-unreal_mcp_server_advanced.py
 unreal_engine_mcp.egg-info/PKG-INFO
 unreal_engine_mcp.egg-info/SOURCES.txt
 unreal_engine_mcp.egg-info/dependency_links.txt

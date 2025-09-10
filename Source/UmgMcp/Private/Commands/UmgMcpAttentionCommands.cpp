@@ -10,24 +10,31 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
 	TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetStringField(TEXT("status"), TEXT("error")); // Default to error
 
-    // Get UmgAttentionSubsystem
-    UUmgAttentionSubsystem* AttentionSubsystem = nullptr;
-    if (GEditor)
-    {
-        AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
-    }
-
+    UUmgAttentionSubsystem* AttentionSubsystem = GEditor ? GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>() : nullptr;
     if (!AttentionSubsystem)
     {
         Response->SetStringField(TEXT("message"), TEXT("UmgAttentionSubsystem not available."));
         return Response;
     }
 
-	if (Command == TEXT("get_last_edited_umg_asset"))
+	// Create a data object for successful responses
+	TSharedPtr<FJsonObject> Data = MakeShareable(new FJsonObject);
+
+	if (Command == TEXT("get_target_umg_asset"))
+	{
+		// Per user's direction, this is now a simple, stable query.
+		// The subsystem itself handles the logic of returning a locked target OR falling back to the last-opened asset.
+        FString AssetPath = AttentionSubsystem->GetTargetUmgAsset();
+        Data->SetStringField(TEXT("asset_path"), AssetPath);
+        Response->SetStringField(TEXT("status"), TEXT("success"));
+		Response->SetObjectField(TEXT("data"), Data);
+	}
+	else if (Command == TEXT("get_last_edited_umg_asset"))
 	{
         FString AssetPath = AttentionSubsystem->GetLastEditedUMGAsset();
+        Data->SetStringField(TEXT("asset_path"), AssetPath);
         Response->SetStringField(TEXT("status"), TEXT("success"));
-        Response->SetStringField(TEXT("asset_path"), AssetPath);
+		Response->SetObjectField(TEXT("data"), Data);
 	}
 	else if (Command == TEXT("get_recently_edited_umg_assets"))
 	{
@@ -43,14 +50,9 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         {
             JsonAssets.Add(MakeShareable(new FJsonValueString(Asset)));
         }
+        Data->SetArrayField(TEXT("assets"), JsonAssets);
         Response->SetStringField(TEXT("status"), TEXT("success"));
-        Response->SetArrayField(TEXT("assets"), JsonAssets);
-	}
-	else if (Command == TEXT("get_target_umg_asset"))
-	{
-        FString AssetPath = AttentionSubsystem->GetTargetUmgAsset();
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        Response->SetStringField(TEXT("asset_path"), AssetPath);
+		Response->SetObjectField(TEXT("data"), Data);
 	}
     else if (Command == TEXT("set_target_umg_asset"))
     {
