@@ -106,12 +106,13 @@ print(default_api.get_last_edited_umg_asset())
 
 ```mermaid
 flowchart TD
-    subgraph Client [External Client (Gemini CLI)]
+    subgraph Client [External Client Gemini CLI]
         A[User Input/Tool Call] --> B{JSON Command}
     end
 
-    subgraph Editor [Unreal Engine Editor]\n        subgraph Plugin [UE5_UMG_MCP Plugin]
-            C[TCP Server (UUmgMcpBridge)]
+    subgraph Editor [Unreal Engine Editor]
+            subgraph Plugin [UE5_UMG_MCP Plugin]
+            C[TCP Server UUmgMcpBridge]
             D{Command Dispatcher}
             E[C++ Command Handlers]
             F[Python Scripting Layer]

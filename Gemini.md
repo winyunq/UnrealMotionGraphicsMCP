@@ -24,6 +24,16 @@
 *   `Resources/Python/UMGGet.py`: “感知”功能的Python客户端模块。
 *   `Resources/Python/UMGSet.py`: “行动”功能的Python客户端模块。
 
+## 当前状态与进展 (V3.1 - 崩溃修复与文档更新)
+
+1.  **修复 `set_widget_properties` 崩溃问题:**
+    *   **问题诊断:** 定位到 `set_widget_properties` 在处理传入的JSON数据时发生崩溃。
+    *   **修复 (命令层):** 修正了 `UmgMcpWidgetCommands.cpp` 中的逻辑错误，使其能正确解析名为 `properties` 的JSON对象，而非错误地查找 `properties_json` 字符串。
+    *   **修复 (健壮性):** 在 `UmgSetSubsystem.cpp` 中增加了对JSON `null` 值的检查，防止 `FJsonObjectConverter::JsonValueToUProperty` 在接收到 `null` 时引发崩溃，提高了代码的健壮性。
+
+2.  **更新项目文档:**
+    *   **API状态表:** 在 `Readme.md` 和 `Readme_zh.md` 中添加了详细的Markdown表格，清晰地记录了每个API的实现状态 (✅/❌)，方便用户和协作者快速了解项目现状。
+
 ## 当前状态与进展 (V3.0 - 核心逻辑重构与清理)
 
 1.  **核心逻辑重构 (C++):** 彻底重构了 `WidgetCommands` 和相关子系统 (`Get`/`Set`) 的工作方式。创建了新的目标解析逻辑，实现了“**优先使用命令参数，失败则回退到全局目标**”的健壮工作流。修复了资生路径中包含 `.uasset` 后缀的加载问题。

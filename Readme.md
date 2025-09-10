@@ -127,12 +127,13 @@ The system now primarily relies on the `UE5_UMG_MCP` plugin for communication be
 
 ```mermaid
 flowchart TD
-    subgraph Client [External Client (Gemini CLI)]
+    subgraph Client [External Client Gemini CLI]
         A[User Input/Tool Call] --> B{JSON Command}
     end
 
-    subgraph Editor [Unreal Engine Editor]\n        subgraph Plugin [UE5_UMG_MCP Plugin]
-            C[TCP Server (UUmgMcpBridge)]
+    subgraph Editor [Unreal Engine Editor]
+            subgraph Plugin [UE5_UMG_MCP Plugin]
+            C[TCP Server UUmgMcpBridge]
             D{Command Dispatcher}
             E[C++ Command Handlers]
             F[Python Scripting Layer]
@@ -161,7 +162,7 @@ flowchart TD
     F -- Returns JSON --> C
     C -- Sends JSON Response --> B
 ```
-```
+
 
 ## API Status
 
@@ -183,4 +184,3 @@ flowchart TD
 | | `reparent_widget` | ❌ |
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |
-```
