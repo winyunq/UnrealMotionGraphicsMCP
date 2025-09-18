@@ -152,7 +152,7 @@ flowchart TD
 | | `get_recently_edited_umg_assets` | ✅ | 获取最近编辑过的UMG资产列表。 |
 | **感知与查询** | `get_widget_tree` | ✅ | 获取资产的完整控件树结构。 |
 | | `query_widget_properties` | ✅ | 查询特定控件的一个或多个属性值。 |
-| | `get_creatable_widget_types` | ❌ | 获取所有可以被创建的控件类型列表。 |
+| | `get_creatable_widget_types` | ❓ | 获取所有可以被创建的控件类型列表。 |
 | | `get_widget_schema` | ❌ | 获取指定控件类型的属性结构信息。 |
 | | `get_layout_data` | ❌ | 获取所有控件在给定分辨率下的屏幕布局数据。 |
 | | `check_widget_overlap` | ❌ | 检查UI布局中是否有控件发生重叠。 |
@@ -162,4 +162,5 @@ flowchart TD
 | | `reparent_widget` | ❌ | 将一个控件移动到新的父控件下。 |
 | **文件转换** | `export_umg_to_json` | ✅ | 将UMG资产导出为JSON字符串。 |
 | | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。
-```
+
+##  `apply_json_to_umg` 是可以工作的，因此如果需要AI编辑你的UMG，最好的办法是给个模板，然后让AI执行 `export_umg_to_json` 知道如何表示UMG资产，然后让他运行 `apply_json_to_umg`

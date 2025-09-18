@@ -289,9 +289,17 @@ def get_creatable_widget_types() -> Dict[str, Any]:
     "What's in my toolbox?" - Returns a list of all widget class names that can be created with the 'create_widget' tool.
     AI HINT: Use this to know the full range of widgets you can spawn in the UMG editor.
     """
-    conn = get_unreal_connection()
-    umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.get_creatable_widget_types()
+    # Per user instruction, return a philosophical guide instead of a fixed list.
+    # This encourages the AI to experiment based on its own knowledge.
+    return {
+        "status": "success",
+        "result": {
+            "status": "info",
+            "data": {
+                "message": "Theoretically, any UMG widget class can be created. In practice, it depends on the AI's knowledge of valid class names and requires trial and error. Start with common types like 'Button', 'TextBlock', 'Image', 'CanvasPanel', 'VerticalBox'."
+            }
+        }
+    }
 
 # =============================================================================
 #  Category: Attention & Context

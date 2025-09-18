@@ -174,7 +174,7 @@ flowchart TD
 | | `get_recently_edited_umg_assets` | ✅ |
 | **Sensing & Querying** | `get_widget_tree` | ✅ |
 | | `query_widget_properties` | ✅ |
-| | `get_creatable_widget_types` | ❌ |
+| | `get_creatable_widget_types` | ❓ |
 | | `get_widget_schema` | ❌ |
 | | `get_layout_data` | ❌ |
 | | `check_widget_overlap` | ❌ |
@@ -184,3 +184,5 @@ flowchart TD
 | | `reparent_widget` | ❌ |
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |
+
+##  `apply_json_to_umg` is able to use.This is mean that you need guild AI do that: learing from `export_umg_to_json` ,using to `apply_json_to_umg`
