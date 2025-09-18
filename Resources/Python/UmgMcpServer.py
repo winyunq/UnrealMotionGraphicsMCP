@@ -511,6 +511,18 @@ This document lists all available tools for interacting with the UMG MCP server.
 
 *   `get_target_umg_asset()`
     *   **作用**: 查询当前设定的全局工作目标是什么。
+
+## 4. 文件转换 (File Transformation)
+
+*   `export_umg_to_json(asset_path: str)`
+    *   **作用**: 将 UMG `.uasset` 文件“反编译”为 JSON 字符串。需要显式提供资产路径。
+
+*   `apply_json_to_umg(asset_path: str, json_data: Dict[str, Any])`
+    *   **作用**: 将 JSON 字符串“编译”回 UMG `.uasset` 文件。需要显式提供资产路径。
+
+## Pro-Tip for AI Assistants
+
+You can work as a powerful assistant by observing user changes. Use `export_umg_to_json` to 'see' what the user has done. Then, you can help them by using `apply_json_to_umg` to apply normalized data, such as cleaning up variable names, refining text, or fine-tuning transform values (X, Y, Z). This offloads tedious work from the user.
 """
 
 if __name__ == "__main__":

@@ -185,4 +185,4 @@ flowchart TD
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |
 
-##  `apply_json_to_umg` is able to use.This is mean that you need guild AI do that: learing from `export_umg_to_json` ,using to `apply_json_to_umg`
+##  `apply_json_to_umg` is able to use.This is mean that you need guide AI do that: learing from `export_umg_to_json` ,using to `apply_json_to_umg`
