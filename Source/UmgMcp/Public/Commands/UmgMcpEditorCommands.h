@@ -4,8 +4,12 @@
 #include "Json.h"
 
 /**
- * Handler class for Editor-related MCP commands
- * Handles viewport control, actor manipulation, and level management
+ * @brief Handler for MCP commands related to general editor and level manipulation.
+ *
+ * This class processes commands for interacting with the main editor environment,
+ * such as spawning/deleting actors in the level, finding actors, and modifying their
+ * transforms. These functions provide a way for an external client to interact with
+ * the level scene, separate from UMG or Blueprint asset editing.
  */
 class UMGMCP_API FUmgMcpEditorCommands
 {

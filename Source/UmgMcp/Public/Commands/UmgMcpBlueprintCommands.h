@@ -4,7 +4,11 @@
 #include "Json.h"
 
 /**
- * Handler class for Blueprint-related MCP commands
+ * @brief Handler class for generic Blueprint-related MCP commands.
+ *
+ * This class processes commands that are not specific to UMG but involve general
+ * Blueprint asset manipulation, such as creating Blueprints, adding components,
+ * or compiling them. These are considered utility functions within the broader MCP framework.
  */
 class FUmgMcpBlueprintCommands
 {

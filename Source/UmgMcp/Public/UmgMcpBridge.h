@@ -23,10 +23,13 @@ class FUmgMcpWidgetCommands; // Forward declaration for Widget Commands
 class FUmgMcpFileTransformationCommands; // Forward declaration for File Transformation Commands
 
 /**
- * Editor subsystem for MCP Bridge
- * Handles communication between external tools and the Unreal Editor
- * through a TCP socket connection. Commands are received as JSON and
- * routed to appropriate command handlers.
+ * @brief The central communication hub for the UMG MCP plugin.
+ *
+ * This editor subsystem is responsible for creating and managing a TCP server that listens for
+ * commands from external clients (like an AI agent). It deserializes incoming JSON requests,
+ * interprets the command type, and dispatches the command to the appropriate handler
+ * (e.g., FUmgMcpWidgetCommands, FUmgMcpAttentionCommands). It acts as the primary bridge
+ * between the network layer and the plugin's internal logic.
  */
 UCLASS()
 class UMGMCP_API UUmgMcpBridge : public UEditorSubsystem

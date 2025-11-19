@@ -8,7 +8,13 @@
 class UUmgMcpBridge;
 
 /**
- * Runnable class for the MCP server thread
+ * @brief Implements the FRunnable for the dedicated TCP server thread.
+ *
+ * This class encapsulates the logic for the TCP server's main loop, which runs on a
+ * separate thread to avoid blocking the Unreal Editor's main thread. Its primary
+ * responsibility in the `Run()` method is to accept incoming client connections and
+ * handle message reception. When a full message (JSON command) is received, it passes
+ * the command string to the UUmgMcpBridge for execution.
  */
 class FMCPServerRunnable : public FRunnable
 {

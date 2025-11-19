@@ -6,6 +6,15 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogUmgSet, Log, All);
 
+/**
+ * @brief Provides "action" capabilities for the AI to modify UMG assets.
+ *
+ * This subsystem acts as the "hands" of the AI agent. It contains functions for making
+ * destructive or creative changes to a UMG asset. Responsibilities include creating new
+ * widgets (CreateWidget), deleting existing ones (DeleteWidget), and modifying their
+ * properties (SetWidgetProperties). These functions are the primary means by which the AI
+ * manipulates and builds UI layouts.
+ */
 UCLASS()
 class UMGMCP_API UUmgSetSubsystem : public UEditorSubsystem
 {

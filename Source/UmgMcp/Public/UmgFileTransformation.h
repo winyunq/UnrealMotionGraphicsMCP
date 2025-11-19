@@ -9,6 +9,15 @@
 class UWidget;
 class FJsonObject;
 
+/**
+ * @brief Handles the "compilation" and "decompilation" of UMG assets to and from JSON.
+ *
+ * This class provides a set of static utility functions that form the core of the version
+ * control workflow. It allows a binary `.uasset` file to be "decompiled" into a human-readable
+ * JSON string (ExportUmgAssetToJsonString) and for that JSON string to be "compiled" back
+ * into a `.uasset` (ApplyJsonStringToUmgAsset). This enables UMG layouts to be stored, diffed,
+ * and merged in source control systems like Git.
+ */
 UCLASS()
 class UMGMCP_API UUmgFileTransformation : public UObject
 {

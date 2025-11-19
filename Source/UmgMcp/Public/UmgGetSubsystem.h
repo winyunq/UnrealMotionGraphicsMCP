@@ -8,7 +8,13 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogUmgGet, Log, All);
 
 /**
- * UEditorSubsystem for providing various "get" functionalities related to UMG.
+ * @brief Provides "sensing" capabilities for the AI to inspect and query UMG assets.
+ *
+ * This subsystem acts as the "eyes" of the AI agent. It contains functions for reading
+ * information from a UMG asset without modifying it. Responsibilities include retrieving the
+ * full widget hierarchy (GetWidgetTree), querying specific properties of a widget
+ * (QueryWidgetProperties), and gathering layout information. All functions are read-only
+ * and are fundamental for the AI to understand the current state of a UI before making changes.
  */
 UCLASS(BlueprintType, Blueprintable)
 class UMGMCP_API UUmgGetSubsystem : public UEditorSubsystem

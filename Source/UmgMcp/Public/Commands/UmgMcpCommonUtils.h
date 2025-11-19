@@ -18,7 +18,13 @@ class UK2Node_Self;
 class UFunction;
 
 /**
- * Common utilities for UmgMcp commands
+ * @brief A collection of static helper functions used across different command handlers.
+ *
+ * This class provides common, reusable utilities to avoid code duplication. Its responsibilities
+ * include creating standardized JSON responses (CreateErrorResponse, CreateSuccessResponse),
+ * parsing complex data types from JSON objects (GetVectorFromJson, etc.), and performing
+ * low-level Blueprint and actor manipulations that are shared by multiple command types.
+ * All functions in this class are static.
  */
 class UMGMCP_API FUmgMcpCommonUtils
 {

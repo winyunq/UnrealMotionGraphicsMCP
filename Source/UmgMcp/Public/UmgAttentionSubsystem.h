@@ -7,7 +7,13 @@
 class UWidgetBlueprint;
 
 /**
- * An editor subsystem to manage the AI's attention towards UMG assets.
+ * @brief Manages the "attention" or context for AI-driven UMG operations.
+ *
+ * This subsystem addresses the ambiguity of user commands by tracking which UMG asset
+ * is the most relevant target. It maintains a history of recently edited assets and allows
+ * for an explicit "attention target" to be set. When a command is issued without a specific
+ * target asset (e.g., "change the button color"), other systems can query this subsystem
+ * to determine which UMG asset the user is likely working on.
  */
 UCLASS()
 class UMGMCP_API UUmgAttentionSubsystem : public UEditorSubsystem

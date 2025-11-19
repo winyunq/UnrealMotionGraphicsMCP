@@ -2,7 +2,14 @@
 
 #include "Modules/ModuleManager.h"
 
-// Define the concrete module class
+/**
+ * @brief The main module class for the UmgMcp plugin.
+ *
+ * This class implements the IModuleInterface and is the primary entry point for the plugin
+ * when it's loaded by the engine. Its main responsibilities in `StartupModule()` are to
+ * initialize and start the UUmgMcpBridge server and register any necessary callbacks.
+ * In `ShutdownModule()`, it cleans up and stops the server.
+ */
 class FUmgMcpModule : public IModuleInterface
 {
 public:
