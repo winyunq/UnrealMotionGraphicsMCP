@@ -121,7 +121,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         {
             FString PropertiesJsonString;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&PropertiesJsonString);
-            FJsonSerializer::Serialize(*PropertiesJsonObject, Writer);
+            FJsonSerializer::Serialize(PropertiesJsonObject->ToSharedRef(), Writer.Get(), false);
 
             if (SetSubsystem->SetWidgetProperties(TargetBlueprint, WidgetName, PropertiesJsonString))
             {

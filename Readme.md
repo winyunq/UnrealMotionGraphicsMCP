@@ -10,82 +10,125 @@
 
 ### 🚀 Quick Start
 
-This section guides you through setting up and using the UMG-MCP plugin.
 
-#### 1. Prerequisites
 
-*   **Unreal Engine 5.5+**: Ensure you have Unreal Engine 5.5 or a newer version installed.
-*   **Python 3.12+**: Python 3.12 or newer is recommended.
-*   **Git**: Required for cloning the project repository.
-*   **`uv` (recommended) or `pip`**: For managing Python virtual environments and dependencies.
+This guide covers the two-step process to install the `UmgMcp` plugin and connect it to your Gemini CLI.
 
-#### 2. Plugin Installation
 
-**Option A: Clone Repository and Install Plugin (Recommended)**
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/winyunq/UnrealMotionGraphicsMCP
-    cd UnrealMotionGraphicsMCP
-    ```
-2.  **Run the installation script:**
-    This script copies the plugin to your Unreal Engine installation or project.
-    Replace `[Your UE Installation Path]` with the actual path to your Unreal Engine installation (e.g., `"C:\Program Files\Epic Games\UE_5.3"`). The port number is optional and defaults to `54517`.
+*   **Prerequisite:** Unreal Engine 5.6 or newer.
+
+
+
+#### 1. Install the Plugin via Git
+
+
+
+1.  **Open a terminal** in your Unreal project's `Plugins` directory. (If the `Plugins` directory doesn't exist at your project root, create it).
 
     ```bash
-    install_to_engine.bat "[Your UE Installation Path]" [Port Number, defaults to 54517]
+
+    cd D:\Path\To\YourUnrealProject\Plugins
+
     ```
 
-#### 3. Python Environment Setup
 
-Navigate to the plugin's Python resources directory and set up a virtual environment:
 
-```bash
-cd Resources/Python
-uv venv # Or use python -m venv .venv
-.\.venv\Scripts\activate # Windows
-# source ./.venv/bin/activate # macOS/Linux
-uv pip install -e . # Or use pip install -e .
-```
+2.  **Clone the repository** directly into this directory:
 
-#### 4. Configure Gemini CLI (`settings.json`)
+    ```bash
 
-You need to add the MCP server tool definition to your Gemini CLI's `settings.json` file.
+    git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
 
-*   `settings.json` is typically located at `C:\Users\YourUsername\.gemini\settings.json` (Windows) or `~/.gemini/settings.json` (macOS/Linux).
-*   Add the following JSON snippet to the `tools` section of your `settings.json`:
+    ```
 
-```json
-"UmgMcp": {
-  "command": "uv",
-  "args": [
-    "--directory",
-    "[Plugin Path]\\Resources\\Python",
-    "run",
-    "UmgMcpServer.py"
-  ]
-}
-```
-*   Ensure you replace `[Plugin Path]` with the absolute path to your plugin's Python resources directory (e.g., `D:\ModelContextProtocol\unreal-engine-mcp\FlopperamUnrealMCP\Plugins\UE5_UMG_MCP`).
 
-#### 5. Launch the MCP Server
 
-*   First, **launch the Unreal Engine editor**.
-*   In the Gemini CLI, run the following command to start the MCP server:
+3.  **Restart the Unreal Editor.** This allows the engine to detect and compile the new plugin.
+
+
+
+#### 2. Connect the Gemini CLI
+
+
+
+Tell Gemini how to find and launch the MCP server.
+
+
+
+1.  **Edit your `settings.json`** file (usually located at `C:\Users\YourUsername\.gemini\`).
+
+2.  **Add the tool definition** to the `tools` object.
+
+
+
+    ```json
+
+    "UmgMcp": {
+
+      "command": "uv",
+
+      "args": [
+
+        "run",
+
+        "--directory",
+
+        "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
+
+        "UmgMcpServer.py"
+
+      ]
+
+    }
+
+    ```
+
+    **IMPORTANT:** You **must** replace the path with the correct **absolute path** to the `Resources/Python` folder from the cloned repository on your machine.
+
+
+
+That's it! When you start the Gemini CLI, it will automatically launch the MCP server in the background.
+
+
+
+#### Testing the Connection
+
+
+
+After restarting your Gemini CLI and opening your Unreal project, you can test the connection by calling any tool function:
 
 ```python
-default_api.UmgMcp()
+
+print(default_api.get_target_umg_asset())
+
 ```
-*   The server will run in the background.
 
-#### 6. Test Communication
 
-Once the server is running, you can test communication with Unreal Engine:
 
-```python
-print(default_api.get_last_edited_umg_asset())
-# Expected output example: {"status": "success", "result": {"status": "success", "asset_path": "/Game/YourAssetPath"}}
-```
+#### Python Environment (Optional)
+
+
+
+The plugin's Python environment is managed by `uv`. In most cases, it should work automatically. If you encounter issues related to Python dependencies (e.g., `uv` command not found or module import errors), you can manually set up the environment:
+
+
+
+1.  Navigate to the directory: `cd YourUnrealProject/Plugins/UmgMcp/Resources/Python`
+
+2.  Run the setup:
+
+    ```bash
+
+    uv venv
+
+    .\.venv\Scripts\activate
+
+    uv pip install -e .
+
+    ```
+
+
 
 ---
 

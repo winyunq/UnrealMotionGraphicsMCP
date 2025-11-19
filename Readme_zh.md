@@ -10,82 +10,64 @@
 
 ### 🚀 快速开始
 
-本节将指导您如何设置和使用UMG-MCP插件。
+本指南包含安装 `UmgMcp` 插件并连接到 Gemini CLI 的两个核心步骤。
 
-#### 1. 先决条件
+*   **先决条件:** Unreal Engine 5.6 或更高版本。
 
-*   **Unreal Engine 5.5+**: 确保您已安装Unreal Engine 5.5或更高版本。
-*   **Python 3.12+**: 推荐使用Python 3.12或更高版本。
-*   **Git**: 用于克隆项目仓库。
-*   **`uv` (推荐) 或 `pip`**: 用于管理Python虚拟环境和依赖。
+#### 1. 通过 Git 安装插件
 
-#### 2. 插件安装
-
-**选项 A: 克隆仓库并安装插件 (推荐)**
-
-1.  **克隆仓库:**
+1.  在您 Unreal 项目的 `Plugins` 目录中 **打开一个终端**。（如果项目根目录没有 `Plugins` 文件夹，请先创建它）。
     ```bash
-    git clone https://github.com/winyunq/UnrealMotionGraphicsMCP
-    cd UnrealMotionGraphicsMCP
-    ```
-2.  **运行安装脚本:**
-    此脚本会将插件复制到您的Unreal Engine安装目录或项目目录。
-    请将 `[您的UE安装路径]` 替换为您的实际Unreal Engine安装路径（例如，`"C:\Program Files\Epic Games\UE_5.3"`）。端口号是可选的，默认为 `54517`。
-
-    ```bash
-    install_to_engine.bat "[您的UE安装路径]" [端口号, 默认为54517]
+    cd D:\您的项目路径\Plugins
     ```
 
-#### 3. Python环境设置
+2.  **直接将本仓库克隆**到该目录中：
+    ```bash
+    git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
+    ```
 
-导航到插件的Python资源目录，并设置虚拟环境：
+3.  **重启Unreal编辑器。** 这将允许引擎检测并编译新插件。
 
-```bash
-cd Resources/Python
-uv venv # 或使用 python -m venv .venv
-.\.venv\Scripts\activate # Windows
-# source ./.venv/bin/activate # macOS/Linux
-uv pip install -e . # 或使用 pip install -e .
-```
+#### 2. 连接 Gemini CLI
 
-#### 4. 配置Gemini CLI (`settings.json`)
+告诉 Gemini 如何找到并启动 MCP 服务器。
 
-您需要将MCP服务器工具定义添加到Gemini CLI的 `settings.json` 文件中。
+1.  **编辑您的 `settings.json` 文件** (通常位于 `C:\Users\您的用户名\.gemini\`)。
+2.  **将工具定义添加**到 `tools` 对象中。
 
-*   `settings.json` 通常位于 `C:\Users\您的用户名\.gemini\settings.json` (Windows) 或 `~/.gemini/settings.json` (macOS/Linux)。
-*   在 `settings.json` 的 `tools` 部分添加以下JSON片段：
+    ```json
+    "UmgMcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "D:\\您的项目路径\\Plugins\\UmgMcp\\Resources\\Python",
+        "UmgMcpServer.py"
+      ]
+    }
+    ```
+    **重要提示:** 您 **必须** 将路径替换为您机器上克隆仓库后 `Resources/Python` 文件夹的**绝对路径**。
 
-```json
-"UmgMcp": {
-  "command": "uv",
-  "args": [
-    "--directory",
-    "[插件路径]\\Resources\\Python",
-    "run",
-    "UmgMcpServer.py"
-  ]
-}
-```
-*   请确保将 `[插件路径]` 替换为您的实际插件Python资源目录的绝对路径（例如，`D:\ModelContextProtocol\unreal-engine-mcp\FlopperamUnrealMCP\Plugins\UE5_UMG_MCP`）。
+完成！当您启动 Gemini CLI 时，它会自动在后台启动 MCP 服务器。
 
-#### 5. 启动MCP服务器
+#### 测试连接
 
-*   首先，**启动Unreal Engine编辑器**。
-*   在Gemini CLI中，运行以下命令来启动MCP服务器：
-
+重启 Gemini CLI 并打开您的 Unreal 项目后，您可以直接调用任何工具函数来测试连接：
 ```python
-default_api.UmgMcp()
+print(default_api.get_target_umg_asset())
 ```
-*   服务器将在后台运行。
 
-#### 6. 测试通信
+#### Python 环境 (可选)
 
-一旦服务器启动，您就可以测试与Unreal Engine的通信了：
+插件的 Python 环境由 `uv` 管理，在大多数情况下会自动运行。如果您遇到与 Python 依赖相关的问题（例如 `uv` 命令找不到或模块导入错误），可以手动设置环境：
 
-```python
-print(default_api.get_last_edited_umg_asset())
-# 预期输出示例: {"status": "success", "result": {"status": "success", "asset_path": "/Game/YourAssetPath"}}
-```
+1.  进入目录: `cd 您的Unreal项目/Plugins/UmgMcp/Resources/Python`
+2.  运行设置:
+    ```bash
+    uv venv
+    .\.venv\Scripts\activate
+    uv pip install -e .
+    ```
 
 ---
 
