@@ -20,16 +20,6 @@ This guide covers the two-step process to install the `UmgMcp` plugin and connec
 
 
 
-#### 1. Install the Plugin via Git
-
-
-
-1.  **Open a terminal** in your Unreal project's `Plugins` directory. (If the `Plugins` directory doesn't exist at your project root, create it).
-
-    ```bash
-
-    cd D:\Path\To\YourUnrealProject\Plugins
-
     ```
 
 

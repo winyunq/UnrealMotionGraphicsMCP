@@ -35,4 +35,7 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
     bool ReparentWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& NewParentName);
+
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
+    bool SaveAsset(class UWidgetBlueprint* WidgetBlueprint);
 };

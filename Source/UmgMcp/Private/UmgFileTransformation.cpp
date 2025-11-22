@@ -308,15 +308,26 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
 
     // 5. Clear the existing widget tree to rebuild it from the JSON data.
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Clearing existing widget tree."));
+    
+    // Remove RootWidget first
     if (WidgetBlueprint->WidgetTree->RootWidget)
     {
         WidgetBlueprint->WidgetTree->RemoveWidget(WidgetBlueprint->WidgetTree->RootWidget);
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Existing root widget removed."));
+        WidgetBlueprint->WidgetTree->RootWidget = nullptr;
     }
-    else
+
+    // Ensure all other widgets are removed (e.g. orphaned widgets)
+    TArray<UWidget*> RemainingWidgets;
+    WidgetBlueprint->WidgetTree->GetAllWidgets(RemainingWidgets);
+    if (RemainingWidgets.Num() > 0)
     {
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: No existing root widget to remove."));
+        UE_LOG(LogUmgMcp, Warning, TEXT("ApplyJsonToUmgAsset_GameThread: Found %d orphaned widgets after removing root. Cleaning up..."), RemainingWidgets.Num());
+        for (UWidget* Widget : RemainingWidgets)
+        {
+            WidgetBlueprint->WidgetTree->RemoveWidget(Widget);
+        }
     }
+    
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Existing widget tree cleared."));
 
     // 6. Recursively create the new widget tree from the JSON data.
@@ -370,6 +381,10 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
         }
     }
     
+    // 9. Notify the editor that the blueprint has changed structurally
+    // This forces the UI to refresh and show the new widgets
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
+    
     UE_LOG(LogUmgMcp, Log, TEXT("Successfully applied JSON to UMG asset '%s'."), *FinalAssetPath);
 
     return true;
@@ -378,14 +393,13 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget)
 {
     FString ParentName = ParentWidget ? ParentWidget->GetName() : TEXT("None");
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Starting for Parent: %s"), *ParentName);
+    // UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Starting for Parent: %s"), *ParentName);
 
     if (!WidgetJson.IsValid() || !WidgetTree)
     {
         UE_LOG(LogUmgMcp, Error, TEXT("CreateWidgetFromJson: Invalid WidgetJson or WidgetTree."));
         return nullptr;
     }
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: WidgetJson and WidgetTree are valid."));
 
     FString WidgetClassPath, WidgetName;
     if (!WidgetJson->TryGetStringField(TEXT("widget_class"), WidgetClassPath) || !WidgetJson->TryGetStringField(TEXT("widget_name"), WidgetName))
@@ -393,7 +407,6 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
         UE_LOG(LogUmgMcp, Error, TEXT("CreateWidgetFromJson: JSON is missing widget_class or widget_name."));
         return nullptr;
     }
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Processing widget '%s' of class '%s'."), *WidgetName, *WidgetClassPath);
 
     UClass* WidgetClass = StaticLoadClass(UWidget::StaticClass(), nullptr, *WidgetClassPath);
     if (!WidgetClass)
@@ -401,7 +414,6 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
         UE_LOG(LogUmgMcp, Error, TEXT("CreateWidgetFromJson: Failed to find widget class '%s'."), *WidgetClassPath);
         return nullptr;
     }
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Widget class '%s' found."), *WidgetClassPath);
 
     UWidget* NewWidget = NewObject<UWidget>(WidgetTree, WidgetClass, FName(*WidgetName));
     if (!NewWidget)
@@ -409,29 +421,19 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
         UE_LOG(LogUmgMcp, Error, TEXT("CreateWidgetFromJson: Failed to create widget of class '%s'."), *WidgetClassPath);
         return nullptr;
     }
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Widget '%s' created."), *WidgetName);
 
-    // Extract Slot properties early (before adding to parent) for later processing
-    TSharedPtr<FJsonObject> SlotPropertiesObj = nullptr;
-    const TSharedPtr<FJsonObject>* PropertiesJsonObj;
-    if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObj))
-    {
-        const TSharedPtr<FJsonObject>* SlotJsonObj;
-        if ((*PropertiesJsonObj)->TryGetObjectField(TEXT("Slot"), SlotJsonObj))
-        {
-            SlotPropertiesObj = *SlotJsonObj;
-        }
-    }
-
-    // Add to parent FIRST so that Slot object is created
+    // 1. Add to parent to create the Slot
+    UPanelSlot* NewSlot = nullptr;
     if (ParentWidget)
     {
         UPanelWidget* ParentPanel = Cast<UPanelWidget>(ParentWidget);
         if (ParentPanel)
         {
-            UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Adding '%s' as child to parent '%s'."), *WidgetName, *ParentName);
-            ParentPanel->AddChild(NewWidget);
-            UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: '%s' added as child."), *WidgetName);
+            NewSlot = ParentPanel->AddChild(NewWidget);
+            if (!NewSlot)
+            {
+                UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: AddChild returned null slot for '%s' in '%s'."), *WidgetName, *ParentName);
+            }
         }
         else
         {
@@ -439,111 +441,69 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
         }
     }
 
-    // Apply default properties
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying default properties for '%s'."), *WidgetName);
-    UObject* DefaultWidget = WidgetClass->GetDefaultObject();
-    for (TFieldIterator<FProperty> PropIt(WidgetClass); PropIt; ++PropIt)
+    // 2. Prepare Property JSONs
+    const TSharedPtr<FJsonObject>* PropertiesJsonObjPtr;
+    TSharedPtr<FJsonObject> WidgetProps = MakeShared<FJsonObject>();
+    TSharedPtr<FJsonObject> SlotProps = nullptr;
+
+    if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObjPtr))
     {
-        FProperty* Property = *PropIt;
-        if (Property->HasAnyPropertyFlags(CPF_Edit))
+        // Copy properties to a new object so we can remove 'Slot' without modifying source
+        TSharedPtr<FJsonObject> SourceProps = *PropertiesJsonObjPtr;
+        for (auto& Pair : SourceProps->Values)
         {
-            void* DestPtr = Property->ContainerPtrToValuePtr<void>(NewWidget);
-            const void* SrcPtr = Property->ContainerPtrToValuePtr<void>(DefaultWidget);
-            Property->CopyCompleteValue(DestPtr, SrcPtr);
-        }
-    }
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Default properties applied for '%s'."), *WidgetName);
-
-    // Apply custom properties (excluding Slot properties which we handle separately)
-    if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObj))
-    {
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying custom properties for '%s'."), *WidgetName);
-        for (const auto& Pair : (*PropertiesJsonObj)->Values)
-        {
-            const FString& PropertyName = Pair.Key;
-            const TSharedPtr<FJsonValue>& JsonVal = Pair.Value;
-
-            // Skip Slot property here - we handle it later
-            if (PropertyName == TEXT("Slot"))
+            if (Pair.Key == TEXT("Slot"))
             {
-                continue;
-            }
-
-            FProperty* Property = FindFProperty<FProperty>(NewWidget->GetClass(), *PropertyName);
-            if (Property)
-            {
-                if (JsonVal.IsValid())
+                const TSharedPtr<FJsonObject>* SlotObjPtr;
+                if (Pair.Value->TryGetObject(SlotObjPtr))
                 {
-                    bool bHandledManually = false;
-                    // Check if it's an FText property and the JSON value is a simple string
-                    if (Property->IsA(FTextProperty::StaticClass()) && JsonVal->Type == EJson::String)
-                    {
-                        FString SourceString = JsonVal->AsString();
-                        if (!SourceString.IsEmpty())
-                        {
-                            FTextProperty* TextProp = CastField<FTextProperty>(Property);
-                            if (TextProp)
-                            {
-                                TextProp->SetPropertyValue_InContainer(NewWidget, FText::FromString(SourceString));
-                                UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Manually applied FText property '%s' for '%s' on '%s'."), *PropertyName, *SourceString, *WidgetName);
-                                bHandledManually = true;
-                            }
-                        }
-                        else
-                        {
-                            UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Failed to extract SourceString for FText property '%s' of '%s' (empty string)."), *PropertyName, *WidgetName);
-                        }
-                    }
-
-                    if (!bHandledManually) // Fallback to generic property application if not handled manually
-                    {
-                        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying property '%s' for '%s'."), *PropertyName, *WidgetName);
-                        FJsonObjectConverter::JsonValueToUProperty(JsonVal, Property, NewWidget, 0, 0);
-                    }
+                    SlotProps = *SlotObjPtr;
                 }
             }
+            else
+            {
+                WidgetProps->SetField(Pair.Key, Pair.Value);
+            }
         }
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Custom properties applied for '%s'."), *WidgetName);
-    }
-    else
-    {
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: No custom properties to apply for '%s'."), *WidgetName);
     }
 
-    // NOW apply Slot properties after widget is added to parent
-    if (SlotPropertiesObj.IsValid() && NewWidget->Slot)
+    // 3. Apply Widget Properties using JsonObjectToUStruct (Safe & Robust)
+    if (WidgetProps->Values.Num() > 0)
     {
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying Slot properties for '%s'."), *WidgetName);
-        for (const auto& SlotPair : SlotPropertiesObj->Values)
+        if (!FJsonObjectConverter::JsonObjectToUStruct(WidgetProps.ToSharedRef(), NewWidget->GetClass(), NewWidget, 0, 0))
         {
-            const FString& SlotPropertyName = SlotPair.Key;
-            const TSharedPtr<FJsonValue>& SlotJsonVal = SlotPair.Value;
-            
-            FProperty* SlotProperty = FindFProperty<FProperty>(NewWidget->Slot->GetClass(), *SlotPropertyName);
-            if (SlotProperty && SlotJsonVal.IsValid())
-            {
-                UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying Slot property '%s' for '%s'."), *SlotPropertyName, *WidgetName);
-                FJsonObjectConverter::JsonValueToUProperty(SlotJsonVal, SlotProperty, NewWidget->Slot, 0, 0);
-            }
-            else if (!SlotProperty)
-            {
-                UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Slot property '%s' not found on Slot class '%s' for widget '%s'."), 
-                    *SlotPropertyName, 
-                    *NewWidget->Slot->GetClass()->GetName(), 
-                    *WidgetName);
-            }
+             UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying properties to '%s'."), *WidgetName);
         }
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Slot properties applied for '%s'."), *WidgetName);
-    }
-    else if (SlotPropertiesObj.IsValid() && !NewWidget->Slot)
-    {
-        UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Slot properties specified but NewWidget->Slot is null for '%s'. Widget may not have been added to a parent panel."), *WidgetName);
     }
 
+    // 4. Apply Slot Properties
+    if (SlotProps.IsValid())
+    {
+        if (NewSlot)
+        {
+            if (!FJsonObjectConverter::JsonObjectToUStruct(SlotProps.ToSharedRef(), NewSlot->GetClass(), NewSlot, 0, 0))
+            {
+                UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying Slot properties to '%s'."), *WidgetName);
+            }
+        }
+        else if (NewWidget->Slot)
+        {
+             // Fallback to NewWidget->Slot if AddChild didn't return one but it exists (e.g. RootWidget might not have slot, but this branch is for children)
+             if (!FJsonObjectConverter::JsonObjectToUStruct(SlotProps.ToSharedRef(), NewWidget->Slot->GetClass(), NewWidget->Slot, 0, 0))
+             {
+                 UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying Slot properties to '%s' (fallback)."), *WidgetName);
+             }
+        }
+        else
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Slot properties specified but no valid Slot found for '%s'."), *WidgetName);
+        }
+    }
+
+    // 5. Process Children
     const TArray<TSharedPtr<FJsonValue>>* ChildrenJsonArray;
     if (WidgetJson->TryGetArrayField(TEXT("children"), ChildrenJsonArray))
     {
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Processing children for '%s'. Total children: %d"), *WidgetName, ChildrenJsonArray->Num());
         for (const TSharedPtr<FJsonValue>& ChildValue : *ChildrenJsonArray)
         {
             const TSharedPtr<FJsonObject>* ChildObject;
@@ -552,13 +512,7 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
                 CreateWidgetFromJson(*ChildObject, WidgetTree, NewWidget);
             }
         }
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Finished processing children for '%s'."), *WidgetName);
-    }
-    else
-    {
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: No children to process for '%s'."), *WidgetName);
     }
 
-    UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Returning new widget '%s'."), *WidgetName);
     return NewWidget;
 }

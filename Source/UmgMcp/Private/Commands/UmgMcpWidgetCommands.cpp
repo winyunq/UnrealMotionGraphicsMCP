@@ -211,6 +211,18 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'new_parent_name' parameter."));
         }
     }
+    else if (Command == TEXT("save_asset"))
+    {
+        UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
+        if (SetSubsystem->SaveAsset(TargetBlueprint))
+        {
+            Response->SetStringField(TEXT("status"), TEXT("success"));
+        }
+        else
+        {
+            Response->SetStringField(TEXT("error"), TEXT("Failed to save asset. Check logs for details."));
+        }
+    }
 
     else
     {

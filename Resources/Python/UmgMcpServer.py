@@ -472,6 +472,16 @@ def reparent_widget(widget_name: str, new_parent_name: str, asset_path: Optional
     umg_set_client = UMGSet.UMGSet(conn)
     return umg_set_client.reparent_widget(asset_path, widget_name, new_parent_name)
 
+@mcp.tool()
+def save_asset(asset_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    "Save my work" - Saves the UMG asset to disk.
+    AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
+    """
+    conn = get_unreal_connection()
+    umg_set_client = UMGSet.UMGSet(conn)
+    return umg_set_client.save_asset(asset_path)
+
 # =============================================================================
 #  Category: File Transformation (Explicit Path)
 # =============================================================================

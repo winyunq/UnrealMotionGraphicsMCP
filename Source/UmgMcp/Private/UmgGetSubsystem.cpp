@@ -166,7 +166,8 @@ FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
     }
 
     FString JsonString;
-    TSharedRef<TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&JsonString);
+    // Use condensed print policy to reduce data size
+    TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&JsonString);
     if (FJsonSerializer::Serialize(RootJsonObject.ToSharedRef(), JsonWriter))
     {
         JsonWriter->Close();
@@ -217,6 +218,7 @@ FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprin
     FString JsonString;
     TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
     FJsonSerializer::Serialize(PropertiesJson.ToSharedRef(), JsonWriter);
+    JsonWriter->Close(); // Explicitly close
     return JsonString;
 }
 
@@ -260,6 +262,7 @@ FString UUmgGetSubsystem::GetLayoutData(UWidgetBlueprint* WidgetBlueprint, int32
     FString JsonString;
     TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
     FJsonSerializer::Serialize(LayoutDataArray, JsonWriter);
+    JsonWriter->Close(); // Explicitly close
     return JsonString;
 }
 

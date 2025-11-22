@@ -39,3 +39,10 @@ class UMGSet:
         if asset_path:
             params["asset_path"] = asset_path
         return self.client.send_command("reparent_widget", params)
+
+    def save_asset(self, asset_path: str) -> Dict[str, Any]:
+        """Saves the UMG asset."""
+        params = {}
+        if asset_path:
+            params["asset_path"] = asset_path
+        return self.client.send_command("save_asset", params)

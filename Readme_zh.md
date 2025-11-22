@@ -12,17 +12,6 @@
 
 本指南包含安装 `UmgMcp` 插件并连接到 Gemini CLI 的两个核心步骤。
 
-*   **先决条件:** Unreal Engine 5.6 或更高版本。
-
-#### 1. 通过 Git 安装插件
-
-1.  在您 Unreal 项目的 `Plugins` 目录中 **打开一个终端**。（如果项目根目录没有 `Plugins` 文件夹，请先创建它）。
-    ```bash
-    cd D:\您的项目路径\Plugins
-    ```
-
-2.  **直接将本仓库克隆**到该目录中：
-    ```bash
     git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
     ```
 

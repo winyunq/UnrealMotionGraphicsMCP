@@ -9,6 +9,7 @@
 #include "Serialization/JsonReader.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "FileHelpers.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
 
@@ -193,4 +194,36 @@ bool UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBlueprint, const F
     NewParentWidget->AddChild(WidgetToMove);
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     return true;
+}
+
+bool UUmgSetSubsystem::SaveAsset(UWidgetBlueprint* WidgetBlueprint)
+{
+    if (!WidgetBlueprint)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("SaveAsset: Received a null WidgetBlueprint."));
+        return false;
+    }
+
+    UPackage* Package = WidgetBlueprint->GetOutermost();
+    if (!Package)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("SaveAsset: Failed to get package for asset '%s'."), *WidgetBlueprint->GetPathName());
+        return false;
+    }
+
+    TArray<UPackage*> PackagesToSave;
+    PackagesToSave.Add(Package);
+
+    FEditorFileUtils::EPromptReturnCode ReturnCode = FEditorFileUtils::PromptForCheckoutAndSave(PackagesToSave, false, false);
+    
+    if (ReturnCode == FEditorFileUtils::EPromptReturnCode::PR_Success)
+    {
+        UE_LOG(LogUmgSet, Log, TEXT("SaveAsset: Successfully saved asset '%s'."), *WidgetBlueprint->GetPathName());
+        return true;
+    }
+    else
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("SaveAsset: Failed to save asset '%s'."), *WidgetBlueprint->GetPathName());
+        return false;
+    }
 }
