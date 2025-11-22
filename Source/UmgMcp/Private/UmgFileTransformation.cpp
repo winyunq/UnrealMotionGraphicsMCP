@@ -22,10 +22,78 @@
 // Log category for this module
 DEFINE_LOG_CATEGORY_STATIC(LogUmgMcp, Log, All);
 
-// Forward declaration for our recursive helper function
+// Forward declarations
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget);
+static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson);
 
 bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData);
+
+/**
+ * Normalizes JSON keys from camelCase to PascalCase to match C++ UPROPERTY names.
+ * This solves the case-sensitivity issue where UE exports JSON with camelCase keys
+ * but JsonObjectToUStruct requires PascalCase to match UPROPERTY names.
+ * 
+ * @param SourceJson The source JSON object with potentially camelCase keys
+ * @return A new JSON object with all keys converted to PascalCase
+ */
+static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson)
+{
+    if (!SourceJson.IsValid())
+    {
+        return nullptr;
+    }
+    
+    TSharedPtr<FJsonObject> NormalizedJson = MakeShared<FJsonObject>();
+    
+    for (const auto& Pair : SourceJson->Values)
+    {
+        FString OriginalKey = Pair.Key;
+        FString NormalizedKey = OriginalKey;
+        
+        // Convert first character to uppercase (camelCase → PascalCase)
+        if (NormalizedKey.Len() > 0 && FChar::IsLower(NormalizedKey[0]))
+        {
+            NormalizedKey[0] = FChar::ToUpper(NormalizedKey[0]);
+            UE_LOG(LogUmgMcp, Verbose, TEXT("NormalizeJsonKeys: '%s' → '%s'"), *OriginalKey, *NormalizedKey);
+        }
+        
+        // Recursively process nested objects and arrays
+        TSharedPtr<FJsonValue> Value = Pair.Value;
+        if (Value->Type == EJson::Object)
+        {
+            TSharedPtr<FJsonObject> NestedObj = Value->AsObject();
+            TSharedPtr<FJsonObject> NormalizedNestedObj = NormalizeJsonKeysToPascalCase(NestedObj);
+            NormalizedJson->SetObjectField(NormalizedKey, NormalizedNestedObj);
+        }
+        else if (Value->Type == EJson::Array)
+        {
+            // Process objects within arrays
+            TArray<TSharedPtr<FJsonValue>> SourceArray = Value->AsArray();
+            TArray<TSharedPtr<FJsonValue>> NormalizedArray;
+            
+            for (const TSharedPtr<FJsonValue>& ArrayValue : SourceArray)
+            {
+                if (ArrayValue->Type == EJson::Object)
+                {
+                    TSharedPtr<FJsonObject> NormalizedArrayObj = NormalizeJsonKeysToPascalCase(ArrayValue->AsObject());
+                    NormalizedArray.Add(MakeShared<FJsonValueObject>(NormalizedArrayObj));
+                }
+                else
+                {
+                    NormalizedArray.Add(ArrayValue);
+                }
+            }
+            NormalizedJson->SetArrayField(NormalizedKey, NormalizedArray);
+        }
+        else
+        {
+            // Primitive types: copy directly
+            NormalizedJson->SetField(NormalizedKey, Value);
+        }
+    }
+    
+    return NormalizedJson;
+}
 
 TSharedPtr<FJsonObject> UUmgFileTransformation::ExportWidgetToJson(UWidget* Widget)
 {
@@ -479,19 +547,41 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
     // 4. Apply Slot Properties
     if (SlotProps.IsValid())
     {
+        // Normalize JSON keys from camelCase to PascalCase to match C++ UPROPERTY names
+        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Processing Slot properties for widget '%s'"), *WidgetName);
+        TSharedPtr<FJsonObject> NormalizedSlotProps = NormalizeJsonKeysToPascalCase(SlotProps);
+        
+        // Log the normalized Slot JSON for debugging
+        FString SlotPropsString;
+        TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&SlotPropsString);
+        FJsonSerializer::Serialize(NormalizedSlotProps.ToSharedRef(), Writer);
+        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Normalized Slot JSON for '%s': %s"), *WidgetName, *SlotPropsString);
+        
         if (NewSlot)
         {
-            if (!FJsonObjectConverter::JsonObjectToUStruct(SlotProps.ToSharedRef(), NewSlot->GetClass(), NewSlot, 0, 0))
+            UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying Slot properties to NewSlot (class: %s)"), *NewSlot->GetClass()->GetName());
+            
+            if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), NewSlot->GetClass(), NewSlot, 0, 0))
             {
                 UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying Slot properties to '%s'."), *WidgetName);
+            }
+            else
+            {
+                UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Successfully applied Slot properties to '%s'"), *WidgetName);
             }
         }
         else if (NewWidget->Slot)
         {
              // Fallback to NewWidget->Slot if AddChild didn't return one but it exists (e.g. RootWidget might not have slot, but this branch is for children)
-             if (!FJsonObjectConverter::JsonObjectToUStruct(SlotProps.ToSharedRef(), NewWidget->Slot->GetClass(), NewWidget->Slot, 0, 0))
+             UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying Slot properties to NewWidget->Slot (class: %s)"), *NewWidget->Slot->GetClass()->GetName());
+             
+             if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), NewWidget->Slot->GetClass(), NewWidget->Slot, 0, 0))
              {
                  UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying Slot properties to '%s' (fallback)."), *WidgetName);
+             }
+             else
+             {
+                 UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Successfully applied Slot properties to '%s' (fallback)"), *WidgetName);
              }
         }
         else

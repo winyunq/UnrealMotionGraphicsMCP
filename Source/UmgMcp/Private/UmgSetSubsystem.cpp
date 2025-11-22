@@ -25,6 +25,68 @@ void UUmgSetSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
+// Forward declaration
+static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson);
+
+/**
+ * Normalizes JSON keys from camelCase to PascalCase to match C++ UPROPERTY names.
+ * (Same implementation as in UmgFileTransformation.cpp)
+ */
+static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson)
+{
+    if (!SourceJson.IsValid())
+    {
+        return nullptr;
+    }
+    
+    TSharedPtr<FJsonObject> NormalizedJson = MakeShared<FJsonObject>();
+    
+    for (const auto& Pair : SourceJson->Values)
+    {
+        FString OriginalKey = Pair.Key;
+        FString NormalizedKey = OriginalKey;
+        
+        // Convert first character to uppercase (camelCase → PascalCase)
+        if (NormalizedKey.Len() > 0 && FChar::IsLower(NormalizedKey[0]))
+        {
+            NormalizedKey[0] = FChar::ToUpper(NormalizedKey[0]);
+        }
+        
+        // Recursively process nested objects
+        TSharedPtr<FJsonValue> Value = Pair.Value;
+        if (Value->Type == EJson::Object)
+        {
+            TSharedPtr<FJsonObject> NormalizedNestedObj = NormalizeJsonKeysToPascalCase(Value->AsObject());
+            NormalizedJson->SetObjectField(NormalizedKey, NormalizedNestedObj);
+        }
+        else if (Value->Type == EJson::Array)
+        {
+            TArray<TSharedPtr<FJsonValue>> SourceArray = Value->AsArray();
+            TArray<TSharedPtr<FJsonValue>> NormalizedArray;
+            
+            for (const TSharedPtr<FJsonValue>& ArrayValue : SourceArray)
+            {
+                if (ArrayValue->Type == EJson::Object)
+                {
+                    TSharedPtr<FJsonObject> NormalizedArrayObj = NormalizeJsonKeysToPascalCase(ArrayValue->AsObject());
+                    NormalizedArray.Add(MakeShared<FJsonValueObject>(NormalizedArrayObj));
+                }
+                else
+                {
+                    NormalizedArray.Add(ArrayValue);
+                }
+            }
+            NormalizedJson->SetArrayField(NormalizedKey, NormalizedArray);
+        }
+        else
+        {
+            NormalizedJson->SetField(NormalizedKey, Value);
+        }
+    }
+    
+    return NormalizedJson;
+}
+
 bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& PropertiesJson)
 {
     if (!WidgetBlueprint)
@@ -54,22 +116,63 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
         return false;
     }
 
-    WidgetBlueprint->Modify();
-    FoundWidget->Modify();
-
-    WidgetBlueprint->Modify();
-    FoundWidget->Modify();
-
-    // Use JsonObjectToUStruct to apply properties safely and robustly
-    // This handles type conversion (e.g. string to FText) and property matching automatically
-    if (!FJsonObjectConverter::JsonObjectToUStruct(PropertiesJsonObject.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0))
+    // Normalize JSON keys from camelCase to PascalCase (especially important for Slot properties)
+    UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Normalizing property keys for widget '%s'"), *WidgetName);
+    TSharedPtr<FJsonObject> NormalizedProperties = NormalizeJsonKeysToPascalCase(PropertiesJsonObject);
+    
+    // Separate Slot properties from widget properties (Slot must be applied to the Slot object, not the Widget)
+    TSharedPtr<FJsonObject> SlotProperties;
+    if (NormalizedProperties->HasField(TEXT("Slot")))
     {
-        UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: JsonObjectToUStruct reported issues applying some properties to '%s'."), *WidgetName);
-        // We continue even if it returns false, as it might have applied some properties successfully
+        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Detected Slot property for widget '%s'"), *WidgetName);
+        
+        SlotProperties = NormalizedProperties->GetObjectField(TEXT("Slot"));
+        
+        // Log the normalized Slot JSON
+        FString SlotJsonString;
+        TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&SlotJsonString);
+        FJsonSerializer::Serialize(SlotProperties.ToSharedRef(), Writer);
+        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Normalized Slot JSON: %s"), *SlotJsonString);
+        
+        // Remove Slot from widget properties (we'll apply it separately)
+        NormalizedProperties->RemoveField(TEXT("Slot"));
     }
-    else
+
+    WidgetBlueprint->Modify();
+    FoundWidget->Modify();
+
+    // Apply widget properties (excluding Slot)
+    if (NormalizedProperties->Values.Num() > 0)
     {
-        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Successfully applied properties to '%s'."), *WidgetName);
+        if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedProperties.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0))
+        {
+            UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: JsonObjectToUStruct reported issues applying some properties to '%s'."), *WidgetName);
+        }
+        else
+        {
+            UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Successfully applied widget properties to '%s'."), *WidgetName);
+        }
+    }
+    
+    // Apply Slot properties separately (CRITICAL: must apply to Slot object, not Widget object)
+    if (SlotProperties.IsValid() && FoundWidget->Slot)
+    {
+        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Applying Slot properties to Slot object (class: %s)"), *FoundWidget->Slot->GetClass()->GetName());
+        
+        FoundWidget->Slot->Modify();
+        
+        if (!FJsonObjectConverter::JsonObjectToUStruct(SlotProperties.ToSharedRef(), FoundWidget->Slot->GetClass(), FoundWidget->Slot, 0, 0))
+        {
+            UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: Issues applying Slot properties to '%s'."), *WidgetName);
+        }
+        else
+        {
+            UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Successfully applied Slot properties to '%s'."), *WidgetName);
+        }
+    }
+    else if (SlotProperties.IsValid() && !FoundWidget->Slot)
+    {
+        UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: Slot properties specified but widget '%s' has no Slot object."), *WidgetName);
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
@@ -90,13 +193,7 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         return FString();
     }
 
-    UPanelWidget* ParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ParentName)));
-    if (!ParentWidget)
-    {
-        UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find ParentWidget with name '%s' in asset '%s'."), *ParentName, *WidgetBlueprint->GetPathName());
-        return FString();
-    }
-
+    // Load widget class first to check if it's valid
     UClass* WidgetClass = FindObject<UClass>(ANY_PACKAGE, *WidgetType);
     if(!WidgetClass)
     {
@@ -109,6 +206,51 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         return FString();
     }
 
+    // Check if this is a request to create root widget (no existing root and ParentName is empty or "Root")
+    bool bCreatingRootWidget = false;
+    if (!WidgetBlueprint->WidgetTree->RootWidget)
+    {
+        if (ParentName.IsEmpty() || ParentName.Equals(TEXT("Root"), ESearchCase::IgnoreCase) || ParentName.Equals(TEXT("CanvasPanel_0"), ESearchCase::IgnoreCase))
+        {
+            bCreatingRootWidget = true;
+            UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: No root widget exists. Attempting to create '%s' as root widget."), *WidgetType);
+            
+            // Verify that the widget type can be a root widget (must be a PanelWidget)
+            if (!WidgetClass->IsChildOf(UPanelWidget::StaticClass()))
+            {
+                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Cannot create '%s' as root widget. Root widget must be a Panel type (e.g., VerticalBox, HorizontalBox, CanvasPanel, Overlay, Grid, etc.). Non-panel widgets like TextBlock, Button, Image cannot be root widgets."), *WidgetType);
+                
+                // Provide helpful suggestion
+                FString Suggestion = TEXT("Suggested root widget types: VerticalBox, HorizontalBox, CanvasPanel, Overlay, Grid, UniformGridPanel, WrapBox, ScrollBox");
+                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: %s"), *Suggestion);
+                
+                return FString();
+            }
+        }
+    }
+
+    UPanelWidget* ParentWidget = nullptr;
+    
+    if (!bCreatingRootWidget)
+    {
+        // Normal case: creating a child widget, need to find parent
+        ParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ParentName)));
+        if (!ParentWidget)
+        {
+            // Check if root widget exists
+            if (!WidgetBlueprint->WidgetTree->RootWidget)
+            {
+                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: No root widget exists. Cannot create child widget '%s'. You must first create a root widget using a Panel type."), *WidgetName);
+                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: To create a root widget, use parent_name=\"\" or \"Root\" with a Panel widget type like VerticalBox or HorizontalBox."));
+            }
+            else
+            {
+                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find ParentWidget with name '%s' in asset '%s'."), *ParentName, *WidgetBlueprint->GetPathName());
+            }
+            return FString();
+        }
+    }
+
     WidgetBlueprint->Modify();
 
     UWidget* NewWidget = WidgetBlueprint->WidgetTree->ConstructWidget<UWidget>(WidgetClass, FName(*WidgetName));
@@ -118,7 +260,18 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         return FString();
     }
 
-    ParentWidget->AddChild(NewWidget);
+    if (bCreatingRootWidget)
+    {
+        // Set as root widget
+        WidgetBlueprint->WidgetTree->RootWidget = NewWidget;
+        UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Successfully created '%s' as root widget."), *WidgetName);
+    }
+    else
+    {
+        // Add as child to parent
+        ParentWidget->AddChild(NewWidget);
+        UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Successfully created '%s' as child of '%s'."), *WidgetName, *ParentName);
+    }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     return NewWidget->GetName();
