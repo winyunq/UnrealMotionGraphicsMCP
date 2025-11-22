@@ -4,6 +4,8 @@
 
 **一个以版本控制为核心的AI协同UMG工作流**
 
+![Project Background](Resources/Docs/project_background.png)
+
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
 
 ---
@@ -123,15 +125,17 @@ flowchart TD
 | | `get_recently_edited_umg_assets` | ✅ | 获取最近编辑过的UMG资产列表。 |
 | **感知与查询** | `get_widget_tree` | ✅ | 获取资产的完整控件树结构。 |
 | | `query_widget_properties` | ✅ | 查询特定控件的一个或多个属性值。 |
-| | `get_creatable_widget_types` | ❓ | 获取所有可以被创建的控件类型列表。 |
-| | `get_widget_schema` | ❌ | 获取指定控件类型的属性结构信息。 (Planned) |
+| | `get_creatable_widget_types` | ✅ | 获取所有可以被创建的控件类型列表。 |
+| | `get_widget_schema` | ✅ | 获取指定控件类型的属性结构信息。 |
 | | `get_layout_data` | ✅ | 获取所有控件在给定分辨率下的屏幕布局数据。 |
 | | `check_widget_overlap` | ✅ | 检查UI布局中是否有控件发生重叠。 |
 | **操作与修改** | `create_widget` | ✅ | 创建一个新的控件并附加到父控件。 |
 | | `delete_widget` | ✅ | 根据名称删除一个控件。 |
 | | `set_widget_properties` | ✅ | 设置一个或多个控件属性。 |
 | | `reparent_widget` | ✅ | 将一个控件移动到新的父控件下。 |
+| | `save_asset` | ✅ | 保存当前的UMG资产。 |
 | **文件转换** | `export_umg_to_json` | ✅ | 将UMG资产导出为JSON字符串。 |
-| | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。
+| | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。 |
+| | `apply_layout` | ✅ | 将HTML/XML布局应用到UMG资产。 |
 
 ##  `apply_json_to_umg` 是可以工作的，因此如果需要AI编辑你的UMG，最好的办法是给个模板，然后让AI执行 `export_umg_to_json` 知道如何表示UMG资产，然后让他运行 `apply_json_to_umg`

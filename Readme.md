@@ -4,6 +4,8 @@
 
 **A Version-Controlled AI-Assisted UMG Workflow**
 
+![Project Background](Resources/Docs/project_background.png)
+
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
 
 ---
@@ -17,10 +19,6 @@ This guide covers the two-step process to install the `UmgMcp` plugin and connec
 
 
 *   **Prerequisite:** Unreal Engine 5.6 or newer.
-
-
-
-    ```
 
 
 
@@ -207,15 +205,17 @@ flowchart TD
 | | `get_recently_edited_umg_assets` | ✅ |
 | **Sensing & Querying** | `get_widget_tree` | ✅ |
 | | `query_widget_properties` | ✅ |
-| | `get_creatable_widget_types` | ❓ |
-| | `get_widget_schema` | ❌ |
-| | `get_layout_data` | ❌ |
-| | `check_widget_overlap` | ❌ |
-| **Actions & Modifications** | `create_widget` | ❌ |
-| | `delete_widget` | ❌ |
+| | `get_creatable_widget_types` | ✅ |
+| | `get_widget_schema` | ✅ |
+| | `get_layout_data` | ✅ |
+| | `check_widget_overlap` | ✅ |
+| **Actions & Modifications** | `create_widget` | ✅ |
+| | `delete_widget` | ✅ |
 | | `set_widget_properties` | ✅ |
-| | `reparent_widget` | ❌ |
+| | `reparent_widget` | ✅ |
+| | `save_asset` | ✅ |
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |
+| | `apply_layout` | ✅ |
 
 ##  `apply_json_to_umg` is able to use.This is mean that you need guide AI do that: learing from `export_umg_to_json` ,using to `apply_json_to_umg`
