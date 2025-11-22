@@ -135,13 +135,13 @@ flowchart TD
 | **感知与查询** | `get_widget_tree` | ✅ | 获取资产的完整控件树结构。 |
 | | `query_widget_properties` | ✅ | 查询特定控件的一个或多个属性值。 |
 | | `get_creatable_widget_types` | ❓ | 获取所有可以被创建的控件类型列表。 |
-| | `get_widget_schema` | ❌ | 获取指定控件类型的属性结构信息。 |
-| | `get_layout_data` | ❌ | 获取所有控件在给定分辨率下的屏幕布局数据。 |
-| | `check_widget_overlap` | ❌ | 检查UI布局中是否有控件发生重叠。 |
-| **操作与修改** | `create_widget` | ❌ | 创建一个新的控件并附加到父控件。 |
-| | `delete_widget` | ❌ | 根据名称删除一个控件。 |
-| | `set_widget_properties` | ❌ | 设置一个或多个控件属性。 |
-| | `reparent_widget` | ❌ | 将一个控件移动到新的父控件下。 |
+| | `get_widget_schema` | ❌ | 获取指定控件类型的属性结构信息。 (Planned) |
+| | `get_layout_data` | ✅ | 获取所有控件在给定分辨率下的屏幕布局数据。 |
+| | `check_widget_overlap` | ✅ | 检查UI布局中是否有控件发生重叠。 |
+| **操作与修改** | `create_widget` | ✅ | 创建一个新的控件并附加到父控件。 |
+| | `delete_widget` | ✅ | 根据名称删除一个控件。 |
+| | `set_widget_properties` | ✅ | 设置一个或多个控件属性。 |
+| | `reparent_widget` | ✅ | 将一个控件移动到新的父控件下。 |
 | **文件转换** | `export_umg_to_json` | ✅ | 将UMG资产导出为JSON字符串。 |
 | | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。
 

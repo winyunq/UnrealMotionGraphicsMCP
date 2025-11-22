@@ -223,7 +223,7 @@ flowchart TD
 | | `check_widget_overlap` | ❌ |
 | **Actions & Modifications** | `create_widget` | ❌ |
 | | `delete_widget` | ❌ |
-| | `set_widget_properties` | ❌ |
+| | `set_widget_properties` | ✅ |
 | | `reparent_widget` | ❌ |
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |

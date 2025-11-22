@@ -56,18 +56,19 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     WidgetBlueprint->Modify();
     FoundWidget->Modify();
 
-    for (const auto& Pair : PropertiesJsonObject->Values)
+    WidgetBlueprint->Modify();
+    FoundWidget->Modify();
+
+    // Use JsonObjectToUStruct to apply properties safely and robustly
+    // This handles type conversion (e.g. string to FText) and property matching automatically
+    if (!FJsonObjectConverter::JsonObjectToUStruct(PropertiesJsonObject.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0))
     {
-        FProperty* Property = FindFProperty<FProperty>(FoundWidget->GetClass(), FName(*Pair.Key));
-        if (Property)
-        {
-            if (Pair.Value.IsValid() && Pair.Value->IsNull())
-            {
-                UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: Received a null JSON value for property '%s' on widget '%s'. Skipping to prevent potential crash."), *Pair.Key, *WidgetName);
-                continue;
-            }
-            FJsonObjectConverter::JsonValueToUProperty(Pair.Value, Property, FoundWidget, 0, 0);
-        }
+        UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: JsonObjectToUStruct reported issues applying some properties to '%s'."), *WidgetName);
+        // We continue even if it returns false, as it might have applied some properties successfully
+    }
+    else
+    {
+        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Successfully applied properties to '%s'."), *WidgetName);
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);

@@ -25,6 +25,7 @@ import UMGAttention
 import UMGGet
 import UMGSet
 import UMGFileTransformation
+import UMGHTMLParser
 
 # Configure logging
 logging.basicConfig(
@@ -54,7 +55,7 @@ class UnrealConnection:
             
             logger.info(f"Connecting to Unreal at {UNREAL_HOST}:{UNREAL_PORT}...")
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(5)  # 5 second timeout
+            self.socket.settimeout(30)  # 30 second timeout
             
             # Set socket options for better stability
             self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -87,7 +88,7 @@ class UnrealConnection:
     def receive_full_response(self, sock, buffer_size=4096) -> bytes:
         """Receive a complete response from Unreal, handling chunked data."""
         chunks = []
-        sock.settimeout(5)  # 5 second timeout
+        sock.settimeout(30)  # 30 second timeout
         try:
             while True:
                 chunk = sock.recv(buffer_size)
@@ -148,13 +149,14 @@ class UnrealConnection:
         try:
             # Match Unity's command format exactly
             command_obj = {
-                "type": command,  # Use "type" instead of "command"
+                "command": command,  # Use "command" to match C++ ProcessMessage expectation
                 "params": params or {}  # Use Unity's params or {} pattern
             }
             
-            # Send without newline, exactly like Unity
-            command_json = json.dumps(command_obj)
-            logger.debug(f"Sending command: {command_json}")
+            # Send with custom delimiter for robust server-side reading
+            # We use 'UmgMcp' as a safe delimiter to avoid collisions with content
+            command_json = json.dumps(command_obj) + "UmgMcp"
+            logger.debug(f"Sending command: {command_json.strip()}")
             self.socket.sendall(command_json.encode('utf-8'))
             
             # Read response using improved handler
@@ -205,6 +207,25 @@ class UnrealConnection:
                 "status": "error",
                 "error": str(e)
             }
+
+class ContextManager:
+    """Manages the 'attention' context for the AI."""
+    def __init__(self):
+        self._target_asset_path: Optional[str] = None
+
+    def set_target(self, asset_path: str):
+        self._target_asset_path = asset_path
+        logger.info(f"Context set to: {asset_path}")
+
+    def get_target(self) -> Optional[str]:
+        return self._target_asset_path
+
+    def clear_target(self):
+        self._target_asset_path = None
+        logger.info("Context cleared")
+
+# Global Context Manager Instance
+context_manager = ContextManager()
 
 # Global connection state
 _unreal_connection: UnrealConnection = None
@@ -341,6 +362,7 @@ def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
     Sets the UMG asset that should be considered the current attention target.
     This allows programmatically setting the active UMG context.
     """
+    context_manager.set_target(asset_path) # Update local context
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
     return umg_attention_client.set_target_umg_asset(asset_path)
@@ -352,9 +374,8 @@ def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
 @mcp.tool()
 def get_widget_tree(asset_path: Optional[str] = None) -> Dict[str, Any]:
     """
-    Retrieves the full widget hierarchy for a UMG asset.
-    AI HINT: If 'asset_path' is omitted, the command will use the globally targeted asset set by 'set_target_umg_asset'.
-    This is your EYES. Call this first to get a map of the UI.
+    "What does this UI look like?" - Fetches the complete widget hierarchy, which is the foundation for all AI reasoning.
+    AI HINT: If 'asset_path' is omitted, the command will use the globally targeted asset.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
@@ -401,8 +422,25 @@ def create_widget(parent_name: str, widget_type: str, new_widget_name: str, asse
     AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset. Use 'get_creatable_widget_types' for 'widget_type'.
     """
     conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = asset_path
+    if not final_path:
+        if context_manager.get_target():
+            final_path = context_manager.get_target()
+        else:
+            resp = conn.send_command("get_target_umg_asset")
+            if resp.get("status") == "success":
+                 final_path = resp.get("result", {}).get("data", {}).get("asset_path")
+
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.create_widget(asset_path, parent_name, widget_type, new_widget_name)
+    result = umg_set_client.create_widget(final_path, parent_name, widget_type, new_widget_name)
+    
+    # Invalidate Cache on Modification
+    if result.get("status") == "success":
+        context_manager.invalidate_cache()
+        
+    return result
 
 @mcp.tool()
 def set_widget_properties(widget_name: str, properties: Dict[str, Any], asset_path: Optional[str] = None) -> Dict[str, Any]:
@@ -446,11 +484,85 @@ def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
     return umg_file_client.export_umg_to_json(asset_path)
 
 @mcp.tool()
-def apply_json_to_umg(asset_path: str, json_data: Dict[str, Any]) -> Dict[str, Any]:
-    """'Compiles' a JSON string into a UMG .uasset file. Requires an explicit asset path."""
+def apply_layout(layout_content: str, asset_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    "Design the UI" - Applies a layout definition to a UMG asset.
+    
+    **Smart Format Detection**:
+    - If content starts with `<`: Treated as **HTML/XML**.
+    - If content starts with `{`: Treated as **JSON**.
+    
+    Args:
+        layout_content: The HTML or JSON string defining the widget tree.
+        asset_path: Optional. If omitted, uses the current target set by 'set_target_umg_asset'.
+    """
+    # 1. Determine Format
+    content = layout_content.strip()
+    is_html = content.startswith("<")
+    
+    # 2. Parse if HTML
+    json_data = None
+    if is_html:
+        try:
+            parser = UMGHTMLParser.UMGHTMLParser()
+            json_data = parser.parse(content)
+        except Exception as e:
+            return {"status": "error", "error": f"HTML Parsing Failed: {str(e)}"}
+    else:
+        try:
+            json_data = json.loads(content)
+        except json.JSONDecodeError as e:
+             return {"status": "error", "error": f"JSON Parsing Failed: {str(e)}"}
+
+    # 3. Apply
     conn = get_unreal_connection()
-    umg_file_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return umg_file_client.apply_json_to_umg(asset_path, json_data)
+    
+    # Resolve Path - C++ will handle default workspace if empty
+    final_path = asset_path
+    if not final_path:
+        if context_manager.get_target():
+            final_path = context_manager.get_target()
+        else:
+            # Try to get currently open asset from Unreal
+            resp = conn.send_command("get_target_umg_asset")
+            if resp.get("status") == "success":
+                data = resp.get("result", {}).get("data", {})
+                if data:
+                    final_path = data.get("asset_path")
+    
+    # If still no path, pass empty string - C++ will use default workspace
+    if not final_path:
+        final_path = ""
+        logger.info("No UMG asset specified. C++ will use default workspace.")
+    else:
+        logger.info(f"Resolved target asset path: {final_path}")
+    
+    umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
+    return umg_trans_client.apply_json_to_umg(final_path, json_data)
+
+# Deprecated: Kept for backward compatibility
+@mcp.tool()
+def apply_json_to_umg(asset_path: str, json_data: Dict[str, Any]) -> Dict[str, Any]:
+    """[Deprecated] Use apply_layout instead."""
+    return apply_layout(json.dumps(json_data), asset_path)
+
+@mcp.tool()
+def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
+    """[Deprecated] Use apply_layout instead."""
+    return apply_layout(html_content, asset_path)
+
+@mcp.tool()
+def preview_html_conversion(html_content: str) -> Dict[str, Any]:
+    """
+    "Debug HTML" - Returns the UMG JSON that WOULD be generated from the given HTML.
+    Use this to verify how your HTML tags map to UMG properties before applying.
+    """
+    try:
+        parser = UMGHTMLParser.UMGHTMLParser()
+        json_data = parser.parse(html_content)
+        return {"status": "success", "data": json_data}
+    except Exception as e:
+        return {"status": "error", "error": f"HTML Parsing Failed: {str(e)}"}
 
 # =============================================================================
 

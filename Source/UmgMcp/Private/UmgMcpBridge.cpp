@@ -230,7 +230,8 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
                      CommandType == TEXT("create_widget") ||
                      CommandType == TEXT("set_widget_properties") ||
                      CommandType == TEXT("delete_widget") ||
-                     CommandType == TEXT("reparent_widget"))
+                     CommandType == TEXT("reparent_widget") ||
+                     CommandType == TEXT("get_widget_schema"))
             {
                 ResultJson = WidgetCommands->HandleCommand(CommandType, Params);
             }

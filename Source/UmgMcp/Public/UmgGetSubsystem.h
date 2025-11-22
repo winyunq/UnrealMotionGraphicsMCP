@@ -41,4 +41,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
 	FString GetAssetFileSystemPath(const FString& AssetPath);
+
+	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
+	FString GetWidgetSchema(const FString& WidgetType);
 };

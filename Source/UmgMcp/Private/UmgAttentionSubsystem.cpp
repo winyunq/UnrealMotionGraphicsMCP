@@ -127,6 +127,31 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
         return AttentionTargetAssetPath;
     }
     
+    // NEW: Check currently open UMG editors
+    if (GEditor)
+    {
+        UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+        if (AssetEditorSubsystem)
+        {
+            TArray<UObject*> EditedAssets = AssetEditorSubsystem->GetAllEditedAssets();
+            for (UObject* Asset : EditedAssets)
+            {
+                if (UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(Asset))
+                {
+                    FString AssetPath = WidgetBP->GetPathName();
+                    UE_LOG(LogUmgAttention, Log, TEXT("Found currently open UMG editor: %s"), *AssetPath);
+                    
+                    // Update our cache
+                    MutableThis->CachedTargetWidgetBlueprint = WidgetBP;
+                    
+                    // Return the first found UMG asset
+                    return AssetPath;
+                }
+            }
+        }
+    }
+    
+    // Fallback to history
     return GetLastEditedUMGAsset();
 }
 

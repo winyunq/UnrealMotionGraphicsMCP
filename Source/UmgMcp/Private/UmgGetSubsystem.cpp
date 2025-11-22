@@ -324,3 +324,50 @@ FString UUmgGetSubsystem::GetAssetFileSystemPath(const FString& AssetPath)
         return FString();
     }
 }
+
+FString UUmgGetSubsystem::GetWidgetSchema(const FString& WidgetType)
+{
+    UClass* WidgetClass = FindObject<UClass>(ANY_PACKAGE, *WidgetType);
+    if (!WidgetClass)
+    {
+        WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
+    }
+
+    if (!WidgetClass)
+    {
+        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetSchema: Failed to find or load widget class '%s'."), *WidgetType);
+        return FString();
+    }
+
+    TSharedPtr<FJsonObject> SchemaJson = MakeShared<FJsonObject>();
+    SchemaJson->SetStringField(TEXT("widget_type"), WidgetType);
+    
+    TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
+
+    for (TFieldIterator<FProperty> PropIt(WidgetClass); PropIt; ++PropIt)
+    {
+        FProperty* Property = *PropIt;
+        bool bIsEditorOnly = false;
+#if WITH_EDITOR
+        bIsEditorOnly = Property->HasAnyPropertyFlags(CPF_EditorOnly);
+#endif
+        if (Property->HasAnyPropertyFlags(CPF_Edit) && !bIsEditorOnly)
+        {
+            TSharedPtr<FJsonObject> PropInfo = MakeShared<FJsonObject>();
+            PropInfo->SetStringField(TEXT("type"), Property->GetCPPType());
+            
+            // Add more metadata if needed, e.g., tooltip, category
+#if WITH_EDITOR
+            PropInfo->SetStringField(TEXT("tooltip"), Property->GetToolTipText().ToString());
+#endif
+            PropertiesJson->SetObjectField(Property->GetName(), PropInfo);
+        }
+    }
+
+    SchemaJson->SetObjectField(TEXT("properties"), PropertiesJson);
+
+    FString JsonString;
+    TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
+    FJsonSerializer::Serialize(SchemaJson.ToSharedRef(), JsonWriter);
+    return JsonString;
+}

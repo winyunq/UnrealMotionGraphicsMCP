@@ -23,12 +23,18 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     }
 
     FString ErrorMessage;
-    UWidgetBlueprint* TargetBlueprint = GetTargetWidgetBlueprint(Params, ErrorMessage);
+    UWidgetBlueprint* TargetBlueprint = nullptr;
 
-    if (!TargetBlueprint)
+    // Some commands don't require a target blueprint
+    if (Command != TEXT("get_widget_schema"))
     {
-        Response->SetStringField(TEXT("error"), ErrorMessage);
-        return Response;
+        TargetBlueprint = GetTargetWidgetBlueprint(Params, ErrorMessage);
+
+        if (!TargetBlueprint)
+        {
+            Response->SetStringField(TEXT("error"), ErrorMessage);
+            return Response;
+        }
     }
 
     // --- GET/QUERY COMMANDS ---
@@ -85,6 +91,30 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'properties' parameter."));
         }
     }
+    else if (Command == TEXT("get_widget_schema"))
+    {
+        UUmgGetSubsystem* GetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
+        FString WidgetType;
+        if (Params->TryGetStringField(TEXT("widget_type"), WidgetType))
+        {
+            FString SchemaJsonString = GetSubsystem->GetWidgetSchema(WidgetType);
+            TSharedPtr<FJsonObject> SchemaJson;
+            TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(SchemaJsonString);
+            if (FJsonSerializer::Deserialize(Reader, SchemaJson) && SchemaJson.IsValid())
+            {
+                Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetObjectField(TEXT("data"), SchemaJson);
+            }
+            else
+            {
+                Response->SetStringField(TEXT("error"), TEXT("Failed to get widget schema or parse response."));
+            }
+        }
+        else
+        {
+            Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_type' parameter."));
+        }
+    }
     // ... other GET commands
     
     // --- SET/ACTION COMMANDS ---
@@ -116,12 +146,16 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     {
         UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
         FString WidgetName;
-        const TSharedPtr<FJsonObject>* PropertiesJsonObject;
-        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName) && Params->TryGetObjectField(TEXT("properties"), PropertiesJsonObject))
+        const TSharedPtr<FJsonObject>* PropertiesPtr;
+        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName) && Params->TryGetObjectField(TEXT("properties"), PropertiesPtr))
         {
+            TSharedPtr<FJsonObject> PropertiesJsonObject = *PropertiesPtr;
             FString PropertiesJsonString;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&PropertiesJsonString);
-            FJsonSerializer::Serialize(PropertiesJsonObject->ToSharedRef(), Writer.Get(), false);
+            FJsonSerializer::Serialize(PropertiesJsonObject.ToSharedRef(), Writer);
+            Writer->Close(); // Explicitly close to ensure flush
+
+            UE_LOG(LogTemp, Log, TEXT("UmgMcpWidgetCommands: Serialized Properties JSON for '%s': %s"), *WidgetName, *PropertiesJsonString);
 
             if (SetSubsystem->SetWidgetProperties(TargetBlueprint, WidgetName, PropertiesJsonString))
             {
@@ -137,7 +171,46 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'properties' (as a JSON object) parameter."));
         }
     }
-    // ... other SET commands
+    else if (Command == TEXT("delete_widget"))
+    {
+        UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
+        FString WidgetName;
+        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+        {
+            if (SetSubsystem->DeleteWidget(TargetBlueprint, WidgetName))
+            {
+                Response->SetStringField(TEXT("status"), TEXT("success"));
+            }
+            else
+            {
+                Response->SetStringField(TEXT("error"), TEXT("Failed to delete widget. Check logs for details."));
+            }
+        }
+        else
+        {
+            Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' parameter."));
+        }
+    }
+    else if (Command == TEXT("reparent_widget"))
+    {
+        UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
+        FString WidgetName, NewParentName;
+        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName) && Params->TryGetStringField(TEXT("new_parent_name"), NewParentName))
+        {
+            if (SetSubsystem->ReparentWidget(TargetBlueprint, WidgetName, NewParentName))
+            {
+                Response->SetStringField(TEXT("status"), TEXT("success"));
+            }
+            else
+            {
+                Response->SetStringField(TEXT("error"), TEXT("Failed to reparent widget. Check logs for details."));
+            }
+        }
+        else
+        {
+            Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'new_parent_name' parameter."));
+        }
+    }
 
     else
     {

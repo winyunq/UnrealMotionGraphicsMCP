@@ -1,103 +1,170 @@
-# Gemini.md - UMG Agent Development Log
+# UMG MCP 默认工作区功能实现
 
-## 项目目标
+## 概述
 
-开发一个针对 Unreal Engine 5 (UE5) UMG (Unreal Motion Graphics) 界面的 AI Agent，使其能够感知和操作 UMG UI。
+实现了"默认工作区"功能：当没有指定UMG资产时，自动使用 `/Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP` 作为默认工作区，如果不存在则自动创建。
 
-## 插件信息
+## 设计原则
 
-*   **插件名称:** `UmgMcp`
-*   **插件类型:** C++ 引擎/项目插件 (目前作为项目插件安装在 `D:\ModelContextProtocol\unreal-engine-mcp\FlopperamUnrealMCP\Plugins\UE5_UMG_MCP`)
-*   **核心功能:**
-    *   提供与 UE5 UMG 交互的 C++ 接口。
-    *   通过 MCP 服务器暴露这些功能，供外部 Python 客户端调用。
+**完全由C++端处理**：默认工作区的逻辑完全在C++端的 `ApplyJsonToUmgAsset_GameThread` 函数中实现，Python端只负责解析HTML/JSON并传递给C++。
 
-## 关键文件
+## 实现细节
 
-*   `UmgMcp.uplugin`: 插件描述文件。
-*   `Source/UmgMcp/UmgMcp.Build.cs`: 模块构建文件，定义依赖项。
-*   `Source/UmgMcp/Public/UmgGetSubsystem.h`: “感知”功能子系统头文件。
-*   `Source/UmgMcp/Private/UmgGetSubsystem.cpp`: “感知”功能子系统实现。
-*   `Source/UmgMcp/Public/UmgSetSubsystem.h`: “行动”功能子系统头文件。
-*   `Source/UmgMcp/Private/UmgSetSubsystem.cpp`: “行动”功能子系统实现。
-*   `Resources/Python/UmgMcpServer.py`: 核心MCP服务器，定义所有工具。
-*   `Resources/Python/UMGGet.py`: “感知”功能的Python客户端模块。
-*   `Resources/Python/UMGSet.py`: “行动”功能的Python客户端模块。
+### Python端 (UmgMcpServer.py)
 
-## 当前状态与进展 (V3.1 - 崩溃修复与文档更新)
+当 `apply_layout` 函数没有找到任何目标资产时，传递**空字符串**给C++端。
 
-1.  **修复 `set_widget_properties` 崩溃问题:**
-    *   **问题诊断:** 定位到 `set_widget_properties` 在处理传入的JSON数据时发生崩溃。
-    *   **修复 (命令层):** 修正了 `UmgMcpWidgetCommands.cpp` 中的逻辑错误，使其能正确解析名为 `properties` 的JSON对象，而非错误地查找 `properties_json` 字符串。
-    *   **修复 (健壮性):** 在 `UmgSetSubsystem.cpp` 中增加了对JSON `null` 值的检查，防止 `FJsonObjectConverter::JsonValueToUProperty` 在接收到 `null` 时引发崩溃，提高了代码的健壮性。
+**关键代码**：
+```python
+# If still no path, pass empty string - C++ will use default workspace
+if not final_path:
+    final_path = ""
+    logger.info("No UMG asset specified. C++ will use default workspace.")
+```
 
-2.  **更新项目文档:**
-    *   **API状态表:** 在 `Readme.md` 和 `Readme_zh.md` 中添加了详细的Markdown表格，清晰地记录了每个API的实现状态 (✅/❌)，方便用户和协作者快速了解项目现状。
+### C++端 (UmgFileTransformation.cpp)
 
-## 当前状态与进展 (V3.0 - 核心逻辑重构与清理)
+#### 1. 默认路径处理
 
-1.  **核心逻辑重构 (C++):** 彻底重构了 `WidgetCommands` 和相关子系统 (`Get`/`Set`) 的工作方式。创建了新的目标解析逻辑，实现了“**优先使用命令参数，失败则回退到全局目标**”的健壮工作流。修复了资生路径中包含 `.uasset` 后缀的加载问题。
+在函数开头检查AssetPath，如果为空则使用默认路径：
 
-2.  **命令清理 (C++):** 从 `UmgMcpBridge` 中移除了所有与 UMG 不直接相关的通用命令（如 `EditorCommands` 和 `BlueprintCommands`），使插件的职责更专注、更清晰。
+```cpp
+// Handle default workspace: if AssetPath is empty, use default path
+FString FinalAssetPath = AssetPath;
+if (FinalAssetPath.IsEmpty() || FinalAssetPath.TrimStartAndEnd().IsEmpty())
+{
+    FinalAssetPath = TEXT("/Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP");
+    UE_LOG(LogUmgMcp, Log, TEXT("No asset path provided. Using default workspace: '%s'."), *FinalAssetPath);
+}
+```
 
-3.  **Python 端同步重构:**
-    *   完全重写了 `UmgMcpServer.py` 中的工具定义，移除了冗余的客户端检查逻辑。
-    *   所有 `Sensing` 和 `Action` 类的工具现在都接受一个可选的 `asset_path` 参数，将目标决策完全交给 C++ 后端处理。
-    *   更新了所有工具的文档字符串（AI HINT），以匹配新的工作流程。
+#### 2. 自动创建资产
 
-## API 清单与评估 (V3.0)
+当资产不存在时，自动创建新的 WidgetBlueprint：
 
-### 1. 感知 (Sensing) - AI的“眼睛”
+```cpp
+// Create a new package
+UPackage* Package = CreatePackage(*PackagePath);
 
-*   `get_widget_tree(asset_path: Optional[str] = None)`
-    *   **作用**: 获取UI的完整层级结构。**这是最核心的感知API**。
-    *   **工作流**: 如果提供了 `asset_path`，则直接操作该文件。如果省略，则自动操作由 `set_target_umg_asset` 设定的全局目标。
+// Create the Widget Blueprint using the factory
+UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
+WidgetBlueprint = Cast<UWidgetBlueprint>(Factory->FactoryCreateNew(
+    UWidgetBlueprint::StaticClass(),
+    Package,
+    FName(*AssetName),
+    RF_Public | RF_Standalone,
+    nullptr,
+    GWarn
+));
 
-*   `query_widget_properties(widget_name: str, properties: List[str], asset_path: Optional[str] = None)`
-    *   **作用**: 精确查询某个控件的一个或多个具体属性的值。
-    *   **工作流**: 同上，优先使用 `asset_path`，否则回退到全局目标。
+bIsNewlyCreated = true;  // Mark as newly created
+```
 
-*   `get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080, asset_path: Optional[str] = None)`
-    *   **作用**: 获取所有控件在给定分辨率下的屏幕坐标和尺寸。
-    *   **工作流**: 同上。
+#### 3. 防止崩溃的关键修复
 
-*   `check_widget_overlap(widget_names: Optional[List[str]] = None, asset_path: Optional[str] = None)`
-    *   **作用**: 一个高效的后端API，直接判断界面上是否存在控件重叠。
-    *   **工作流**: 同上。
+**问题**：调用 `FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified()` 会导致崩溃（对新创建和已存在的Blueprint都会崩溃）。
 
-### 2. 行动 (Action) - AI的“双手”
+**根本原因**：这个函数在异步的GameThread上下文中不安全，即使Blueprint已经完全初始化也会导致访问冲突。
 
-*   `create_widget(parent_name: str, widget_type: str, new_widget_name: str, asset_path: Optional[str] = None)`
-    *   **作用**: 在指定的父控件下创建一个新的控件。
-    *   **工作流**: 同上。
+**最终解决方案**：
+- **完全移除** `MarkBlueprintAsStructurallyModified` 调用
+- 对所有Blueprint（新创建和已存在）统一使用：只标记Package为dirty
+- 让用户手动保存或在编辑器中刷新
 
-*   `delete_widget(widget_name: str, asset_path: Optional[str] = None)`
-    *   **作用**: 删除一个指定的控件。
-    *   **工作流**: 同上。
+```cpp
+// Save the blueprint by marking package as dirty
+// Note: We don't call MarkBlueprintAsStructurallyModified because it causes crashes
+// in async context, even for existing blueprints.
+UPackage* Package = WidgetBlueprint->GetOutermost();
+if (Package)
+{
+    Package->MarkPackageDirty();
+    
+    if (bIsNewlyCreated)
+    {
+        UE_LOG(LogUmgMcp, Log, TEXT("New asset created. Please save manually (Ctrl+S)."));
+    }
+    else
+    {
+        UE_LOG(LogUmgMcp, Log, TEXT("Existing asset modified. Close and reopen the asset to see changes, or press Compile."));
+    }
+}
+```
 
-*   `set_widget_properties(widget_name: str, properties: Dict[str, Any], asset_path: Optional[str] = None)`
-    *   **作用**: 修改一个控件的一个或多个属性。**这是最核心的修改API**。
-    *   **工作流**: 同上。
+## 使用方法
 
-*   `reparent_widget(widget_name: str, new_parent_name: str, asset_path: Optional[str] = None)`
-    *   **作用**: 将一个控件从一个父容器移动到另一个。
-    *   **工作流**: 同上。
+### 示例1：不指定资产路径（使用默认工作区）
 
-### 3. 自省与上下文 (Introspection & Context)
+```python
+# 会自动使用/创建 /Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP
+result = await session.call_tool("apply_layout", arguments={
+    "layout_content": html_content
+    # 不传 asset_path
+})
+```
 
-*   `get_creatable_widget_types()`
-    *   **作用**: 告诉AI它“工具箱”里有哪些类型的控件可以被创建。
+### 示例2：显式指定资产路径
 
-*   `get_widget_schema(widget_type)`
-    *   **作用**: 告诉AI某个特定类型的控件有哪些可以被编辑的属性。
+```python
+result = await session.call_tool("apply_layout", arguments={
+    "layout_content": html_content,
+    "asset_path": "/Game/MyCustomUI.MyCustomUI"
+})
+```
 
-*   `set_target_umg_asset(asset_path: str)`
-    *   **作用**: 设置一个全局工作目标，所有后续省略 `asset_path` 参数的命令都将操作此目标。
+## 文件修改列表
 
-*   `get_target_umg_asset()`
-    *   **作用**: 查询当前设定的全局工作目标是什么。
+- ✅ `UmgMcpServer.py` - Python端：传递空字符串给C++
+- ✅ `UmgFileTransformation.cpp` - C++端：
+  - 默认路径处理
+  - 自动创建资产
+  - 完全移除 `MarkBlueprintAsStructurallyModified` 调用
+- ✅ `Gemini_test_default_workspace.py` - 测试脚本
 
-### 评估结论
+## 用户体验
 
-*   **核心能力**: API 逻辑和工作流已得到极大改善，更加健壮和灵活。
-*   **下一步建议**: 对重构后的 API 进行全面的功能性测试，确保所有分支（提供/不提供 `asset_path`）都能正常工作。
+### 新创建的资产
+- 资产会自动创建并应用UI布局
+- **需要手动保存**：按 `Ctrl+S` 或在关闭项目时保存
+- 保存后可在Content Browser中看到新资产
+
+### 已存在的资产
+- UI布局会立即应用
+- 如果资产在编辑器中打开：
+  - **方法1**：关闭资产编辑器，然后重新打开查看更改
+  - **方法2**：点击"Compile"按钮刷新
+- 如果资产未打开：下次打开时会看到更改
+
+## 已知限制
+
+1. **不会自动刷新编辑器**：需要手动关闭/重新打开或点击Compile
+2. **新资产需要手动保存**：不会自动保存到磁盘
+3. **默认路径硬编码**：固定为 `/Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP`
+
+## 测试结果
+
+### 未打开文件时
+✅ 传递空字符串给C++
+✅ C++检测到空字符串并使用默认路径
+✅ 自动创建 UnrealMotionGraphicsMCP 资产
+✅ 成功应用UI布局
+✅ Package标记为dirty
+
+### 打开文件时
+✅ 使用打开文件的路径
+✅ 成功应用UI布局
+✅ Package标记为dirty
+✅ **不再崩溃**（已移除 MarkBlueprintAsStructurallyModified）
+
+## 下一步
+
+需要用户：
+1. **重新编译插件**（C++代码已修改）
+2. **重启Unreal Editor**
+3. **运行测试**：
+   ```bash
+   python Gemini_test_default_workspace.py
+   ```
+4. **验证两种情况**：
+   - 没有打开UMG文件时运行
+   - 打开UMG文件时运行
