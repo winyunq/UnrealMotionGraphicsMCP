@@ -26,6 +26,8 @@ import UMGGet
 import UMGSet
 import UMGFileTransformation
 import UMGHTMLParser
+import UMGEditor
+import UMGBlueprint
 
 # Configure logging
 logging.basicConfig(
@@ -298,7 +300,6 @@ mcp = FastMCP(
 def get_widget_schema(widget_type: str) -> Dict[str, Any]:
     """
     "What can this component do?" - Retrieves the "schema" for a widget type, detailing its editable properties and their types.
-    AI HINT: Call this BEFORE using 'set_widget_properties' to know which properties are valid, preventing errors.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
@@ -308,7 +309,6 @@ def get_widget_schema(widget_type: str) -> Dict[str, Any]:
 def get_creatable_widget_types() -> Dict[str, Any]:
     """
     "What's in my toolbox?" - Returns a list of all widget class names that can be created with the 'create_widget' tool.
-    AI HINT: Use this to know the full range of widgets you can spawn in the UMG editor.
     """
     # Per user instruction, return a philosophical guide instead of a fixed list.
     # This encourages the AI to experiment based on its own knowledge.
@@ -330,7 +330,6 @@ def get_creatable_widget_types() -> Dict[str, Any]:
 def get_target_umg_asset() -> Dict[str, Any]:
     """
     "What UMG is the user editing right now?" - Gets the asset path of the UMG Editor the user is currently focused on.
-    AI HINT: This is your PRIMARY tool for understanding ambiguous commands like "change this button".
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
@@ -340,7 +339,6 @@ def get_target_umg_asset() -> Dict[str, Any]:
 def get_last_edited_umg_asset() -> Dict[str, Any]:
     """
     "What was the user just working on?" - Gets the asset path of the last UMG asset that was opened or saved.
-    AI HINT: Use this as a fallback if 'get_target_umg_asset' returns null. Our tools do this automatically.
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
@@ -350,7 +348,6 @@ def get_last_edited_umg_asset() -> Dict[str, Any]:
 def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
     """
     "What has the user been working on recently?" - Gets a list of recently edited UMG assets.
-    AI HINT: Use this to offer suggestions if the context is completely lost.
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
@@ -360,7 +357,6 @@ def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
 def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
     """
     Sets the UMG asset that should be considered the current attention target.
-    This allows programmatically setting the active UMG context.
     """
     context_manager.set_target(asset_path) # Update local context
     conn = get_unreal_connection()
@@ -372,51 +368,71 @@ def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
 # =============================================================================
 
 @mcp.tool()
-def get_widget_tree(asset_path: Optional[str] = None) -> Dict[str, Any]:
+def get_widget_tree() -> Dict[str, Any]:
     """
     "What does this UI look like?" - Fetches the complete widget hierarchy, which is the foundation for all AI reasoning.
-    AI HINT: If 'asset_path' is omitted, the command will use the globally targeted asset.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.get_widget_tree(asset_path)
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    return umg_get_client.get_widget_tree(final_path)
 
 @mcp.tool()
-def query_widget_properties(widget_name: str, properties: List[str], asset_path: Optional[str] = None) -> Dict[str, Any]:
+def query_widget_properties(widget_name: str, properties: List[str]) -> Dict[str, Any]:
     """
     Queries a list of specific properties from a single widget by its name (e.g., 'Slot.Size').
-    AI HINT: If 'asset_path' is omitted, the command will use the globally targeted asset.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.query_widget_properties(asset_path, widget_name, properties)
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    return umg_get_client.query_widget_properties(final_path, widget_name, properties)
 
 @mcp.tool()
-def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080, asset_path: Optional[str] = None) -> Dict[str, Any]:
+def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
     """
     Gets screen-space bounding boxes for all widgets in the asset at a given resolution.
-    AI HINT: If 'asset_path' is omitted, the command will use the globally targeted asset.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.get_layout_data(asset_path, resolution_width, resolution_height)
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    return umg_get_client.get_layout_data(final_path, resolution_width, resolution_height)
 
 @mcp.tool()
-def check_widget_overlap(widget_names: Optional[List[str]] = None, asset_path: Optional[str] = None) -> Dict[str, Any]:
+def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     "Are any widgets overlapping?" - Efficiently checks for layout overlap between widgets in the asset.
-    AI HINT: PREFER this server-side check. If 'asset_path' is omitted, it uses the globally targeted asset.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.check_widget_overlap(asset_path, widget_names)
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    return umg_get_client.check_widget_overlap(final_path, widget_names)
 
 # =============================================================================
 #  Category: Action
 # =============================================================================
 
 @mcp.tool()
-def create_widget(parent_name: str, widget_type: str, new_widget_name: str, asset_path: Optional[str] = None) -> Dict[str, Any]:
+def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> Dict[str, Any]:
     """
     Creates a new widget and attaches it to a parent.
     AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset. Use 'get_creatable_widget_types' for 'widget_type'.
@@ -424,14 +440,18 @@ def create_widget(parent_name: str, widget_type: str, new_widget_name: str, asse
     conn = get_unreal_connection()
     
     # Resolve Path
-    final_path = asset_path
+    final_path = context_manager.get_target()
     if not final_path:
-        if context_manager.get_target():
-            final_path = context_manager.get_target()
+        resp = conn.send_command("get_target_umg_asset")
+        if resp.get("status") == "success":
+            data = resp.get("result", {}).get("data", {})
+            if data and data.get("asset_path"):
+                final_path = data.get("asset_path")
+                context_manager.set_target(final_path)
+            else:
+                return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
         else:
-            resp = conn.send_command("get_target_umg_asset")
-            if resp.get("status") == "success":
-                 final_path = resp.get("result", {}).get("data", {}).get("asset_path")
+            return {"status": "error", "error": "Failed to get target UMG asset from Unreal."}
 
     umg_set_client = UMGSet.UMGSet(conn)
     result = umg_set_client.create_widget(final_path, parent_name, widget_type, new_widget_name)
@@ -443,44 +463,68 @@ def create_widget(parent_name: str, widget_type: str, new_widget_name: str, asse
     return result
 
 @mcp.tool()
-def set_widget_properties(widget_name: str, properties: Dict[str, Any], asset_path: Optional[str] = None) -> Dict[str, Any]:
+def set_widget_properties(widget_name: str, properties: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Sets one or more properties on a specific widget by its name. This is your primary modification tool.
-    AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset. Use get_widget_schema to see available properties.
+    Sets one or more properties on a specific widget by its name in the currently targeted UMG asset. This is your primary modification tool.
+    AI HINT: Use get_widget_schema to see available properties.
     """
     conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.set_widget_properties(asset_path, widget_name, properties)
+    return umg_set_client.set_widget_properties(final_path, widget_name, properties)
 
 @mcp.tool()
-def delete_widget(widget_name: str, asset_path: Optional[str] = None) -> Dict[str, Any]:
+def delete_widget(widget_name: str) -> Dict[str, Any]:
     """
     Deletes a widget by its name from the UMG asset.
     AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
     """
     conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.delete_widget(asset_path, widget_name)
+    return umg_set_client.delete_widget(final_path, widget_name)
 
 @mcp.tool()
-def reparent_widget(widget_name: str, new_parent_name: str, asset_path: Optional[str] = None) -> Dict[str, Any]:
+def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
     """
     Moves a widget to be a child of a different parent.
     AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
     """
     conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.reparent_widget(asset_path, widget_name, new_parent_name)
+    return umg_set_client.reparent_widget(final_path, widget_name, new_parent_name)
 
 @mcp.tool()
-def save_asset(asset_path: Optional[str] = None) -> Dict[str, Any]:
+def save_asset() -> Dict[str, Any]:
     """
     "Save my work" - Saves the UMG asset to disk.
     AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
     """
     conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.save_asset(asset_path)
+    return umg_set_client.save_asset(final_path)
 
 # =============================================================================
 #  Category: File Transformation (Explicit Path)
@@ -494,7 +538,7 @@ def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
     return umg_file_client.export_umg_to_json(asset_path)
 
 @mcp.tool()
-def apply_layout(layout_content: str, asset_path: Optional[str] = None) -> Dict[str, Any]:
+def apply_layout(layout_content: str) -> Dict[str, Any]:
     """
     "Design the UI" - Applies a layout definition to a UMG asset.
     
@@ -504,7 +548,6 @@ def apply_layout(layout_content: str, asset_path: Optional[str] = None) -> Dict[
     
     Args:
         layout_content: The HTML or JSON string defining the widget tree.
-        asset_path: Optional. If omitted, uses the current target set by 'set_target_umg_asset'.
     """
     # 1. Determine Format
     content = layout_content.strip()
@@ -527,25 +570,22 @@ def apply_layout(layout_content: str, asset_path: Optional[str] = None) -> Dict[
     # 3. Apply
     conn = get_unreal_connection()
     
-    # Resolve Path - C++ will handle default workspace if empty
-    final_path = asset_path
+    # Resolve Path
+    final_path = context_manager.get_target()
     if not final_path:
-        if context_manager.get_target():
-            final_path = context_manager.get_target()
-        else:
-            # Try to get currently open asset from Unreal
-            resp = conn.send_command("get_target_umg_asset")
-            if resp.get("status") == "success":
-                data = resp.get("result", {}).get("data", {})
-                if data:
-                    final_path = data.get("asset_path")
+        # Try to get currently open asset from Unreal
+        resp = conn.send_command("get_target_umg_asset")
+        if resp.get("status") == "success":
+            data = resp.get("result", {}).get("data", {})
+            if data:
+                final_path = data.get("asset_path")
+                if final_path:
+                    context_manager.set_target(final_path)
     
-    # If still no path, pass empty string - C++ will use default workspace
     if not final_path:
-        final_path = ""
-        logger.info("No UMG asset specified. C++ will use default workspace.")
-    else:
-        logger.info(f"Resolved target asset path: {final_path}")
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+    
+    logger.info(f"Resolved target asset path: {final_path}")
     
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
     return umg_trans_client.apply_json_to_umg(final_path, json_data)
@@ -556,12 +596,12 @@ def apply_json_to_umg(asset_path: str, json_data: Dict[str, Any]) -> Dict[str, A
     """[Deprecated] Use apply_layout instead."""
     return apply_layout(json.dumps(json_data), asset_path)
 
-@mcp.tool()
+# @mcp.tool()
 def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
     """[Deprecated] Use apply_layout instead."""
     return apply_layout(html_content, asset_path)
 
-@mcp.tool()
+# @mcp.tool()
 def preview_html_conversion(html_content: str) -> Dict[str, Any]:
     """
     "Debug HTML" - Returns the UMG JSON that WOULD be generated from the given HTML.
@@ -575,76 +615,134 @@ def preview_html_conversion(html_content: str) -> Dict[str, Any]:
         return {"status": "error", "error": f"HTML Parsing Failed: {str(e)}"}
 
 # =============================================================================
+#  Category: Editor & Level (New)
+# =============================================================================
+
+# @mcp.tool()
+def refresh_asset_registry(paths: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    "I can't find the file!" - Forces Unreal to re-scan the disk for new assets.
+    AI HINT: Use this if you created a file (like a Blueprint) but cannot find it immediately.
+    """
+    conn = get_unreal_connection()
+    editor_client = UMGEditor.UMGEditor(conn)
+    return editor_client.refresh_asset_registry(paths)
+
+# @mcp.tool()
+def get_actors_in_level() -> Dict[str, Any]:
+    """
+    "What's in the scene?" - Gets a list of all actors in the current level.
+    """
+    conn = get_unreal_connection()
+    editor_client = UMGEditor.UMGEditor(conn)
+    return editor_client.get_actors_in_level()
+
+# @mcp.tool()
+def spawn_actor(actor_type: str, name: str, location: List[float] = None, rotation: List[float] = None) -> Dict[str, Any]:
+    """
+    Spawns a basic actor (StaticMeshActor, PointLight, etc.) in the level.
+    """
+    conn = get_unreal_connection()
+    editor_client = UMGEditor.UMGEditor(conn)
+    return editor_client.spawn_actor(actor_type, name, location, rotation)
+
+# =============================================================================
+#  Category: Blueprint (New)
+# =============================================================================
+
+# @mcp.tool()
+def create_blueprint(name: str, parent_class: str = "AActor") -> Dict[str, Any]:
+    """
+    Creates a new Blueprint asset.
+    """
+    conn = get_unreal_connection()
+    bp_client = UMGBlueprint.UMGBlueprint(conn)
+    return bp_client.create_blueprint(name, parent_class)
+
+# @mcp.tool()
+def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
+    """
+    Compiles a Blueprint.
+    """
+    conn = get_unreal_connection()
+    bp_client = UMGBlueprint.UMGBlueprint(conn)
+    return bp_client.compile_blueprint(blueprint_name)
+
+# =============================================================================
 
 @mcp.prompt()
 def info():
     """Run method:"tools/list" to get more details."""
     return """
-# UMG MCP API - v3.0
+# UMG MCP API - v3.0 (English)
 
 This document lists all available tools for interacting with the UMG MCP server.
 
-## 1. 感知 (Sensing) - AI的“眼睛”
+## 1. Sensing - The "Eyes" of the AI
 
-*   `get_widget_tree(asset_path: Optional[str] = None)`
-    *   **作用**: 获取UI的完整层级结构。**这是最核心的感知API**。
-    *   **工作流**: 如果提供了 `asset_path`，则直接操作该文件。如果省略，则自动操作由 `set_target_umg_asset` 设定的全局目标。
+*   `get_widget_tree()`
+    *   **Purpose**: Get the complete hierarchy of the UI. **This is the core sensing API**.
+    *   **Workflow**: Operates on the global target set by `set_target_umg_asset`.
 
-*   `query_widget_properties(widget_name: str, properties: List[str], asset_path: Optional[str] = None)`
-    *   **作用**: 精确查询某个控件的一个或多个具体属性的值。
-    *   **工作流**: 同上，优先使用 `asset_path`，否则回退到全局目标。
+*   `query_widget_properties(widget_name: str, properties: List[str])`
+    *   **Purpose**: Query specific property values of a widget.
+    *   **Workflow**: Same as above.
 
-*   `get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080, asset_path: Optional[str] = None)`
-    *   **作用**: 获取所有控件在给定分辨率下的屏幕坐标和尺寸。
-    *   **工作流**: 同上。
+*   `get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080)`
+    *   **Purpose**: Get screen coordinates and size for all widgets at a given resolution.
+    *   **Workflow**: Same as above.
 
-*   `check_widget_overlap(widget_names: Optional[List[str]] = None, asset_path: Optional[str] = None)`
-    *   **作用**: 一个高效的后端API，直接判断界面上是否存在控件重叠。
-    *   **工作流**: 同上。
+*   `check_widget_overlap(widget_names: Optional[List[str]] = None)`
+    *   **Purpose**: Efficient backend check for widget overlaps.
+    *   **Workflow**: Same as above.
 
-## 2. 行动 (Action) - AI的“双手”
+## 2. Action - The "Hands" of the AI
 
-*   `create_widget(parent_name: str, widget_type: str, new_widget_name: str, asset_path: Optional[str] = None)`
-    *   **作用**: 在指定的父控件下创建一个新的控件。
-    *   **工作流**: 同上。
+*   `create_widget(parent_name: str, widget_type: str, new_widget_name: str)`
+    *   **Purpose**: Create a new widget under a specified parent.
+    *   **Workflow**: Same as above.
 
-*   `delete_widget(widget_name: str, asset_path: Optional[str] = None)`
-    *   **作用**: 删除一个指定的控件。
-    *   **工作流**: 同上。
+*   `delete_widget(widget_name: str)`
+    *   **Purpose**: Delete a specified widget.
+    *   **Workflow**: Same as above.
 
-*   `set_widget_properties(widget_name: str, properties: Dict[str, Any], asset_path: Optional[str] = None)`
-    *   **作用**: 修改一个控件的一个或多个属性。**这是最核心的修改API**。
-    *   **工作流**: 同上。
+*   `set_widget_properties(widget_name: str, properties: Dict[str, Any])`
+    *   **Purpose**: Modify one or more properties of a widget. **This is the core modification API**.
+    *   **Workflow**: Same as above.
 
-*   `reparent_widget(widget_name: str, new_parent_name: str, asset_path: Optional[str] = None)`
-    *   **作用**: 将一个控件从一个父容器移动到另一个。
-    *   **工作流**: 同上。
+*   `reparent_widget(widget_name: str, new_parent_name: str)`
+    *   **Purpose**: Move a widget from one parent to another.
+    *   **Workflow**: Same as above.
 
-## 3. 自省与上下文 (Introspection & Context)
+## 3. Introspection & Context
 
 *   `get_creatable_widget_types()`
-    *   **作用**: 告诉AI它“工具箱”里有哪些类型的控件可以被创建。
+    *   **Purpose**: Tells the AI what types of widgets are in its "toolbox".
 
 *   `get_widget_schema(widget_type)`
-    *   **作用**: 告诉AI某个特定类型的控件有哪些可以被编辑的属性。
+    *   **Purpose**: Tells the AI what editable properties exist for a widget type.
 
 *   `set_target_umg_asset(asset_path: str)`
-    *   **作用**: 设置一个全局工作目标，所有后续省略 `asset_path` 参数的命令都将操作此目标。
+    *   **Purpose**: Sets a global target. All subsequent commands without `asset_path` will use this target.
 
 *   `get_target_umg_asset()`
-    *   **作用**: 查询当前设定的全局工作目标是什么。
+    *   **Purpose**: Query the current global target.
 
-## 4. 文件转换 (File Transformation)
+## 4. File Transformation
 
 *   `export_umg_to_json(asset_path: str)`
-    *   **作用**: 将 UMG `.uasset` 文件“反编译”为 JSON 字符串。需要显式提供资产路径。
+    *   **Purpose**: "Decompile" a UMG `.uasset` to JSON. Requires explicit path.
 
-*   `apply_json_to_umg(asset_path: str, json_data: Dict[str, Any])`
-    *   **作用**: 将 JSON 字符串“编译”回 UMG `.uasset` 文件。需要显式提供资产路径。
+*   `apply_layout(layout_content: str, asset_path: Optional[str] = None)`
+    *   **Purpose**: Apply a JSON or HTML layout definition to a UMG asset.
+
+## 5. Editor & Blueprint (New)
+
+(Hidden to avoid confusion, strictly UMG focused)
 
 ## Pro-Tip for AI Assistants
 
-You can work as a powerful assistant by observing user changes. Use `export_umg_to_json` to 'see' what the user has done. Then, you can help them by using `apply_json_to_umg` to apply normalized data, such as cleaning up variable names, refining text, or fine-tuning transform values (X, Y, Z). This offloads tedious work from the user.
+You can work as a powerful assistant by observing user changes. Use `export_umg_to_json` to 'see' what the user has done. Then, you can help them by using `apply_layout` (or `set_widget_properties`) to apply normalized data, such as cleaning up variable names, refining text, or fine-tuning transform values.
 """
 
 if __name__ == "__main__":

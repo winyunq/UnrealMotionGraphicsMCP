@@ -62,6 +62,8 @@ UUmgMcpBridge::UUmgMcpBridge()
     AttentionCommands = MakeShared<FUmgMcpAttentionCommands>();
     WidgetCommands = MakeShared<FUmgMcpWidgetCommands>();
     FileTransformationCommands = MakeShared<FUmgMcpFileTransformationCommands>();
+    EditorCommands = MakeShared<FUmgMcpEditorCommands>();
+    BlueprintCommands = MakeShared<FUmgMcpBlueprintCommands>();
 }
 
 UUmgMcpBridge::~UUmgMcpBridge()
@@ -69,6 +71,8 @@ UUmgMcpBridge::~UUmgMcpBridge()
     AttentionCommands.Reset();
     WidgetCommands.Reset();
     FileTransformationCommands.Reset();
+    EditorCommands.Reset();
+    BlueprintCommands.Reset();
 }
 
 // Initialize subsystem
@@ -241,6 +245,31 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
                      CommandType == TEXT("apply_json_to_umg"))
             {
                 ResultJson = FileTransformationCommands->HandleCommand(CommandType, Params);
+            }
+            // Editor Commands (Actors, Level, etc.)
+            else if (CommandType == TEXT("get_actors_in_level") ||
+                     CommandType == TEXT("find_actors_by_name") ||
+                     CommandType == TEXT("spawn_actor") ||
+                     CommandType == TEXT("delete_actor") ||
+                     CommandType == TEXT("set_actor_transform") ||
+                     CommandType == TEXT("refresh_asset_registry"))
+            {
+                ResultJson = EditorCommands->HandleCommand(CommandType, Params);
+            }
+            // Blueprint Commands
+            else if (CommandType == TEXT("create_blueprint") ||
+                     CommandType == TEXT("add_component_to_blueprint") ||
+                     CommandType == TEXT("set_physics_properties") ||
+                     CommandType == TEXT("compile_blueprint") ||
+                     CommandType == TEXT("set_static_mesh_properties") ||
+                     CommandType == TEXT("spawn_blueprint_actor") ||
+                     CommandType == TEXT("set_mesh_material_color") ||
+                     CommandType == TEXT("get_available_materials") ||
+                     CommandType == TEXT("apply_material_to_actor") ||
+                     CommandType == TEXT("apply_material_to_blueprint") ||
+                     CommandType == TEXT("get_actor_material_info"))
+            {
+                ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }
             else
             {

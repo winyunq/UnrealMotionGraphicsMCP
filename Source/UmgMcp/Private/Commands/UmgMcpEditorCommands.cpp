@@ -55,6 +55,11 @@ TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleCommand(const FString& Comm
     {
         return HandleSpawnBlueprintActor(Params);
     }
+    // Asset Registry
+    else if (CommandType == TEXT("refresh_asset_registry"))
+    {
+        return HandleRefreshAssetRegistry(Params);
+    }
     
     return FUmgMcpCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
@@ -305,4 +310,36 @@ TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleSpawnBlueprintActor(const T
     // This function will now correctly call the implementation in BlueprintCommands
     FUmgMcpBlueprintCommands BlueprintCommands;
     return BlueprintCommands.HandleCommand(TEXT("spawn_blueprint_actor"), Params);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleRefreshAssetRegistry(const TSharedPtr<FJsonObject>& Params)
+{
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+    IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+    
+    // Scan all paths
+    TArray<FString> PathsToScan;
+    PathsToScan.Add(TEXT("/Game"));
+    AssetRegistry.ScanPathsSynchronous(PathsToScan, true);
+    
+    // Also search for specific files if requested
+    if (Params->HasField(TEXT("paths")))
+    {
+        const TArray<TSharedPtr<FJsonValue>>* PathsArray;
+        if (Params->TryGetArrayField(TEXT("paths"), PathsArray))
+        {
+            TArray<FString> SpecificPaths;
+            for (const TSharedPtr<FJsonValue>& Value : *PathsArray)
+            {
+                SpecificPaths.Add(Value->AsString());
+            }
+            AssetRegistry.ScanPathsSynchronous(SpecificPaths, true);
+        }
+    }
+    
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("refreshed"), true);
+    ResultObj->SetStringField(TEXT("message"), TEXT("Asset Registry refreshed successfully"));
+    
+    return ResultObj;
 }
