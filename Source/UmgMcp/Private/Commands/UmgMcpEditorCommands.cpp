@@ -21,6 +21,7 @@
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "EditorAssetLibrary.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Commands/UmgMcpBlueprintCommands.h"
 
 FUmgMcpEditorCommands::FUmgMcpEditorCommands()
