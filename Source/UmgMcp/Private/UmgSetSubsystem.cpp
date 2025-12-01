@@ -194,10 +194,33 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
     }
 
     // Load widget class first to check if it's valid
-    UClass* WidgetClass = FindObject<UClass>(ANY_PACKAGE, *WidgetType);
+    // Load widget class first to check if it's valid
+    UClass* WidgetClass = FindObject<UClass>(nullptr, *WidgetType);
     if(!WidgetClass)
     {
         WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
+    }
+    
+    // Fallback: Try finding it in the UMG package (for native widgets like VerticalBox, TextBlock)
+    if (!WidgetClass)
+    {
+        FString NativePath = FString::Printf(TEXT("/Script/UMG.%s"), *WidgetType);
+        WidgetClass = FindObject<UClass>(nullptr, *NativePath);
+        if (!WidgetClass)
+        {
+             WidgetClass = LoadObject<UClass>(nullptr, *NativePath);
+        }
+    }
+
+    // Fallback: Try finding it with 'U' prefix in UMG package (e.g. UVerticalBox) - though usually reflection name is without U
+    if (!WidgetClass)
+    {
+        FString NativePathU = FString::Printf(TEXT("/Script/UMG.U%s"), *WidgetType);
+        WidgetClass = FindObject<UClass>(nullptr, *NativePathU);
+         if (!WidgetClass)
+        {
+             WidgetClass = LoadObject<UClass>(nullptr, *NativePathU);
+        }
     }
     
     if (!WidgetClass)
@@ -206,26 +229,23 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         return FString();
     }
 
-    // Check if this is a request to create root widget (no existing root and ParentName is empty or "Root")
+    // Check if this is a request to create root widget (no existing root)
     bool bCreatingRootWidget = false;
     if (!WidgetBlueprint->WidgetTree->RootWidget)
     {
-        if (ParentName.IsEmpty() || ParentName.Equals(TEXT("Root"), ESearchCase::IgnoreCase) || ParentName.Equals(TEXT("CanvasPanel_0"), ESearchCase::IgnoreCase))
+        // If the tree is empty, ANY creation request must be for the root.
+        // We are lenient here: if the widget type is a Panel (valid for root), we allow it regardless of what ParentName the AI sent.
+        // This handles cases where AI sends "None", "Null", or hallucinates a parent name.
+        
+        if (WidgetClass->IsChildOf(UPanelWidget::StaticClass()))
         {
             bCreatingRootWidget = true;
-            UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: No root widget exists. Attempting to create '%s' as root widget."), *WidgetType);
-            
-            // Verify that the widget type can be a root widget (must be a PanelWidget)
-            if (!WidgetClass->IsChildOf(UPanelWidget::StaticClass()))
-            {
-                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Cannot create '%s' as root widget. Root widget must be a Panel type (e.g., VerticalBox, HorizontalBox, CanvasPanel, Overlay, Grid, etc.). Non-panel widgets like TextBlock, Button, Image cannot be root widgets."), *WidgetType);
-                
-                // Provide helpful suggestion
-                FString Suggestion = TEXT("Suggested root widget types: VerticalBox, HorizontalBox, CanvasPanel, Overlay, Grid, UniformGridPanel, WrapBox, ScrollBox");
-                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: %s"), *Suggestion);
-                
-                return FString();
-            }
+            UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: No root widget exists. Auto-promoting '%s' to root widget (ignoring ParentName: '%s')."), *WidgetType, *ParentName);
+        }
+        else
+        {
+            UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Cannot create '%s' as root widget. Root widget must be a Panel type (e.g., VerticalBox, HorizontalBox, CanvasPanel)."), *WidgetType);
+            return FString();
         }
     }
 
