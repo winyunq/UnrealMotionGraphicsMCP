@@ -137,14 +137,14 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
             MessageBuffer.Append(ReceivedData);
             
             // Process complete messages (messages are terminated with custom delimiter)
-            if (MessageBuffer.Contains(TEXT("UmgMcp")))
-            {
-                UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Delimiter detected in buffer, processing messages"));
-                
-                TArray<FString> Messages;
-                // Use CullEmpty=false so that if the message ends with delimiter, we get an empty string at the end
-                // This ensures the logic below (processing Num-1) works correctly for the last message
-                MessageBuffer.ParseIntoArray(Messages, TEXT("UmgMcp"), false);
+                if (MessageBuffer.Contains(TEXT("__MCP_END__")))
+                {
+                    UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Delimiter detected in buffer, processing messages"));
+                    
+                    TArray<FString> Messages;
+                    // Use CullEmpty=false so that if the message ends with delimiter, we get an empty string at the end
+                    // This ensures the logic below (processing Num-1) works correctly for the last message
+                    MessageBuffer.ParseIntoArray(Messages, TEXT("__MCP_END__"), false);
                 
                 UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Found %d message(s) in buffer"), Messages.Num());
                 
