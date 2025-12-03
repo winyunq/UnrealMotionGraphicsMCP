@@ -38,7 +38,9 @@ public class UmgMcp : ModuleRules
 				"DeveloperSettings",
 				"PhysicsCore",
 				"UnrealEd",
-				"UMG" // Add this line
+				"UMG", // Add this line
+				"MovieScene",
+				"MovieSceneTracks"
 			}
 		);
 		

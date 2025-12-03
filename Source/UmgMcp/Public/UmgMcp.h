@@ -2,6 +2,8 @@
 
 #include "Modules/ModuleManager.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogUmgMcp, Log, All);
+
 /**
  * @brief The main module class for the UmgMcp plugin.
  *

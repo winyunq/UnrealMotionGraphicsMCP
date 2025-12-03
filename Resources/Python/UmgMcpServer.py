@@ -28,6 +28,7 @@ import UMGFileTransformation
 import UMGHTMLParser
 import UMGEditor
 import UMGBlueprint
+import UMGSequencer
 
 # Configure logging
 logging.basicConfig(
@@ -156,8 +157,8 @@ class UnrealConnection:
             }
             
             # Send with custom delimiter for robust server-side reading
-            # We use 'UmgMcp' as a safe delimiter to avoid collisions with content
-            command_json = json.dumps(command_obj) + "UmgMcp"
+            # We use '__MCP_END__' as a safe delimiter to avoid collisions with content
+            command_json = json.dumps(command_obj) + "__MCP_END__"
             logger.debug(f"Sending command: {command_json.strip()}")
             self.socket.sendall(command_json.encode('utf-8'))
             
@@ -670,6 +671,109 @@ def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
 
 # =============================================================================
 
+# =============================================================================
+#  Category: Animation & Sequencer (New)
+# =============================================================================
+
+@mcp.tool()
+def get_all_animations() -> Dict[str, Any]:
+    """
+    "What animations are there?" - Lists all animations in the current UMG asset.
+    """
+    conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.get_all_animations(final_path)
+
+@mcp.tool()
+def create_animation(animation_name: str) -> Dict[str, Any]:
+    """
+    Creates a new animation in the current UMG asset.
+    """
+    conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.create_animation(final_path, animation_name)
+
+@mcp.tool()
+def delete_animation(animation_name: str) -> Dict[str, Any]:
+    """
+    Deletes an animation from the current UMG asset.
+    """
+    conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.delete_animation(final_path, animation_name)
+
+@mcp.tool()
+def focus_animation(animation_name: str) -> Dict[str, Any]:
+    """
+    "I'm working on this animation." - Sets the context to a specific animation.
+    Subsequent commands like 'add_key' will use this animation by default.
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.focus_animation(animation_name)
+
+@mcp.tool()
+def focus_widget(widget_name: str) -> Dict[str, Any]:
+    """
+    "I'm animating this widget." - Sets the context to a specific widget track.
+    Subsequent commands like 'add_key' will use this widget by default.
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.focus_widget(widget_name)
+
+@mcp.tool()
+def add_track(property_name: str, animation_name: Optional[str] = None, widget_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Adds a track for a specific widget property to an animation.
+    AI HINT: If animation_name or widget_name are omitted, uses the focused context.
+    """
+    conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.add_track(final_path, animation_name, widget_name, property_name)
+
+@mcp.tool()
+def add_key(property_name: str, time: float, value: float, animation_name: Optional[str] = None, widget_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Adds a keyframe to a track at a specific time.
+    AI HINT: If animation_name or widget_name are omitted, uses the focused context.
+    """
+    conn = get_unreal_connection()
+    
+    # Resolve Path
+    final_path = context_manager.get_target()
+    if not final_path:
+        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
+
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return sequencer_client.add_key(final_path, animation_name, widget_name, property_name, time, value)
+
+# =============================================================================
+
 @mcp.prompt()
 def info():
     """Run method:"tools/list" to get more details."""
@@ -736,7 +840,24 @@ This document lists all available tools for interacting with the UMG MCP server.
 *   `apply_layout(layout_content: str, asset_path: Optional[str] = None)`
     *   **Purpose**: Apply a JSON or HTML layout definition to a UMG asset.
 
-## 5. Editor & Blueprint (New)
+## 5. Animation & Sequencer (New)
+
+*   `get_all_animations()`
+    *   **Purpose**: List all animations.
+
+*   `create_animation(animation_name: str)`
+    *   **Purpose**: Create a new animation.
+
+*   `delete_animation(animation_name: str)`
+    *   **Purpose**: Delete an animation.
+
+*   `add_track(animation_name: str, widget_name: str, property_name: str)`
+    *   **Purpose**: Add a property track to an animation.
+
+*   `add_key(animation_name: str, widget_name: str, property_name: str, time: float, value: float)`
+    *   **Purpose**: Add a keyframe to a track.
+
+## 6. Editor & Blueprint (New)
 
 (Hidden to avoid confusion, strictly UMG focused)
 

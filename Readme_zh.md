@@ -7,7 +7,7 @@
 
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
-[![Project Background](Resources/Docs/project_background.png)](https://www.bilibili.com/video/BV1mCUpBwEnc)
+[一个简单的RTS界面](https://www.bilibili.com/video/BV1mCUpBwEnc)
 ---
 
 ### 🚀 快速开始
@@ -137,5 +137,18 @@ flowchart TD
 | **文件转换** | `export_umg_to_json` | ✅ | 将UMG资产导出为JSON字符串。 |
 | | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。 |
 | | `apply_layout` | ✅ | 将HTML/XML布局应用到UMG资产。 |
+
+## UMG Sequencer API 实现状态
+
+| 分类 | API 名称 | 状态 | 描述 |
+|---|---|:---:|---|
+| **动画管理** | `get_all_animations` | ⏳ | 获取所有动画列表。 |
+| | `create_animation` | ⏳ | 创建新的动画序列。 |
+| | `delete_animation` | ⏳ | 删除指定的动画序列。 |
+| **轨道与关键帧** | `add_track` | ⏳ | 为控件添加动画轨道。 |
+| | `remove_track` | ⏳ | 移除控件的动画轨道。 |
+| | `add_key` | ⏳ | 添加关键帧。 |
+| | `remove_key` | ⏳ | 移除关键帧。 |
+| | `get_animation_data` | ⏳ | 获取动画的详细数据。 |
 
 ##  `apply_json_to_umg` 是可以工作的，因此如果需要AI编辑你的UMG，最好的办法是给个模板，然后让AI执行 `export_umg_to_json` 知道如何表示UMG资产，然后让他运行 `apply_json_to_umg`

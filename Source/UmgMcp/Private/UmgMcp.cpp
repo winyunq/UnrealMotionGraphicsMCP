@@ -1,5 +1,7 @@
 #include "UmgMcp.h"
-#include "UmgMcpConfig.h" // Include our config header
+#include "Bridge/UmgMcpConfig.h" // Include our config header
+
+DEFINE_LOG_CATEGORY(LogUmgMcp);
 
 #define LOCTEXT_NAMESPACE "FUmgMcpModule"
 

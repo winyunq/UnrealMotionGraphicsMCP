@@ -6,7 +6,7 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
 
-[![Project Background](Resources/Docs/project_background.png)](https://youtu.be/O86VCzxyF5o)
+[Demo Designed A RTS UI](https://youtu.be/O86VCzxyF5o)
 
 ---
 
@@ -116,8 +116,6 @@ The plugin's Python environment is managed by `uv`. In most cases, it should wor
 
     ```
 
-
-
 ---
 
 ## English
@@ -127,19 +125,6 @@ This project provides a powerful, command-line driven workflow for managing Unre
 Inspired by tools like `blender-mcp`, this system allows developers, UI designers, and AI assistants to interact with UMG assets programmatically, enabling true Git collaboration, automated UI generation, and iteration.
 
 ### Core Philosophy: Focus & Traceability
-
-*   **Focus**: We only care about UMG. This project aims to be the optimal solution for managing UI assets in UE, without venturing into other domains.
-*   **Traceability**: All UI changes are made by modifying `.json` files. This means every adjustment to alignment, color, or layout can be clearly reviewed, merged, and reverted in Git history.
-
-### Core Workflow
-
-The workflow revolves around two core operations, orchestrated by a central management script (`mcp.py`):\n\n1.\t**Export (UMG -> JSON):** A UE Python script reads existing `.uasset` files in the editor and "decompiles" their widget hierarchy and properties into a structured `.json` file. This `.json` file is what you commit to Git.\n2.\t**Apply (JSON -> UMG):** A UE Python script reads the `.json` file and programmatically creates or overwrites a `.uasset` file within the editor. This is the step where your version-controlled text file is "compiled" back into an engine-usable asset.
-
-### Current Status & Limitations
-
-*   **Functionality**: The current version supports `export_umg_to_json` (exporting UMG to JSON) and `apply_json_to_umg` (applying JSON to UMG).
-*   **Known Issues**: Please be aware that applying JSON to UMG assets might still lead to unexpected behavior or crashes due to underlying plugin limitations or specific property handling. This is an experimental tool.
-
 
 
 ### AI Authorship & Disclaimer
@@ -217,5 +202,26 @@ flowchart TD
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |
 | | `apply_layout` | ✅ |
+
+## UMG Sequencer API Status
+ 
+| Category | API Name | Status |
+|---|---|:---:|
+| **Animation Management** | `get_all_animations` | ✅ |
+| | `create_animation` | ✅ |
+| | `delete_animation` | ✅ |
+| **Track & Keyframe** | `add_track` | ✅ |
+| | `remove_track` | ⏳ |
+| | `add_key` | ✅ |
+| | `remove_key` | ⏳ |
+| | `get_animation_data` | ⏳ |
+| **Context Awareness** | `focus_animation` | ✅ |
+| | `focus_widget` | ✅ |
+
+### Context-Aware Workflow (New!)
+The API now supports a "Context-Aware" workflow, making it smarter and less verbose.
+- **Auto-Focus**: Creating a widget or animation automatically sets it as the active context.
+- **Implicit Parameters**: You can call `add_key` without specifying `widget_name` or `animation_name`. The system infers them from the current context.
+- **Smart Defaults**: If you don't provide a name for a new animation, it defaults to `UnrealMotionGraphicsMCP_X`.
 
 ##  `apply_json_to_umg` is able to use.This is mean that you need guide AI do that: learing from `export_umg_to_json` ,using to `apply_json_to_umg`
