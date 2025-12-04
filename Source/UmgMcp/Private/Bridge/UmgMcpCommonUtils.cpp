@@ -746,45 +746,88 @@ bool FUmgMcpCommonUtils::SetObjectProperty(UObject* Object, const FString& Prope
 }
 
 // UMG Utilities
+// UMG Utilities
 UWidgetBlueprint* FUmgMcpCommonUtils::GetTargetWidgetBlueprint(const TSharedPtr<FJsonObject>& Params, FString& OutError)
 {
-    FString AssetPath;
-    // Priority 1: Check for 'asset_path' in the command parameters.
-    if (Params && Params->TryGetStringField(TEXT("asset_path"), AssetPath) && !AssetPath.IsEmpty())
-    {
-        // Clean the asset path, removing the .uasset extension if present.
-        if (AssetPath.EndsWith(FPackageName::GetAssetPackageExtension()))
-        {
-            AssetPath.LeftChopInline(FPackageName::GetAssetPackageExtension().Len());
-        }
-
-        UWidgetBlueprint* LoadedBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
-        if (LoadedBlueprint)
-        {
-            return LoadedBlueprint;
-        }
-        else
-        {
-            OutError = FString::Printf(TEXT("Failed to load UMG asset from specified path: %s"), *AssetPath);
-            return nullptr;
-        }
-    }
-
-    // Priority 2: Fallback to the cached target in UmgAttentionSubsystem.
+    // 1. CACHE LAYER: Check the Subsystem's Cache FIRST.
+    // This is like checking a CPU register or L1 cache. If we have the object, USE IT.
     if (GEditor)
     {
-        UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
-        if (AttentionSubsystem)
+        if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
         {
-            UWidgetBlueprint* CachedBlueprint = AttentionSubsystem->GetCachedTargetWidgetBlueprint();
-            if (CachedBlueprint)
+            // If the user did NOT provide a specific asset_path override, trust the cache.
+            FString ParamPath;
+            bool bHasPathOverride = Params && Params->TryGetStringField(TEXT("asset_path"), ParamPath) && !ParamPath.IsEmpty();
+            
+            if (!bHasPathOverride)
             {
-                return CachedBlueprint;
+                if (UWidgetBlueprint* CachedBP = AttentionSubsystem->GetCachedTargetWidgetBlueprint())
+                {
+                    return CachedBP;
+                }
             }
         }
     }
 
-    // If both attempts fail, return an error.
-    OutError = TEXT("No UMG asset target specified. Please provide an 'asset_path' parameter or set a target using the attention subsystem.");
-    return nullptr;
+    // 2. CONTEXT LAYER: Resolve the target path.
+    FString AssetPath;
+    if (Params && Params->TryGetStringField(TEXT("asset_path"), AssetPath) && !AssetPath.IsEmpty())
+    {
+        // Clean the asset path
+        if (AssetPath.EndsWith(FPackageName::GetAssetPackageExtension()))
+        {
+            AssetPath.LeftChopInline(FPackageName::GetAssetPackageExtension().Len());
+        }
+    }
+    else if (GEditor)
+    {
+        // Fallback to Subsystem's target path if no override provided
+        if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+        {
+            AssetPath = AttentionSubsystem->GetTargetUmgAsset();
+        }
+    }
+
+    if (AssetPath.IsEmpty())
+    {
+        OutError = TEXT("No UMG asset target specified. Please provide an 'asset_path' parameter or set a target using the attention subsystem.");
+        return nullptr;
+    }
+
+    // 3. RESOLUTION LAYER: Find the object for the path.
+    // Priority: Open Editor > Disk/Memory Load
+    
+    if (GEditor)
+    {
+        if (UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+        {
+             FSoftObjectPath ObjectPath(AssetPath);
+             UObject* AssetObj = ObjectPath.ResolveObject();
+             
+             // If the object is already in memory, check if it has an editor
+             if (AssetObj)
+             {
+                 IAssetEditorInstance* Editor = AssetEditorSubsystem->FindEditorForAsset(AssetObj, false);
+                 if (Editor)
+                 {
+                     if (UWidgetBlueprint* WB = Cast<UWidgetBlueprint>(AssetObj))
+                     {
+                         return WB;
+                     }
+                 }
+             }
+        }
+    }
+
+    // Fallback: LoadObject
+    UWidgetBlueprint* LoadedBlueprint = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+    if (LoadedBlueprint)
+    {
+        return LoadedBlueprint;
+    }
+    else
+    {
+        OutError = FString::Printf(TEXT("Failed to load UMG asset from specified path: %s"), *AssetPath);
+        return nullptr;
+    }
 }

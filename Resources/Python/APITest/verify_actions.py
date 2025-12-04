@@ -10,14 +10,11 @@ logger = logging.getLogger("verify_actions")
 
 async def run():
     # Define server parameters
+    # Define server parameters
     server_params = StdioServerParameters(
-        command="uv",
-        args=[
-            "run",
-            "--directory",
-            "d:/ModelContextProtocol/unreal-engine-mcp/FlopperamUnrealMCP/Plugins/UmgMcp/Resources/Python",
-            "UmgMcpServer.py"
-        ]
+        command="python",
+        args=["../UmgMcpServer.py"],
+        env=None
     )
 
     async with stdio_client(server_params) as (read, write):

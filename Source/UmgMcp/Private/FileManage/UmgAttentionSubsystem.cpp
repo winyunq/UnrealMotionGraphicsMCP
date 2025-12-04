@@ -3,6 +3,9 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "WidgetBlueprint.h"
 #include "Logging/LogMacros.h"
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
+#include "WidgetBlueprintFactory.h"
 
 // Define a log category for easy debugging.
 DEFINE_LOG_CATEGORY_STATIC(LogUmgAttention, Log, All);
@@ -77,25 +80,82 @@ void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         return;
     }
 
-    // Attempt to load the object from the provided path.
-    UWidgetBlueprint* LoadedBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+    UWidgetBlueprint* TargetBP = nullptr;
 
-    if (LoadedBP)
+    // 1. Try to find the asset in an open editor FIRST
+    if (GEditor)
     {
-        // SUCCESS: The path is valid and the object was loaded.
+        if (UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+        {
+             FSoftObjectPath ObjectPath(AssetPath);
+             UObject* AssetObj = ObjectPath.ResolveObject();
+             
+             if (AssetObj)
+             {
+                 IAssetEditorInstance* Editor = AssetEditorSubsystem->FindEditorForAsset(AssetObj, false);
+                 if (Editor)
+                 {
+                     TargetBP = Cast<UWidgetBlueprint>(AssetObj);
+                     if (TargetBP)
+                     {
+                         UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Found open editor for %s. Using live instance."), *AssetPath);
+                     }
+                 }
+             }
+        }
+    }
+
+    // 2. Fallback to LoadObject if not found in editor
+    if (!TargetBP)
+    {
+        TargetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+    }
+
+    // 3. POLICY CHANGE: "Select = Ensure Exists"
+    // If the asset still doesn't exist, create it.
+    if (!TargetBP)
+    {
+        UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Asset '%s' not found. Creating new WidgetBlueprint..."), *AssetPath);
+        
+        FString PackageName = AssetPath;
+        FString AssetName = FPaths::GetBaseFilename(AssetPath);
+        FString PackagePath = FPaths::GetPath(AssetPath);
+
+        // Ensure AssetTools module is loaded
+        IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
+        
+        // Create a factory for WidgetBlueprint
+        UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
+        
+        UObject* NewAsset = AssetTools.CreateAsset(AssetName, PackagePath, UWidgetBlueprint::StaticClass(), Factory);
+        TargetBP = Cast<UWidgetBlueprint>(NewAsset);
+        
+        if (TargetBP)
+        {
+             UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Successfully created new asset '%s'."), *AssetPath);
+        }
+        else
+        {
+             UE_LOG(LogUmgAttention, Error, TEXT("SetTargetUmgAsset: Failed to create asset '%s'."), *AssetPath);
+        }
+    }
+
+    if (TargetBP)
+    {
+        // SUCCESS: The path is valid and the object was loaded/found.
         UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *AssetPath);
         AttentionTargetAssetPath = AssetPath;
-        CachedTargetWidgetBlueprint = LoadedBP;
+        CachedTargetWidgetBlueprint = TargetBP;
 
         // Also treat setting a target as an 'edit' action to update the history, ensuring consistency.
         UmgAssetHistory.Remove(AssetPath);
         UmgAssetHistory.Insert(AssetPath, 0);
-        UE_LOG(LogUmgAttention, Log, TEXT("Successfully loaded and cached UMG asset object."));
+        UE_LOG(LogUmgAttention, Log, TEXT("Successfully cached UMG asset object."));
     }
     else
     {
         // FAILURE: The path was invalid. Clear any existing target to prevent errors.
-        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load UMG asset from path: %s. Clearing attention target."), *AssetPath);
+        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load or create UMG asset from path: %s. Clearing attention target."), *AssetPath);
         AttentionTargetAssetPath.Empty();
         CachedTargetWidgetBlueprint = nullptr;
     }

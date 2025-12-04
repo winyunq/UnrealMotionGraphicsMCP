@@ -194,16 +194,21 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
     }
 
     // Load widget class first to check if it's valid
-    // Load widget class first to check if it's valid
-    UClass* WidgetClass = FindObject<UClass>(nullptr, *WidgetType);
-    if(!WidgetClass)
+    // 1. Try finding/loading as a fully qualified path (if provided)
+    UClass* WidgetClass = nullptr;
+    if (WidgetType.Contains(TEXT("/")))
     {
-        WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
+        WidgetClass = FindObject<UClass>(nullptr, *WidgetType);
+        if (!WidgetClass)
+        {
+            WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
+        }
     }
-    
-    // Fallback: Try finding it in the UMG package (for native widgets like VerticalBox, TextBlock)
+
+    // 2. If not found or simple name, try native UMG paths
     if (!WidgetClass)
     {
+        // Try /Script/UMG.WidgetType
         FString NativePath = FString::Printf(TEXT("/Script/UMG.%s"), *WidgetType);
         WidgetClass = FindObject<UClass>(nullptr, *NativePath);
         if (!WidgetClass)
@@ -212,7 +217,7 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         }
     }
 
-    // Fallback: Try finding it with 'U' prefix in UMG package (e.g. UVerticalBox) - though usually reflection name is without U
+    // 3. Try /Script/UMG.UWidgetType (Reflection prefix)
     if (!WidgetClass)
     {
         FString NativePathU = FString::Printf(TEXT("/Script/UMG.U%s"), *WidgetType);
@@ -220,6 +225,17 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
          if (!WidgetClass)
         {
              WidgetClass = LoadObject<UClass>(nullptr, *NativePathU);
+        }
+    }
+
+    // 4. Last resort: Try LoadObject with the raw name (might cause 'Class None.X' warning but handles some edge cases)
+    if (!WidgetClass && !WidgetType.Contains(TEXT("/")))
+    {
+        WidgetClass = FindObject<UClass>(nullptr, *WidgetType);
+        if (!WidgetClass)
+        {
+            // Only call LoadObject if we really have to, as it might warn
+            WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
         }
     }
     

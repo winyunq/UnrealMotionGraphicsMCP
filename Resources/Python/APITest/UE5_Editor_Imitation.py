@@ -30,7 +30,7 @@ C = {
 async def run_demo():
     server_params = StdioServerParameters(
         command="python",
-        args=["UmgMcpServer.py"],
+        args=["../UmgMcpServer.py"],
         env=None
     )
 

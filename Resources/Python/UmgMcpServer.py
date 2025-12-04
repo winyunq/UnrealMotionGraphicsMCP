@@ -21,14 +21,14 @@ from mcp.server.fastmcp import FastMCP
 from mcp_config import UNREAL_HOST, UNREAL_PORT
 
 # Import the modular clients
-import UMGAttention
-import UMGGet
-import UMGSet
-import UMGFileTransformation
-import UMGHTMLParser
-import UMGEditor
-import UMGBlueprint
-import UMGSequencer
+from FileManage import UMGAttention
+from Widget import UMGGet
+from Widget import UMGSet
+from FileManage import UMGFileTransformation
+from Bridge import UMGHTMLParser
+from Editor import UMGEditor
+from Blueprint import UMGBlueprint
+
 
 # Configure logging
 logging.basicConfig(
@@ -89,9 +89,9 @@ class UnrealConnection:
         self.connected = False
 
     def receive_full_response(self, sock, buffer_size=4096) -> bytes:
-        """Receive a complete response from Unreal, handling chunked data."""
+        """Receive a complete response from Unreal, handling chunked data and delimiters."""
         chunks = []
-        sock.settimeout(30)  # 30 second timeout
+        sock.settimeout(0.3)  # 0.3 second timeout as requested
         try:
             while True:
                 chunk = sock.recv(buffer_size)
@@ -101,33 +101,27 @@ class UnrealConnection:
                     break
                 chunks.append(chunk)
                 
-                # Process the data received so far
-                data = b''.join(chunks)
-                decoded_data = data.decode('utf-8')
+                # Check for null byte delimiter in the raw chunk
+                if b'\0' in chunk:
+                    # We found the end.
+                    # Combine all chunks
+                    data = b''.join(chunks)
+                    
+                    # Split by null byte
+                    parts = data.split(b'\0')
+                    valid_json_bytes = parts[0]
+                    
+                    logger.info(f"Received complete response with null delimiter ({len(valid_json_bytes)} bytes)")
+                    return valid_json_bytes
                 
-                # Try to parse as JSON to check if complete
-                try:
-                    json.loads(decoded_data)
-                    logger.info(f"Received complete response ({len(data)} bytes)")
-                    return data
-                except json.JSONDecodeError:
-                    # Not complete JSON yet, continue reading
-                    logger.debug(f"Received partial response, waiting for more data...")
-                    continue
-                except Exception as e:
-                    logger.warning(f"Error processing response chunk: {str(e)}")
-                    continue
         except socket.timeout:
             logger.warning("Socket timeout during receive")
             if chunks:
                 # If we have some data already, try to use it
                 data = b''.join(chunks)
-                try:
-                    json.loads(data.decode('utf-8'))
-                    logger.info(f"Using partial response after timeout ({len(data)} bytes)")
-                    return data
-                except:
-                    pass
+                if b'\0' in data:
+                     parts = data.split(b'\0')
+                     return parts[0]
             raise Exception("Timeout receiving Unreal response")
         except Exception as e:
             logger.error(f"Error during receive: {str(e)}")
@@ -156,11 +150,12 @@ class UnrealConnection:
                 "params": params or {}  # Use Unity's params or {} pattern
             }
             
-            # Send with custom delimiter for robust server-side reading
-            # We use '__MCP_END__' as a safe delimiter to avoid collisions with content
-            command_json = json.dumps(command_obj) + "__MCP_END__"
+            # Send with null delimiter
+            command_json = json.dumps(command_obj)
             logger.debug(f"Sending command: {command_json.strip()}")
-            self.socket.sendall(command_json.encode('utf-8'))
+            
+            # Send JSON + Null Byte
+            self.socket.sendall(command_json.encode('utf-8') + b'\0')
             
             # Read response using improved handler
             response_data = self.receive_full_response(self.socket)
@@ -376,12 +371,12 @@ def get_widget_tree() -> Dict[str, Any]:
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
     
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    return umg_get_client.get_widget_tree(final_path)
+    # Note: We rely on the implicit context on the server/plugin side now.
+    # But for robustness, we can still check if we have a local context to warn early,
+    # or just let the plugin handle it.
+    # Given the user's strong preference for implicit defaults, we just call the method.
+    
+    return umg_get_client.get_widget_tree()
 
 @mcp.tool()
 def query_widget_properties(widget_name: str, properties: List[str]) -> Dict[str, Any]:
@@ -390,13 +385,7 @@ def query_widget_properties(widget_name: str, properties: List[str]) -> Dict[str
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    return umg_get_client.query_widget_properties(final_path, widget_name, properties)
+    return umg_get_client.query_widget_properties(widget_name, properties)
 
 @mcp.tool()
 def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
@@ -405,13 +394,7 @@ def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    return umg_get_client.get_layout_data(final_path, resolution_width, resolution_height)
+    return umg_get_client.get_layout_data(resolution_width, resolution_height)
 
 @mcp.tool()
 def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -420,13 +403,7 @@ def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, 
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    return umg_get_client.check_widget_overlap(final_path, widget_names)
+    return umg_get_client.check_widget_overlap(widget_names)
 
 # =============================================================================
 #  Category: Action
@@ -436,30 +413,16 @@ def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, 
 def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> Dict[str, Any]:
     """
     Creates a new widget and attaches it to a parent.
-    AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset. Use 'get_creatable_widget_types' for 'widget_type'.
+    AI HINT: Uses the globally targeted asset implicitly. Use 'get_creatable_widget_types' for 'widget_type'.
     """
     conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        resp = conn.send_command("get_target_umg_asset")
-        if resp.get("status") == "success":
-            data = resp.get("result", {}).get("data", {})
-            if data and data.get("asset_path"):
-                final_path = data.get("asset_path")
-                context_manager.set_target(final_path)
-            else:
-                return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-        else:
-            return {"status": "error", "error": "Failed to get target UMG asset from Unreal."}
-
     umg_set_client = UMGSet.UMGSet(conn)
-    result = umg_set_client.create_widget(final_path, parent_name, widget_type, new_widget_name)
+    result = umg_set_client.create_widget(widget_type, new_widget_name, parent_name)
     
     # Invalidate Cache on Modification
     if result.get("status") == "success":
-        context_manager.invalidate_cache()
+        # context_manager.invalidate_cache() # If we had one
+        pass
         
     return result
 
@@ -470,62 +433,38 @@ def set_widget_properties(widget_name: str, properties: Dict[str, Any]) -> Dict[
     AI HINT: Use get_widget_schema to see available properties.
     """
     conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.set_widget_properties(final_path, widget_name, properties)
+    return umg_set_client.set_widget_properties(widget_name, properties)
 
 @mcp.tool()
 def delete_widget(widget_name: str) -> Dict[str, Any]:
     """
     Deletes a widget by its name from the UMG asset.
-    AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
+    AI HINT: Uses the globally targeted asset implicitly.
     """
     conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.delete_widget(final_path, widget_name)
+    return umg_set_client.delete_widget(widget_name)
 
 @mcp.tool()
 def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
     """
     Moves a widget to be a child of a different parent.
-    AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
+    AI HINT: Uses the globally targeted asset implicitly.
     """
     conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.reparent_widget(final_path, widget_name, new_parent_name)
+    return umg_set_client.reparent_widget(widget_name, new_parent_name)
 
 @mcp.tool()
 def save_asset() -> Dict[str, Any]:
     """
     "Save my work" - Saves the UMG asset to disk.
-    AI HINT: If 'asset_path' is omitted, it uses the globally targeted asset.
+    AI HINT: Uses the globally targeted asset implicitly.
     """
     conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.save_asset(final_path)
+    return umg_set_client.save_asset()
 
 # =============================================================================
 #  Category: File Transformation (Explicit Path)
@@ -595,12 +534,12 @@ def apply_layout(layout_content: str) -> Dict[str, Any]:
 @mcp.tool()
 def apply_json_to_umg(asset_path: str, json_data: Dict[str, Any]) -> Dict[str, Any]:
     """[Deprecated] Use apply_layout instead."""
-    return apply_layout(json.dumps(json_data), asset_path)
+    return apply_layout(json.dumps(json_data))
 
 # @mcp.tool()
 def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
     """[Deprecated] Use apply_layout instead."""
-    return apply_layout(html_content, asset_path)
+    return apply_layout(html_content)
 
 # @mcp.tool()
 def preview_html_conversion(html_content: str) -> Dict[str, Any]:
@@ -671,106 +610,7 @@ def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
 
 # =============================================================================
 
-# =============================================================================
-#  Category: Animation & Sequencer (New)
-# =============================================================================
 
-@mcp.tool()
-def get_all_animations() -> Dict[str, Any]:
-    """
-    "What animations are there?" - Lists all animations in the current UMG asset.
-    """
-    conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.get_all_animations(final_path)
-
-@mcp.tool()
-def create_animation(animation_name: str) -> Dict[str, Any]:
-    """
-    Creates a new animation in the current UMG asset.
-    """
-    conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.create_animation(final_path, animation_name)
-
-@mcp.tool()
-def delete_animation(animation_name: str) -> Dict[str, Any]:
-    """
-    Deletes an animation from the current UMG asset.
-    """
-    conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.delete_animation(final_path, animation_name)
-
-@mcp.tool()
-def focus_animation(animation_name: str) -> Dict[str, Any]:
-    """
-    "I'm working on this animation." - Sets the context to a specific animation.
-    Subsequent commands like 'add_key' will use this animation by default.
-    """
-    conn = get_unreal_connection()
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.focus_animation(animation_name)
-
-@mcp.tool()
-def focus_widget(widget_name: str) -> Dict[str, Any]:
-    """
-    "I'm animating this widget." - Sets the context to a specific widget track.
-    Subsequent commands like 'add_key' will use this widget by default.
-    """
-    conn = get_unreal_connection()
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.focus_widget(widget_name)
-
-@mcp.tool()
-def add_track(property_name: str, animation_name: Optional[str] = None, widget_name: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Adds a track for a specific widget property to an animation.
-    AI HINT: If animation_name or widget_name are omitted, uses the focused context.
-    """
-    conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.add_track(final_path, animation_name, widget_name, property_name)
-
-@mcp.tool()
-def add_key(property_name: str, time: float, value: float, animation_name: Optional[str] = None, widget_name: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Adds a keyframe to a track at a specific time.
-    AI HINT: If animation_name or widget_name are omitted, uses the focused context.
-    """
-    conn = get_unreal_connection()
-    
-    # Resolve Path
-    final_path = context_manager.get_target()
-    if not final_path:
-        return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
-
-    sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return sequencer_client.add_key(final_path, animation_name, widget_name, property_name, time, value)
 
 # =============================================================================
 
@@ -798,6 +638,24 @@ This document lists all available tools for interacting with the UMG MCP server.
 
 *   `check_widget_overlap(widget_names: Optional[List[str]] = None)`
     *   **Purpose**: Efficient backend check for widget overlaps.
+
+## 2. Action - The "Hands" of the AI
+
+*   `create_widget(parent_name: str, widget_type: str, new_widget_name: str)`
+*   `set_widget_properties(widget_name: str, properties: Dict[str, Any])`
+*   `delete_widget(widget_name: str)`
+*   `reparent_widget(widget_name: str, new_parent_name: str)`
+*   `save_asset()`
+*   `apply_layout(layout_content: str)`: **POWERFUL**. Applies a full JSON/HTML layout in one go.
+
+
+
+## 4. Editor & Blueprint
+
+*   `refresh_asset_registry()`
+*   `get_actors_in_level()` / `spawn_actor(...)`
+*   `create_blueprint(...)` / `compile_blueprint(...)`
+
     *   **Workflow**: Same as above.
 
 ## 2. Action - The "Hands" of the AI
@@ -837,25 +695,10 @@ This document lists all available tools for interacting with the UMG MCP server.
 *   `export_umg_to_json(asset_path: str)`
     *   **Purpose**: "Decompile" a UMG `.uasset` to JSON. Requires explicit path.
 
-*   `apply_layout(layout_content: str, asset_path: Optional[str] = None)`
+*   `apply_layout(layout_content: str)`
     *   **Purpose**: Apply a JSON or HTML layout definition to a UMG asset.
 
-## 5. Animation & Sequencer (New)
 
-*   `get_all_animations()`
-    *   **Purpose**: List all animations.
-
-*   `create_animation(animation_name: str)`
-    *   **Purpose**: Create a new animation.
-
-*   `delete_animation(animation_name: str)`
-    *   **Purpose**: Delete an animation.
-
-*   `add_track(animation_name: str, widget_name: str, property_name: str)`
-    *   **Purpose**: Add a property track to an animation.
-
-*   `add_key(animation_name: str, widget_name: str, property_name: str, time: float, value: float)`
-    *   **Purpose**: Add a keyframe to a track.
 
 ## 6. Editor & Blueprint (New)
 

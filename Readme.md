@@ -205,19 +205,18 @@ flowchart TD
 
 ## UMG Sequencer API Status
  
-| Category | API Name | Status |
-|---|---|:---:|
-| **Animation Management** | `get_all_animations` | ✅ |
-| | `create_animation` | ✅ |
-| | `delete_animation` | ✅ |
-| **Track & Keyframe** | `add_track` | ✅ |
-| | `remove_track` | ⏳ |
-| | `add_key` | ✅ |
-| | `remove_key` | ⏳ |
-| | `get_animation_data` | ⏳ |
-| **Context Awareness** | `focus_animation` | ✅ |
-| | `focus_widget` | ✅ |
-
+| Command | Status | Description |
+| :--- | :--- | :--- |
+| `set_animation_scope` | ✅ Implemented | Set the target animation for subsequent commands |
+| `set_widget_scope` | ✅ Implemented | Set the target widget for subsequent commands |
+| `get_all_animations` | ✅ Implemented | Get list of all animations in the blueprint |
+| `create_animation` | ✅ Implemented | Create a new animation |
+| `delete_animation` | ✅ Implemented | Delete an animation |
+| `set_property_keys` | ✅ Implemented | Set keyframes for a property (Float only currently) |
+| `remove_property_track` | 🚧 Planned | Remove a property track |
+| `remove_keys` | 🚧 Planned | Remove specific keys |
+| `get_animation_keyframes` | 🚧 Planned | Get keyframes for an animation |
+| `get_animated_widgets` | 🚧 Planned | Get list of widgets affected by an animation |
 ### Context-Aware Workflow (New!)
 The API now supports a "Context-Aware" workflow, making it smarter and less verbose.
 - **Auto-Focus**: Creating a widget or animation automatically sets it as the active context.
