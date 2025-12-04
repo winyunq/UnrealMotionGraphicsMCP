@@ -20,6 +20,28 @@
 3.  **重启Unreal编辑器。** 这将允许引擎检测并编译新插件。
 
 #### 2. 连接 Gemini CLI
+[Click here for English version](Readme.md)
+
+# UE5-UMG-MCP 🤖📄
+
+**一个以版本控制为核心的AI协同UMG工作流**
+
+
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
+[一个简单的RTS界面](https://www.bilibili.com/video/BV1mCUpBwEnc)
+---
+
+### 🚀 快速开始
+
+本指南包含安装 `UmgMcp` 插件并连接到 Gemini CLI 的两个核心步骤。
+
+    git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
+    ```
+
+3.  **重启Unreal编辑器。** 这将允许引擎检测并编译新插件。
+
+#### 2. 连接 Gemini CLI
 
 告诉 Gemini 如何找到并启动 MCP 服务器。
 
@@ -27,14 +49,25 @@
 2.  **将工具定义添加**到 `tools` 对象中。
 
     ```json
-    "UmgMcp": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "D:\\您的项目路径\\Plugins\\UmgMcp\\Resources\\Python",
-        "UmgMcpServer.py"
-      ]
+    "mcpServers": {
+      "UmgMcp": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--directory",
+          "D:\\您的项目路径\\Plugins\\UmgMcp\\Resources\\Python",
+          "UmgMcpServer.py"
+        ]
+      },
+      "UmgSequencer": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--directory",
+          "D:\\您的项目路径\\Plugins\\UmgMcp\\Resources\\Python",
+          "UmgSequencerServer.py"
+        ]
+      }
     }
     ```
     **重要提示:** 您 **必须** 将路径替换为您机器上克隆仓库后 `Resources/Python` 文件夹的**绝对路径**。
@@ -142,13 +175,13 @@ flowchart TD
 
 | 分类 | API 名称 | 状态 | 描述 |
 |---|---|:---:|---|
-| **动画管理** | `get_all_animations` | ⏳ | 获取所有动画列表。 |
-| | `create_animation` | ⏳ | 创建新的动画序列。 |
-| | `delete_animation` | ⏳ | 删除指定的动画序列。 |
-| **轨道与关键帧** | `add_track` | ⏳ | 为控件添加动画轨道。 |
-| | `remove_track` | ⏳ | 移除控件的动画轨道。 |
-| | `add_key` | ⏳ | 添加关键帧。 |
-| | `remove_key` | ⏳ | 移除关键帧。 |
-| | `get_animation_data` | ⏳ | 获取动画的详细数据。 |
-
-##  `apply_json_to_umg` 是可以工作的，因此如果需要AI编辑你的UMG，最好的办法是给个模板，然后让AI执行 `export_umg_to_json` 知道如何表示UMG资产，然后让他运行 `apply_json_to_umg`
+| **动画管理** | `get_all_animations` | ✅ | 获取所有动画列表。 |
+| | `create_animation` | ✅ | 创建新的动画序列。 |
+| | `delete_animation` | ✅ | 删除指定的动画序列。 |
+| | `set_animation_scope` | ✅ | 设置后续命令的目标动画。 |
+| | `set_widget_scope` | ✅ | 设置后续命令的目标控件。 |
+| **轨道与关键帧** | `set_property_keys` | ✅ | 设置属性的关键帧（目前仅支持浮点）。 |
+| | `remove_property_track` | ⏳ | 移除属性轨道。 |
+| | `remove_keys` | ⏳ | 移除特定关键帧。 |
+| | `get_animation_keyframes` | ⏳ | 获取动画的关键帧数据。 |
+| | `get_animated_widgets` | ⏳ | 获取受动画影响的控件列表。 |

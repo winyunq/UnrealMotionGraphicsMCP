@@ -12,108 +12,73 @@
 
 ### 🚀 Quick Start
 
-
-
 This guide covers the two-step process to install the `UmgMcp` plugin and connect it to your Gemini CLI.
-
-
 
 *   **Prerequisite:** Unreal Engine 5.6 or newer.
 
+#### 1. Install the Plugin
 
-
+1.  **Navigate to your project's Plugins folder:** `YourProject/Plugins/` (create it if it doesn't exist).
 2.  **Clone the repository** directly into this directory:
 
     ```bash
-
     git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
-
     ```
-
-
 
 3.  **Restart the Unreal Editor.** This allows the engine to detect and compile the new plugin.
 
-
-
 #### 2. Connect the Gemini CLI
-
-
 
 Tell Gemini how to find and launch the MCP server.
 
-
-
 1.  **Edit your `settings.json`** file (usually located at `C:\Users\YourUsername\.gemini\`).
-
-2.  **Add the tool definition** to the `tools` object.
-
-
+2.  **Add the tool definition** to the `mcpServers` object.
 
     ```json
-
-    "UmgMcp": {
-
-      "command": "uv",
-
-      "args": [
-
-        "run",
-
-        "--directory",
-
-        "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
-
-        "UmgMcpServer.py"
-
-      ]
-
+    "mcpServers": {
+      "UmgMcp": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--directory",
+          "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
+          "UmgMcpServer.py"
+        ]
+      },
+      "UmgSequencer": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--directory",
+          "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
+          "UmgSequencerServer.py"
+        ]
+      }
     }
-
     ```
 
     **IMPORTANT:** You **must** replace the path with the correct **absolute path** to the `Resources/Python` folder from the cloned repository on your machine.
 
-
-
 That's it! When you start the Gemini CLI, it will automatically launch the MCP server in the background.
 
-
-
 #### Testing the Connection
-
-
 
 After restarting your Gemini CLI and opening your Unreal project, you can test the connection by calling any tool function:
 
 ```python
-
 print(default_api.get_target_umg_asset())
-
 ```
-
-
 
 #### Python Environment (Optional)
 
-
-
 The plugin's Python environment is managed by `uv`. In most cases, it should work automatically. If you encounter issues related to Python dependencies (e.g., `uv` command not found or module import errors), you can manually set up the environment:
 
-
-
 1.  Navigate to the directory: `cd YourUnrealProject/Plugins/UmgMcp/Resources/Python`
-
 2.  Run the setup:
-
     ```bash
-
     uv venv
-
     .\.venv\Scripts\activate
-
     uv pip install -e .
-
     ```
 
 ---
@@ -126,10 +91,10 @@ Inspired by tools like `blender-mcp`, this system allows developers, UI designer
 
 ### Core Philosophy: Focus & Traceability
 
-
 ### AI Authorship & Disclaimer
 
-This project has been developed with significant assistance from **Gemini, an AI**. As such:\n*   **Experimental Nature**: This is an experimental project. Its reliability is not guaranteed.
+This project has been developed with significant assistance from **Gemini, an AI**. As such:
+*   **Experimental Nature**: This is an experimental project. Its reliability is not guaranteed.
 *   **Commercial Use**: Commercial use is not recommended without thorough independent validation and understanding of its limitations.
 *   **Disclaimer**: Use at your own risk. The developers and AI are not responsible for any consequences arising from its use.
 
@@ -179,7 +144,6 @@ flowchart TD
     C -- Sends JSON Response --> B
 ```
 
-
 ## API Status
 
 | Category | API Name | Status |
@@ -204,7 +168,7 @@ flowchart TD
 | | `apply_layout` | ✅ |
 
 ## UMG Sequencer API Status
- 
+
 | Command | Status | Description |
 | :--- | :--- | :--- |
 | `set_animation_scope` | ✅ Implemented | Set the target animation for subsequent commands |
@@ -217,10 +181,3 @@ flowchart TD
 | `remove_keys` | 🚧 Planned | Remove specific keys |
 | `get_animation_keyframes` | 🚧 Planned | Get keyframes for an animation |
 | `get_animated_widgets` | 🚧 Planned | Get list of widgets affected by an animation |
-### Context-Aware Workflow (New!)
-The API now supports a "Context-Aware" workflow, making it smarter and less verbose.
-- **Auto-Focus**: Creating a widget or animation automatically sets it as the active context.
-- **Implicit Parameters**: You can call `add_key` without specifying `widget_name` or `animation_name`. The system infers them from the current context.
-- **Smart Defaults**: If you don't provide a name for a new animation, it defaults to `UnrealMotionGraphicsMCP_X`.
-
-##  `apply_json_to_umg` is able to use.This is mean that you need guide AI do that: learing from `export_umg_to_json` ,using to `apply_json_to_umg`
