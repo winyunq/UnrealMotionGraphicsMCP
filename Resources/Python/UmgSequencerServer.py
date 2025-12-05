@@ -8,6 +8,9 @@ systems within the UmgMcp plugin in Unreal Engine 5.
 import logging
 import socket
 import json
+import sys
+import os
+
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, Optional, List
 from mcp.server.fastmcp import FastMCP

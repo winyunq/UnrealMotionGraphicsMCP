@@ -13,6 +13,9 @@ tools operate implicitly on that target.
 import logging
 import socket
 import json
+import sys
+import os
+
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, Optional, List
 from mcp.server.fastmcp import FastMCP
@@ -36,7 +39,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[ logging.FileHandler('umg_mcp_server.log') ]
 )
-logger = logging.getLogger("UmgMcpServerV3")
+logger = logging.getLogger("UmgMcpServer")
 
 class UnrealConnection:
     """Manages the socket connection to the UmgMcp plugin running inside Unreal Engine."""
