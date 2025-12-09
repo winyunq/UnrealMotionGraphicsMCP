@@ -67,7 +67,8 @@ That's it! When you start the Gemini CLI, it will automatically launch the MCP s
 After restarting your Gemini CLI and opening your Unreal project, you can test the connection by calling any tool function:
 
 ```python
-print(default_api.get_target_umg_asset())
+  cd Resources/Python/APITest
+  python UE5_Editor_Imitation.py
 ```
 
 #### Python Environment (Optional)
@@ -90,7 +91,39 @@ This project provides a powerful, command-line driven workflow for managing Unre
 
 Inspired by tools like `blender-mcp`, this system allows developers, UI designers, and AI assistants to interact with UMG assets programmatically, enabling true Git collaboration, automated UI generation, and iteration.
 
-### Core Philosophy: Focus & Traceability
+---
+
+## Prompt Manager
+
+A visual web tool for configuring system instructions, tool descriptions, and user prompt templates.
+
+### Features
+
+1.  **System Instruction Editor**: Modify the global instructions for the AI context.
+2.  **Tool Management**:
+    *   **Enable/Disable**: Toggle specific MCP tools on or off. Disabled tools are not registered with the MCP server, effectively **compressing the context window** to prevent AI distraction.
+    *   **Edit Descriptions**: Customize tool descriptions (prompts) to better suit your workflow.
+3.  **User Templates (Prompts)**: Add reusable prompt templates for quick access by the MCP client.
+
+### How to Run
+
+Execute the following command in your Python environment:
+```bash
+python Resources/Python/PromptManager/server.py
+```
+The browser will automatically open `http://localhost:8085`.
+
+### Usage Tips
+
+Prompts are crucial for AI tool effectiveness. Use the Prompt Manager to tailor the AI's behavior:
+
+*   **One-Click Deployment Mode**: If you want the AI to focus solely on generating UI from design, disable all tools except `apply_layout` and `export_umg_to_json`.
+*   **Tutor Mode**: If you want the AI to guide you without making changes, keep only read-only tools (e.g., `get_widget_tree`, `get_widget_schema`).
+*   **Context Optimization**: For models with smaller context windows, disable tools you aren't currently using to improve speed and accuracy.
+
+Contributions of effective prompt configurations are welcome!
+
+---
 
 ### AI Authorship & Disclaimer
 

@@ -14,28 +14,7 @@
 
 本指南包含安装 `UmgMcp` 插件并连接到 Gemini CLI 的两个核心步骤。
 
-    git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
-    ```
-
-3.  **重启Unreal编辑器。** 这将允许引擎检测并编译新插件。
-
-#### 2. 连接 Gemini CLI
-[Click here for English version](Readme.md)
-
-# UE5-UMG-MCP 🤖📄
-
-**一个以版本控制为核心的AI协同UMG工作流**
-
-
-
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
-[一个简单的RTS界面](https://www.bilibili.com/video/BV1mCUpBwEnc)
----
-
-### 🚀 快速开始
-
-本指南包含安装 `UmgMcp` 插件并连接到 Gemini CLI 的两个核心步骤。
-
+    ```bash
     git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
     ```
 
@@ -78,7 +57,8 @@
 
 重启 Gemini CLI 并打开您的 Unreal 项目后，您可以直接调用任何工具函数来测试连接：
 ```python
-print(default_api.get_target_umg_asset())
+  cd Resources/Python/APITest
+  python UE5_Editor_Imitation.py
 ```
 
 #### Python 环境 (可选)
@@ -92,6 +72,38 @@ print(default_api.get_target_umg_asset())
     .\.venv\Scripts\activate
     uv pip install -e .
     ```
+
+---
+
+## 提示词管理器 (Prompt Manager)
+
+这是一个可视化的 Web 工具，用于配置 MCP 服务器的系统提示词、工具描述以及用户模板。
+
+### 功能亮点
+
+1.  **系统提示词编辑**：直接修改 AI 的全局指令。
+2.  **工具管理**：
+    *   **启用/禁用**：通过开关（Toggle）来启用或禁用特定的 MCP 工具。禁用工具后，该工具将不会注册到 MCP 服务器，从而**压缩上下文窗口**，避免 AI 被无关工具干扰。
+    *   **编辑描述**：修改工具的提示词（Description），使其更适合您的特定工作流。
+3.  **用户模板 (Prompts)**：添加预置的 Prompts，供 MCP 客户端直接调用。
+
+### 运行方法
+
+在 Python 环境下运行以下命令：
+```bash
+python Resources/Python/PromptManager/server.py
+```
+浏览器将自动打开 `http://localhost:8085`。
+
+### 使用建议
+
+提示词是 AI 工具效能的关键。通过 Prompt Manager，您可以根据需求定制 AI 的行为：
+
+*   **一键部署模式**：如果您希望 AI 专注于根据设计生成 UI，可以关闭除了 `apply_layout` 和 `export_umg_to_json` 之外的所有工具。
+*   **教学模式**：如果您希望 AI 作为导师指导您学习 UMG，可以只保留只读工具（如 `get_widget_tree`, `get_widget_schema`），防止 AI 自动修改您的资产。
+*   **上下文优化**：对于上下文窗口较小的模型，建议关闭您当前任务不需要的工具，以提高响应速度和准确性。
+
+欢迎贡献高效的提示词配置，让 AI 更聪明地工作！
 
 ---
 

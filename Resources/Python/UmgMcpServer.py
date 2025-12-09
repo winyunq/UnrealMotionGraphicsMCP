@@ -292,22 +292,89 @@ mcp = FastMCP(
 )
 
 # =============================================================================
+#  Dynamic Tool Configuration (Loaded from prompts.json)
+# =============================================================================
+
+PROMPTS_CONFIG = []
+
+def load_tool_and_prompt_config():
+    """Load tool definitions and prompts from prompts.json."""
+    global TOOLS_CONFIG, PROMPTS_CONFIG
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.abspath(os.path.join(current_dir, "..", "prompts.json"))
+        
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+                # Load Tools
+                for tool in data.get("tools", []):
+                    TOOLS_CONFIG[tool["name"]] = tool
+                    
+                # Load Prompts
+                PROMPTS_CONFIG = data.get("prompts", [])
+                
+            logger.info(f"Loaded {len(TOOLS_CONFIG)} tools and {len(PROMPTS_CONFIG)} prompts from prompts.json")
+        else:
+            logger.warning(f"prompts.json not found at {json_path}")
+            
+    except Exception as e:
+        logger.error(f"Error loading prompts.json: {e}")
+
+load_tool_and_prompt_config()
+
+# Register Prompts dynamically
+for p_data in PROMPTS_CONFIG:
+    p_name = p_data.get("name", "Unknown")
+    p_content = p_data.get("content", "")
+    p_desc = p_data.get("description", "")
+    
+    # Create closure to capture content
+    def make_prompt_func(content):
+        def prompt_func():
+            return content
+        return prompt_func
+        
+    safe_name = p_name.lower().replace(" ", "_").replace("-", "_")
+    mcp.prompt(name=safe_name, description=p_desc)(make_prompt_func(p_content))
+    
+
+
+def register_tool(name: str, default_desc: str):
+    """
+    Decorator to register a tool with MCP only if it is enabled in prompts.json.
+    This effectively compresses the context by hiding disabled tools from the AI.
+    """
+    def decorator(func):
+        config = TOOLS_CONFIG.get(name, {})
+        is_enabled = config.get("enabled", True)
+        if is_enabled:
+            description = config.get("description", default_desc)
+            # Register with FastMCP
+            return mcp.tool(name=name, description=description)(func)
+        else:
+            # Do not register, just return the function
+            return func
+    return decorator
+
+# =============================================================================
 #  Category: Introspection (Knowledge Base)
 # =============================================================================
 
-@mcp.tool()
+@register_tool("get_widget_schema", "Retrieves the schema for a widget type.")
 def get_widget_schema(widget_type: str) -> Dict[str, Any]:
     """
-    "What can this component do?" - Retrieves the "schema" for a widget type, detailing its editable properties and their types.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
     return umg_get_client.get_widget_schema(widget_type)
 
-@mcp.tool()
+@register_tool("get_creatable_widget_types", "Returns a list of creatable widget types.")
 def get_creatable_widget_types() -> Dict[str, Any]:
     """
-    "What's in my toolbox?" - Returns a list of all widget class names that can be created with the 'create_widget' tool.
+    (Description loaded from prompts.json)
     """
     # Per user instruction, return a philosophical guide instead of a fixed list.
     # This encourages the AI to experiment based on its own knowledge.
@@ -325,37 +392,37 @@ def get_creatable_widget_types() -> Dict[str, Any]:
 #  Category: Attention & Context
 # =============================================================================
 
-@mcp.tool()
+@register_tool("get_target_umg_asset", "Gets the asset path of the UMG Editor user is focused on.")
 def get_target_umg_asset() -> Dict[str, Any]:
     """
-    "What UMG is the user editing right now?" - Gets the asset path of the UMG Editor the user is currently focused on.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
     return umg_attention_client.get_target_umg_asset()
 
-@mcp.tool()
+@register_tool("get_last_edited_umg_asset", "Gets the last edited UMG asset path.")
 def get_last_edited_umg_asset() -> Dict[str, Any]:
     """
-    "What was the user just working on?" - Gets the asset path of the last UMG asset that was opened or saved.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
     return umg_attention_client.get_last_edited_umg_asset()
 
-@mcp.tool()
+@register_tool("get_recently_edited_umg_assets", "Gets a list of recently edited assets.")
 def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
     """
-    "What has the user been working on recently?" - Gets a list of recently edited UMG assets.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
     return umg_attention_client.get_recently_edited_umg_assets(max_count)
 
-@mcp.tool()
+@register_tool("set_target_umg_asset", "Sets the target UMG asset.")
 def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
     """
-    Sets the UMG asset that should be considered the current attention target.
+    (Description loaded from prompts.json)
     """
     context_manager.set_target(asset_path) # Update local context
     conn = get_unreal_connection()
@@ -366,10 +433,10 @@ def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
 #  Category: Sensing
 # =============================================================================
 
-@mcp.tool()
+@register_tool("get_widget_tree", "Fetches the complete widget hierarchy.")
 def get_widget_tree() -> Dict[str, Any]:
     """
-    "What does this UI look like?" - Fetches the complete widget hierarchy, which is the foundation for all AI reasoning.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
@@ -381,28 +448,28 @@ def get_widget_tree() -> Dict[str, Any]:
     
     return umg_get_client.get_widget_tree()
 
-@mcp.tool()
+@register_tool("query_widget_properties", "Queries specific properties of a widget.")
 def query_widget_properties(widget_name: str, properties: List[str]) -> Dict[str, Any]:
     """
-    Queries a list of specific properties from a single widget by its name (e.g., 'Slot.Size').
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
     return umg_get_client.query_widget_properties(widget_name, properties)
 
-@mcp.tool()
+@register_tool("get_layout_data", "Gets bounding boxes for widgets.")
 def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
     """
-    Gets screen-space bounding boxes for all widgets in the asset at a given resolution.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
     return umg_get_client.get_layout_data(resolution_width, resolution_height)
 
-@mcp.tool()
+@register_tool("check_widget_overlap", "Checks for widget overlap.")
 def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    "Are any widgets overlapping?" - Efficiently checks for layout overlap between widgets in the asset.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
@@ -412,11 +479,10 @@ def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, 
 #  Category: Action
 # =============================================================================
 
-@mcp.tool()
+@register_tool("create_widget", "Creates a new widget.")
 def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> Dict[str, Any]:
     """
-    Creates a new widget and attaches it to a parent.
-    AI HINT: Uses the globally targeted asset implicitly. Use 'get_creatable_widget_types' for 'widget_type'.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
@@ -429,41 +495,37 @@ def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> D
         
     return result
 
-@mcp.tool()
+@register_tool("set_widget_properties", "Sets properties on a widget.")
 def set_widget_properties(widget_name: str, properties: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Sets one or more properties on a specific widget by its name in the currently targeted UMG asset. This is your primary modification tool.
-    AI HINT: Use get_widget_schema to see available properties.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
     return umg_set_client.set_widget_properties(widget_name, properties)
 
-@mcp.tool()
+@register_tool("delete_widget", "Deletes a widget.")
 def delete_widget(widget_name: str) -> Dict[str, Any]:
     """
-    Deletes a widget by its name from the UMG asset.
-    AI HINT: Uses the globally targeted asset implicitly.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
     return umg_set_client.delete_widget(widget_name)
 
-@mcp.tool()
+@register_tool("reparent_widget", "Moves a widget to a new parent.")
 def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
     """
-    Moves a widget to be a child of a different parent.
-    AI HINT: Uses the globally targeted asset implicitly.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
     return umg_set_client.reparent_widget(widget_name, new_parent_name)
 
-@mcp.tool()
+@register_tool("save_asset", "Saves the UMG asset.")
 def save_asset() -> Dict[str, Any]:
     """
-    "Save my work" - Saves the UMG asset to disk.
-    AI HINT: Uses the globally targeted asset implicitly.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
@@ -473,24 +535,19 @@ def save_asset() -> Dict[str, Any]:
 #  Category: File Transformation (Explicit Path)
 # =============================================================================
 
-@mcp.tool()
+@register_tool("export_umg_to_json", "Decompiles UMG to JSON.")
 def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
-    """'Decompiles' a UMG .uasset file into a JSON string. Requires an explicit asset path."""
+    """
+    (Description loaded from prompts.json)
+    """
     conn = get_unreal_connection()
     umg_file_client = UMGFileTransformation.UMGFileTransformation(conn)
     return umg_file_client.export_umg_to_json(asset_path)
 
-@mcp.tool()
+@register_tool("apply_layout", "Applies a layout logic to a UMG asset.")
 def apply_layout(layout_content: str) -> Dict[str, Any]:
     """
-    "Design the UI" - Applies a layout definition to a UMG asset.
-    
-    **Smart Format Detection**:
-    - If content starts with `<`: Treated as **HTML/XML**.
-    - If content starts with `{`: Treated as **JSON**.
-    
-    Args:
-        layout_content: The HTML or JSON string defining the widget tree.
+    (Description loaded from prompts.json)
     """
     # 1. Determine Format
     content = layout_content.strip()
@@ -561,29 +618,28 @@ def preview_html_conversion(html_content: str) -> Dict[str, Any]:
 #  Category: Editor & Level (New)
 # =============================================================================
 
-# @mcp.tool()
+@register_tool("refresh_asset_registry", "Forces asset registry rescan.")
 def refresh_asset_registry(paths: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    "I can't find the file!" - Forces Unreal to re-scan the disk for new assets.
-    AI HINT: Use this if you created a file (like a Blueprint) but cannot find it immediately.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     editor_client = UMGEditor.UMGEditor(conn)
     return editor_client.refresh_asset_registry(paths)
 
-# @mcp.tool()
+@register_tool("get_actors_in_level", "Lists actors in level.")
 def get_actors_in_level() -> Dict[str, Any]:
     """
-    "What's in the scene?" - Gets a list of all actors in the current level.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     editor_client = UMGEditor.UMGEditor(conn)
     return editor_client.get_actors_in_level()
 
-# @mcp.tool()
+@register_tool("spawn_actor", "Spawns an actor.")
 def spawn_actor(actor_type: str, name: str, location: List[float] = None, rotation: List[float] = None) -> Dict[str, Any]:
     """
-    Spawns a basic actor (StaticMeshActor, PointLight, etc.) in the level.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     editor_client = UMGEditor.UMGEditor(conn)
@@ -593,19 +649,19 @@ def spawn_actor(actor_type: str, name: str, location: List[float] = None, rotati
 #  Category: Blueprint (New)
 # =============================================================================
 
-# @mcp.tool()
+@register_tool("create_blueprint", "Creates a Blueprint.")
 def create_blueprint(name: str, parent_class: str = "AActor") -> Dict[str, Any]:
     """
-    Creates a new Blueprint asset.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     bp_client = UMGBlueprint.UMGBlueprint(conn)
     return bp_client.create_blueprint(name, parent_class)
 
-# @mcp.tool()
+@register_tool("compile_blueprint", "Compiles a Blueprint.")
 def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
     """
-    Compiles a Blueprint.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     bp_client = UMGBlueprint.UMGBlueprint(conn)
@@ -617,100 +673,67 @@ def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
 
 # =============================================================================
 
-@mcp.prompt()
-def info():
-    """Run method:"tools/list" to get more details."""
-    return """
-# UMG MCP API - v3.0 (English)
+# =============================================================================
+#  Category: Dynamic Prompts (Loaded from JSON)
+# =============================================================================
 
-This document lists all available tools for interacting with the UMG MCP server.
+def load_prompts():
+    """Load prompts from the JSON file and register them with MCP."""
+    try:
+        # Resolve path relative to this script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.abspath(os.path.join(current_dir, "..", "prompts.json"))
+        
+        if not os.path.exists(json_path):
+            logger.warning(f"prompts.json not found at {json_path}")
+            return
 
-## 1. Sensing - The "Eyes" of the AI
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-*   `get_widget_tree()`
-    *   **Purpose**: Get the complete hierarchy of the UI. **This is the core sensing API**.
-    *   **Workflow**: Operates on the global target set by `set_target_umg_asset`.
+        # 1. Register Action Prompts (from specific categories)
+        target_categories = ["UMG Editor", "Blueprint Logic"]
+        
+        for category in target_categories:
+            if category in data:
+                for item in data[category]:
+                    name = item.get("name", "Unknown")
+                    prompt_text = item.get("prompt", "")
+                    
+                    # Store in a closure to capture 'prompt_text'
+                    def make_prompt_func(text_content):
+                        def p_func():
+                            return text_content
+                        return p_func
 
-*   `query_widget_properties(widget_name: str, properties: List[str])`
-    *   **Purpose**: Query specific property values of a widget.
-    *   **Workflow**: Same as above.
+                    # Register with MCP
+                    # Sanitize name for ID if needed, but FastMCP usually allows spaces in decorator? 
+                    # FastMCP uses the function name as the tool name by default, OR the 'name' argument.
+                    # We'll use the 'name' argument.
+                    safe_name = name.lower().replace(" ", "_")
+                    mcp.prompt(name=safe_name, description=name)(make_prompt_func(prompt_text))
+                    logger.info(f"Registered prompt: {safe_name}")
 
-*   `get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080)`
-    *   **Purpose**: Get screen coordinates and size for all widgets at a given resolution.
-    *   **Workflow**: Same as above.
+        # 2. Register System Info (Documentation)
+        # We look for "Server Documentation" -> "UMG Info"
+        doc_category = data.get("Server Documentation", [])
+        for item in doc_category:
+            if item.get("name") == "UMG Info":
+                info_text = item.get("prompt", "No documentation found.")
+                
+                @mcp.prompt(name="info")
+                def info():
+                    """Run method:"tools/list" to get more details."""
+                    return info_text
+                
+                logger.info("Registered 'info' prompt from JSON.")
+                break
 
-*   `check_widget_overlap(widget_names: Optional[List[str]] = None)`
-    *   **Purpose**: Efficient backend check for widget overlaps.
+    except Exception as e:
+        logger.error(f"Failed to load prompts from JSON: {e}")
 
-## 2. Action - The "Hands" of the AI
-
-*   `create_widget(parent_name: str, widget_type: str, new_widget_name: str)`
-*   `set_widget_properties(widget_name: str, properties: Dict[str, Any])`
-*   `delete_widget(widget_name: str)`
-*   `reparent_widget(widget_name: str, new_parent_name: str)`
-*   `save_asset()`
-*   `apply_layout(layout_content: str)`: **POWERFUL**. Applies a full JSON/HTML layout in one go.
-
-
-
-## 4. Editor & Blueprint
-
-*   `refresh_asset_registry()`
-*   `get_actors_in_level()` / `spawn_actor(...)`
-*   `create_blueprint(...)` / `compile_blueprint(...)`
-
-    *   **Workflow**: Same as above.
-
-## 2. Action - The "Hands" of the AI
-
-*   `create_widget(parent_name: str, widget_type: str, new_widget_name: str)`
-    *   **Purpose**: Create a new widget under a specified parent.
-    *   **Workflow**: Same as above.
-
-*   `delete_widget(widget_name: str)`
-    *   **Purpose**: Delete a specified widget.
-    *   **Workflow**: Same as above.
-
-*   `set_widget_properties(widget_name: str, properties: Dict[str, Any])`
-    *   **Purpose**: Modify one or more properties of a widget. **This is the core modification API**.
-    *   **Workflow**: Same as above.
-
-*   `reparent_widget(widget_name: str, new_parent_name: str)`
-    *   **Purpose**: Move a widget from one parent to another.
-    *   **Workflow**: Same as above.
-
-## 3. Introspection & Context
-
-*   `get_creatable_widget_types()`
-    *   **Purpose**: Tells the AI what types of widgets are in its "toolbox".
-
-*   `get_widget_schema(widget_type)`
-    *   **Purpose**: Tells the AI what editable properties exist for a widget type.
-
-*   `set_target_umg_asset(asset_path: str)`
-    *   **Purpose**: Sets a global target. All subsequent commands without `asset_path` will use this target.
-
-*   `get_target_umg_asset()`
-    *   **Purpose**: Query the current global target.
-
-## 4. File Transformation
-
-*   `export_umg_to_json(asset_path: str)`
-    *   **Purpose**: "Decompile" a UMG `.uasset` to JSON. Requires explicit path.
-
-*   `apply_layout(layout_content: str)`
-    *   **Purpose**: Apply a JSON or HTML layout definition to a UMG asset.
-
-
-
-## 6. Editor & Blueprint (New)
-
-(Hidden to avoid confusion, strictly UMG focused)
-
-## Pro-Tip for AI Assistants
-
-You can work as a powerful assistant by observing user changes. Use `export_umg_to_json` to 'see' what the user has done. Then, you can help them by using `apply_layout` (or `set_widget_properties`) to apply normalized data, such as cleaning up variable names, refining text, or fine-tuning transform values.
-"""
+# Load prompts at module level (or just before run)
+load_prompts()
 
 if __name__ == "__main__":
     port = UNREAL_PORT

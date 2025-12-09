@@ -281,22 +281,62 @@ mcp = FastMCP(
 )
 
 # =============================================================================
+#  Dynamic Tool Configuration (Loaded from prompts.json)
+# =============================================================================
+
+TOOLS_CONFIG = {}
+
+def load_tool_config():
+    """Load tool definitions from prompts.json."""
+    global TOOLS_CONFIG
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.abspath(os.path.join(current_dir, "..", "prompts.json"))
+        
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                for tool in data.get("tools", []):
+                    TOOLS_CONFIG[tool["name"]] = tool
+            logger.info(f"Loaded {len(TOOLS_CONFIG)} tool definitions from prompts.json")
+        else:
+            logger.warning(f"prompts.json not found at {json_path}")
+    except Exception as e:
+        logger.error(f"Error loading prompts.json: {e}")
+
+load_tool_config()
+
+def register_tool(name: str, default_desc: str):
+    """
+    Decorator to register a tool with MCP only if it is enabled in prompts.json.
+    """
+    def decorator(func):
+        config = TOOLS_CONFIG.get(name, {})
+        is_enabled = config.get("enabled", True)
+        if is_enabled:
+            description = config.get("description", default_desc)
+            return mcp.tool(name=name, description=description)(func)
+        else:
+            return func
+    return decorator
+
+# =============================================================================
 #  Category: Attention & Context
 # =============================================================================
 
-@mcp.tool()
+@register_tool("set_animation_scope", "Sets the current animation scope.")
 def set_animation_scope(animation_name: str) -> Dict[str, Any]:
     """
-    Sets the current animation scope. Subsequent read/write operations will target this animation.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.set_animation_scope(animation_name)
 
-@mcp.tool()
+@register_tool("set_widget_scope", "Sets the current widget scope.")
 def set_widget_scope(widget_name: str) -> Dict[str, Any]:
     """
-    Sets the current widget scope within the active animation. Subsequent keyframe operations will target this widget.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
@@ -306,10 +346,10 @@ def set_widget_scope(widget_name: str) -> Dict[str, Any]:
 #  Category: Read (Sensing)
 # =============================================================================
 
-@mcp.tool()
+@register_tool("get_all_animations", "Lists all animations.")
 def get_all_animations() -> Dict[str, Any]:
     """
-    "What animations are there?" - Lists all animations in the current UMG asset.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     
@@ -319,41 +359,37 @@ def get_all_animations() -> Dict[str, Any]:
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.get_all_animations()
 
-@mcp.tool()
+@register_tool("get_animation_keyframes", "Gets keyframes for an animation.")
 def get_animation_keyframes(animation_name: str) -> Dict[str, Any]:
     """
-    Gets the keyframe sequence (time points) for the specified animation.
-    Useful for understanding the rhythm and timing of the animation.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.get_animation_keyframes(animation_name)
 
-@mcp.tool()
+@register_tool("get_animated_widgets", "Gets widgets affected by animation.")
 def get_animated_widgets(animation_name: str) -> Dict[str, Any]:
     """
-    Gets a list of widgets that are affected by the specified animation.
-    Useful for understanding the scope of the animation.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.get_animated_widgets(animation_name)
 
-@mcp.tool()
+@register_tool("get_animation_full_data", "Gets complete animation data.")
 def get_animation_full_data(animation_name: str) -> Dict[str, Any]:
     """
-    Gets the complete data for an animation, including all tracks and keys.
-    Use with caution on large animations.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.get_animation_full_data(animation_name)
 
-@mcp.tool()
+@register_tool("get_widget_animation_data", "Gets data for a specific widget in animation.")
 def get_widget_animation_data(animation_name: str, widget_name: str) -> Dict[str, Any]:
     """
-    Gets the animation data specific to a single widget within an animation.
-    Useful for fine-tuning a specific object's behavior.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
@@ -363,82 +399,101 @@ def get_widget_animation_data(animation_name: str, widget_name: str) -> Dict[str
 #  Category: Write (Action)
 # =============================================================================
 
-@mcp.tool()
+@register_tool("create_animation", "Creates a new animation.")
 def create_animation(animation_name: str) -> Dict[str, Any]:
     """
-    Creates a new animation in the current UMG asset.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.create_animation(animation_name)
 
-@mcp.tool()
+@register_tool("delete_animation", "Deletes an animation.")
 def delete_animation(animation_name: str) -> Dict[str, Any]:
     """
-    Deletes an animation from the current UMG asset.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.delete_animation(animation_name)
 
-@mcp.tool()
+@register_tool("set_property_keys", "Sets keyframes for a property.")
 def set_property_keys(property_name: str, keys: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Sets a sequence of keyframes for a specific property on the currently scoped widget.
-    
-    Args:
-        property_name: The name of the property (e.g., "RenderOpacity", "Slot.CanvasSlot.Position").
-        keys: A list of dictionaries, each containing 'time' and 'value' (and optional 'interp').
-              Example: [{"time": 0.0, "value": 0.0}, {"time": 1.0, "value": 1.0}]
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.set_property_keys(property_name, keys)
 
-@mcp.tool()
+@register_tool("remove_property_track", "Removes a property track.")
 def remove_property_track(property_name: str) -> Dict[str, Any]:
     """
-    Removes the entire track for a specific property from the currently scoped widget.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.remove_property_track(property_name)
 
-@mcp.tool()
+@register_tool("remove_keys", "Removes specific keys.")
 def remove_keys(property_name: str, times: List[float]) -> Dict[str, Any]:
     """
-    Removes keyframes at specific times for a property on the currently scoped widget.
+    (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return sequencer_client.remove_keys(property_name, times)
 
-@mcp.prompt()
-def info():
-    """Run method:"tools/list" to get more details."""
-    return """
-# UMG Sequencer MCP API - v2.0 (English)
+# =============================================================================
+#  Category: Dynamic Prompts (Loaded from JSON)
+# =============================================================================
 
-This document lists all available tools for interacting with the UMG Sequencer MCP server.
+def load_prompts():
+    """Load prompts from the JSON file and register them with MCP."""
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.abspath(os.path.join(current_dir, "..", "prompts.json"))
+        
+        if not os.path.exists(json_path):
+            logger.warning(f"prompts.json not found at {json_path}")
+            return
 
-## Attention (Context)
-*   `set_animation_scope(animation_name)`: Lock focus on an animation.
-*   `set_widget_scope(widget_name)`: Lock focus on a widget within that animation.
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-## Read (Sensing)
-*   `get_all_animations()`: List available animations.
-*   `get_animation_keyframes(animation_name)`: Get timing rhythm.
-*   `get_animated_widgets(animation_name)`: Get affected objects.
-*   `get_animation_full_data(animation_name)`: Get everything (use carefully).
-*   `get_widget_animation_data(animation_name, widget_name)`: Get details for one object.
+        # 1. Register Sequencer Action Prompts
+        if "Animation Sequencer" in data:
+            for item in data["Animation Sequencer"]:
+                name = item.get("name", "Unknown")
+                prompt_text = item.get("prompt", "")
+                
+                def make_prompt_func(text_content):
+                    def p_func():
+                        return text_content
+                    return p_func
 
-## Write (Action)
-*   `create_animation(animation_name)`
-*   `delete_animation(animation_name)`
-*   `set_property_keys(property_name, keys)`: **Core Write Tool**. Batch set keys for a property.
-*   `remove_property_track(property_name)`: Delete a whole track.
-*   `remove_keys(property_name, times)`: Delete specific keys.
-"""
+                safe_name = name.lower().replace(" ", "_")
+                mcp.prompt(name=safe_name, description=name)(make_prompt_func(prompt_text))
+                logger.info(f"Registered prompt: {safe_name}")
+
+        # 2. Register Sequencer Info (Documentation)
+        doc_category = data.get("Server Documentation", [])
+        for item in doc_category:
+            if item.get("name") == "Sequencer Info":
+                info_text = item.get("prompt", "No documentation found.")
+                
+                @mcp.prompt(name="info")
+                def info():
+                    """Run method:"tools/list" to get more details."""
+                    return info_text
+                
+                logger.info("Registered 'info' prompt from JSON.")
+                break
+
+    except Exception as e:
+        logger.error(f"Failed to load prompts from JSON: {e}")
+
+load_prompts()
 
 if __name__ == "__main__":
     port = UNREAL_PORT

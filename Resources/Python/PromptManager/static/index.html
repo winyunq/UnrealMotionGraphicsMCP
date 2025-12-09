@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini MCP Prompt Manager</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --sidebar-width: 200px;
+            --list-width: 300px;
+            --border-color: #333;
+            --text-color: #ccc;
+            --hover-color: #2a2d2e;
+            --active-color: #37373d;
+            --accent-color: #007acc;
+            --danger-color: #ce9178;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* 1. Main Sidebar (Categories & Actions) */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: #252526;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .sidebar-header {
+            padding: 15px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            color: #aaa;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            background-color: var(--hover-color);
+            color: white;
+        }
+
+        .nav-item.active {
+            background-color: var(--active-color);
+            border-left-color: var(--accent-color);
+            color: white;
+        }
+
+        .sidebar-actions {
+            border-top: 1px solid var(--border-color);
+            padding: 10px;
+        }
+
+        .action-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #3c3c3c;
+            border: none;
+            color: white;
+            cursor: pointer;
+            text-align: left;
+            border-radius: 4px;
+        }
+
+        .action-btn:hover {
+            background-color: #505050;
+        }
+
+        .action-btn.save {
+            background-color: var(--accent-color);
+        }
+
+        .save-indicator {
+            text-align: center;
+            font-size: 11px;
+            color: #89d185;
+            height: 15px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        /* 2. Tool List Panel */
+        .tool-panel {
+            width: var(--list-width);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            background-color: #1e1e1e;
+        }
+
+        .panel-header {
+            padding: 15px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .tool-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tool-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2a2a2a;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tool-item:hover {
+            background-color: var(--hover-color);
+        }
+
+        .tool-item.active {
+            background-color: #094771;
+            color: white;
+        }
+
+        .tool-item.disabled {
+            opacity: 0.5;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 32px;
+            height: 18px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 18px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(14px);
+        }
+
+        /* 3. Editor Area */
+        .editor-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #1e1e1e;
+        }
+
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #555;
+            font-size: 1.2em;
+        }
+
+        .editor-container {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .editor-header {
+            font-size: 18px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+
+        .tab {
+            padding: 8px 20px;
+            background-color: #2d2d2d;
+            cursor: pointer;
+            color: #888;
+        }
+
+        .tab.active {
+            background-color: #1e1e1e;
+            color: white;
+            border-top: 2px solid var(--accent-color);
+        }
+
+        textarea {
+            flex: 1;
+            background-color: #252526;
+            color: #d4d4d4;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+        }
+
+        .preview-box {
+            flex: 1;
+            padding: 15px;
+            background-color: #252526;
+            white-space: pre-wrap;
+            font-family: 'Consolas', monospace;
+            border: 1px solid var(--border-color);
+            color: #d4d4d4;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            background-color: #3c3c3c;
+            border: 1px solid var(--border-color);
+            color: white;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. LEFT SIDEBAR: Categories & Actions -->
+    <div class="sidebar">
+        <div>
+            <div class="sidebar-header">Server Manager</div>
+            <div class="nav-item active" onclick="filterCategory('All')">All Tools</div>
+            <div class="nav-item" onclick="filterCategory('UMG')">UMG Items</div>
+            <div class="nav-item" onclick="filterCategory('Animation')">Animation Items</div>
+            <div class="nav-item" onclick="filterCategory('Blueprint')">Blueprint Items</div>
+            <div class="nav-item" onclick="filterCategory('Level')">Level Items</div>
+            <div class="nav-item" onclick="filterCategory('System')">System & Context</div>
+
+            <div class="sidebar-header" style="margin-top:20px;">Global Config</div>
+            <div class="nav-item" onclick="editSystemInstruction()">System Instruction</div>
+        </div>
+
+        <div class="sidebar-actions">
+            <div class="save-indicator" id="saveIndicator">Config Saved!</div>
+            <button class="action-btn save" onclick="saveData()">Save Config</button>
+            <button class="action-btn" onclick="createNewTool()">+ Create New Tool</button>
+        </div>
+    </div>
+
+    <!-- 2. MIDDLE PANEL: Tool List -->
+    <div class="tool-panel">
+        <div class="panel-header">
+            <span id="categoryTitle">All Tools</span>
+            <small id="toolCount" style="color:#666">0</small>
+        </div>
+        <div class="tool-list" id="toolList">
+            <!-- Items injected via JS -->
+        </div>
+    </div>
+
+    <!-- 3. RIGHT PANEL: Editor -->
+    <div class="editor-area">
+        <div id="emptyState" class="empty-state">Select a tool to view details</div>
+
+        <div id="editorContainer" class="editor-container" style="display:none;">
+            <div class="editor-header" id="editorTitle">Tool Details</div>
+
+            <label style="font-size:12px;color:#888;display:block;margin-bottom:5px;">Check Name (ID)</label>
+            <input type="text" id="toolNameInput">
+
+            <div class="tabs">
+                <div class="tab" id="tabPreview" onclick="setMode('preview')">Preview</div>
+                <div class="tab" id="tabEdit" onclick="setMode('edit')">Edit Prompt</div>
+            </div>
+
+            <textarea id="promptEditor" style="display:none;"></textarea>
+            <div id="promptPreview" class="preview-box"></div>
+
+            <div style="text-align:right; margin-top:10px;">
+                <button onclick="deleteCurrentTool()"
+                    style="background:transparent;border:none;color:var(--danger-color);cursor:pointer;text-decoration:underline;">Delete
+                    Tool</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let promptsData = { system_instruction: "", tools: [], prompts: [] };
+        let currentCategory = 'All';
+        let currentToolIndex = -1; // Global index in promptsData.tools
+        let isSystemEdit = false;
+
+        async function init() {
+            try {
+                const res = await fetch('/api/prompts');
+                promptsData = await res.json();
+                renderList();
+            } catch (e) { console.error(e); }
+        }
+
+        function filterCategory(cat) {
+            currentCategory = cat;
+            document.getElementById('categoryTitle').innerText = cat === 'All' ? 'All Tools' : (cat === 'Prompts' ? 'User Prompts' : cat + ' Tools');
+
+            // UI Active State
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.innerText.includes(cat) || (cat === 'All' && el.innerText === 'All Tools') || (cat === 'Prompts' && el.innerText.includes('User Prompts'))) {
+                    el.classList.add('active');
+                }
+            });
+
+            isSystemEdit = false;
+            renderList();
+            showEmptyState();
+        }
+
+        function renderList() {
+            const list = document.getElementById('toolList');
+            list.innerHTML = '';
+
+            let count = 0;
+            let items = [];
+
+            if (currentCategory === 'Prompts') {
+                items = promptsData.prompts || [];
+            } else {
+                items = promptsData.tools || [];
+            }
+
+            items.forEach((item, index) => {
+                // Filter Tools by Category (Skip for Prompts/All)
+                if (currentCategory !== 'Prompts' && currentCategory !== 'All' && item.category !== currentCategory) return;
+
+                const div = document.createElement('div');
+                div.className = `tool-item ${index === currentToolIndex ? 'active' : ''} ${item.enabled === false ? 'disabled' : ''}`;
+
+                div.onclick = (e) => {
+                    if (e.target.closest('.switch')) return;
+                    selectItem(index);
+                };
+
+                const span = document.createElement('span');
+                span.innerText = item.name;
+                span.style.flex = "1";
+                span.style.whiteSpace = "nowrap";
+                span.style.overflow = "hidden";
+                span.style.textOverflow = "ellipsis";
+
+                div.appendChild(span);
+
+                // Toggle only for Tools
+                if (currentCategory !== 'Prompts') {
+                    const label = document.createElement('label');
+                    label.className = 'switch';
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = item.enabled !== false;
+                    input.onchange = (e) => {
+                        item.enabled = e.target.checked;
+                        renderList();
+                        saveData(true);
+                    };
+                    const slider = document.createElement('span');
+                    slider.className = 'slider';
+                    label.appendChild(input);
+                    label.appendChild(slider);
+                    div.appendChild(label);
+                }
+
+                list.appendChild(div);
+                count++;
+            });
+            document.getElementById('toolCount').innerText = count;
+        }
+
+        function selectItem(index) {
+            currentToolIndex = index;
+            isSystemEdit = false;
+            renderList();
+
+            let item;
+            if (currentCategory === 'Prompts') {
+                item = promptsData.prompts[index];
+            } else {
+                item = promptsData.tools[index];
+            }
+
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('editorContainer').style.display = 'flex';
+
+            document.getElementById('editorTitle').innerText = currentCategory === 'Prompts' ? "Edit Prompt Template" : "Edit Tool: " + item.name;
+            document.getElementById('toolNameInput').value = item.name;
+
+            // For Prompts, 'content' is the main text. For Tools, 'description' is.
+            const text = currentCategory === 'Prompts' ? (item.content || "") : (item.description || "");
+
+            document.getElementById('promptEditor').value = text;
+            document.getElementById('promptPreview').innerText = text;
+
+            setMode('preview');
+        }
+
+        function editSystemInstruction() {
+            isSystemEdit = true;
+            currentToolIndex = -1;
+            renderList(); // Clear selection highlight
+
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('editorContainer').style.display = 'flex';
+            document.getElementById('editorTitle').innerText = "System Instruction (Global)";
+
+            document.getElementById('toolNameInput').value = "system_instruction";
+            document.getElementById('toolNameInput').disabled = true; // Read-only ID
+
+            document.getElementById('promptEditor').value = promptsData.system_instruction || "";
+            document.getElementById('promptPreview').innerText = promptsData.system_instruction || "";
+
+            setMode('preview');
+
+            // UI Highlight
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            // Ideally highlight "System Instruction" item but it's simpler to just leave it
+        }
+
+        function setMode(mode) {
+            const tabPrev = document.getElementById('tabPreview');
+            const tabEdit = document.getElementById('tabEdit');
+            const editor = document.getElementById('promptEditor');
+            const preview = document.getElementById('promptPreview');
+
+            if (mode === 'preview') {
+                tabPrev.classList.add('active');
+                tabEdit.classList.remove('active');
+                editor.style.display = 'none';
+                preview.style.display = 'block';
+                // Update preview from editor content in case of unsaved edits
+                preview.innerText = editor.value;
+            } else {
+                tabEdit.classList.add('active');
+                tabPrev.classList.remove('active');
+                preview.style.display = 'none';
+                editor.style.display = 'block';
+            }
+        }
+
+        function showEmptyState() {
+            currentToolIndex = -1;
+            document.getElementById('emptyState').style.display = 'flex';
+            document.getElementById('editorContainer').style.display = 'none';
+        }
+
+        async function saveData(silent = false) {
+            // Commit changes from Editor to Logic Object
+            if (isSystemEdit) {
+                promptsData.system_instruction = document.getElementById('promptEditor').value;
+            } else if (currentCategory === 'Prompts' && currentToolIndex >= 0) {
+                promptsData.prompts[currentToolIndex].name = document.getElementById('toolNameInput').value;
+                promptsData.prompts[currentToolIndex].content = document.getElementById('promptEditor').value;
+            } else if (currentToolIndex >= 0) {
+                promptsData.tools[currentToolIndex].name = document.getElementById('toolNameInput').value;
+                promptsData.tools[currentToolIndex].description = document.getElementById('promptEditor').value;
+            }
+
+            try {
+                await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(promptsData)
+                });
+                if (!silent) {
+                    const ind = document.getElementById('saveIndicator');
+                    ind.style.opacity = 1;
+                    setTimeout(() => ind.style.opacity = 0, 2000);
+                    if (!isSystemEdit) renderList();
+                }
+            } catch (e) { alert("Save failed"); }
+        }
+
+        function createNewTool() {
+            const name = prompt("Name / ID:");
+            if (!name) return;
+
+            if (currentCategory === 'Prompts') {
+                if (!promptsData.prompts) promptsData.prompts = [];
+                promptsData.prompts.push({
+                    name: name,
+                    description: "Description...",
+                    content: "Enter prompt template here..."
+                });
+            } else {
+                promptsData.tools.push({
+                    name: name,
+                    description: "New tool description...",
+                    enabled: true,
+                    category: currentCategory === 'All' ? 'UMG' : currentCategory
+                });
+            }
+            filterCategory(currentCategory);
+            selectItem(currentCategory === 'Prompts' ? promptsData.prompts.length - 1 : promptsData.tools.length - 1);
+            saveData();
+        }
+
+        function deleteCurrentTool() {
+            if (isSystemEdit) { alert("Cannot delete System Instruction."); return; }
+            if (confirm("Delete this item?")) {
+                if (currentCategory === 'Prompts') {
+                    promptsData.prompts.splice(currentToolIndex, 1);
+                } else {
+                    promptsData.tools.splice(currentToolIndex, 1);
+                }
+                saveData();
+                showEmptyState();
+                renderList();
+            }
+        }
+
+
+        init();
+    </script>
+</body>
+
+</html>
+```
