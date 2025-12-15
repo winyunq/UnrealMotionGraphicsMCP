@@ -12,6 +12,8 @@
 
 [Demo Recreating the UE5 editor in UMG editor](https://youtu.be/pq12x2MH1L4)
 
+[Chat with Gemini 3 to editor the UMG file](https://youtu.be/93_Fiil9nd8)
+
 ---
 
 ### 🚀 Quick Start
@@ -47,15 +49,6 @@ Tell Gemini how to find and launch the MCP server.
           "--directory",
           "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
           "UmgMcpServer.py"
-        ]
-      },
-      "UmgSequencer": {
-        "command": "uv",
-        "args": [
-          "run",
-          "--directory",
-          "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
-          "UmgSequencerServer.py"
         ]
       }
     }
