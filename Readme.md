@@ -146,12 +146,12 @@ The system now primarily relies on the `UE5_UMG_MCP` plugin for communication be
 ```mermaid
 flowchart LR
     subgraph "Local Execution Environment"
-        CLI[Gemini CLI] --"StdIO (JSON-RPC)"--> PY[Python (UmgMcpServer.py)]
+        CLI["Gemini CLI"] --"StdIO (JSON-RPC)"--> PY["Python (UmgMcpServer.py)"]
     end
 
     subgraph "Unreal Engine 5"
-        PY --"TCP Socket (JSON)"--> TCP[UmgMcpBridge (C++)]
-        TCP --> API[Unreal API / UMG]
+        PY --"TCP Socket (JSON)"--> TCP["UmgMcpBridge (C++)"]
+        TCP --> API["Unreal API / UMG"]
     end
 ```
 
@@ -191,4 +191,11 @@ flowchart LR
 | `remove_property_track` | 🚧 Planned | Remove a property track |
 | `remove_keys` | 🚧 Planned | Remove specific keys |
 | `get_animation_keyframes` | 🚧 Planned | Get keyframes for an animation |
-| `get_animated_widgets` | 🚧 Planned | Get list of widgets affected by an animation |
+
+## Troubleshooting & Known Issues
+
+> [!WARNING]
+> **Startup Order is Critical**
+> We have observed that the TCP connection handshake can be confusing. **You MUST launch the Unreal Engine 5 project FIRST**, wait for it to initialize, and **THEN launch the Gemini CLI**.
+>
+> If you launch the CLI first, the Python server may fail to connect correctly or enter a retry loop that results in connection failures or "success-on-kill" behavior. The UE5 Server acts as the Listener; it must be ready before the Client connects.

@@ -124,13 +124,13 @@ python Resources/Python/PromptManager/server.py
 
 ```mermaid
 flowchart LR
-    subgraph "本地执行环境 (Local Environment)"
-        CLI[Gemini CLI] --"StdIO (JSON-RPC)"--> PY[Python (UmgMcpServer.py)]
+    subgraph "Local Execution Environment"
+        CLI["Gemini CLI"] --"StdIO (JSON-RPC)"--> PY["Python (UmgMcpServer.py)"]
     end
 
     subgraph "Unreal Engine 5"
-        PY --"TCP Socket (JSON)"--> TCP[UmgMcpBridge (C++)]
-        TCP --> API[Unreal API / UMG]
+        PY --"TCP Socket (JSON)"--> TCP["UmgMcpBridge (C++)"]
+        TCP --> API["Unreal API / UMG"]
     end
 ```
 
@@ -171,3 +171,11 @@ flowchart LR
 | | `remove_keys` | ⏳ | 移除特定关键帧。 |
 | | `get_animation_keyframes` | ⏳ | 获取动画的关键帧数据。 |
 | | `get_animated_widgets` | ⏳ | 获取受动画影响的控件列表。 |
+
+## 故障排除与已知问题
+
+> [!WARNING]
+> **这很重要：关于启动顺序**
+> 我们发现 MCP 的连接机制对顺序非常敏感。**你必须先启动 UE5 项目**，等待它初始化完毕，**然后再启动 Gemini CLI**。
+>
+> 如果你先启动 CLI，Python 服务器可能会因为连接不上 UE5 而进入奇怪的状态，导致连接失败或者只有在你杀死进程时才突然连接成功（Success-on-kill）。请务必遵循 **"UE5 先行，CLI 后行"** 的原则。
