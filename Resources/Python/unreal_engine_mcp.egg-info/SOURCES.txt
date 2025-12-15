@@ -1,6 +1,0 @@
-pyproject.toml
-unreal_engine_mcp.egg-info/PKG-INFO
-unreal_engine_mcp.egg-info/SOURCES.txt
-unreal_engine_mcp.egg-info/dependency_links.txt
-unreal_engine_mcp.egg-info/requires.txt
-unreal_engine_mcp.egg-info/top_level.txt

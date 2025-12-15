@@ -123,41 +123,15 @@ python Resources/Python/PromptManager/server.py
 **架构图:** 
 
 ```mermaid
-flowchart TD
-    subgraph Client [External Client Gemini CLI]
-        A[User Input/Tool Call] --> B{JSON Command}
+flowchart LR
+    subgraph "本地执行环境 (Local Environment)"
+        CLI[Gemini CLI] --"StdIO (JSON-RPC)"--> PY[Python (UmgMcpServer.py)]
     end
 
-    subgraph Editor [Unreal Engine Editor]
-            subgraph Plugin [UE5_UMG_MCP Plugin]
-            C[TCP Server UUmgMcpBridge]
-            D{Command Dispatcher}
-            E[C++ Command Handlers]
-            F[Python Scripting Layer]
-            G[Unreal Engine Core API]
-
-            C -- Receives JSON --> D
-            D -- Dispatches --> E
-            D -- Dispatches --> F
-            E -- Interacts with --> G
-            F -- Calls C++ Functions --> G
-            F -- Executes Python Logic --> G
-        end
-
-        H[Unreal Editor Environment]
-        I[Unreal Python API]
-
-        D -- Queries for Tools --> H
-        H -- Exposes C++ BlueprintCallable --> I
-        I -- Exposes Python Functions --> H
-
-        C -- Listens on Configured Host/Port --> H
+    subgraph "Unreal Engine 5"
+        PY --"TCP Socket (JSON)"--> TCP[UmgMcpBridge (C++)]
+        TCP --> API[Unreal API / UMG]
     end
-
-    B -- Sends via TCP/IP --> C
-    E -- Returns JSON --> C
-    F -- Returns JSON --> C
-    C -- Sends JSON Response --> B
 ```
 
 ## API 实现状态

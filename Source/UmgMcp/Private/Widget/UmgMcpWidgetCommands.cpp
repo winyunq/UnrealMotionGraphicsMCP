@@ -122,23 +122,14 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     {
         UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
         FString ParentName, WidgetType, NewWidgetName;
-        if (Params->TryGetStringField(TEXT("parent_name"), ParentName) &&
-            Params->TryGetStringField(TEXT("widget_type"), WidgetType) &&
+        if (Params->TryGetStringField(TEXT("widget_type"), WidgetType) &&
             Params->TryGetStringField(TEXT("new_widget_name"), NewWidgetName))
         {
+            Params->TryGetStringField(TEXT("parent_name"), ParentName); // Optional
+            
             FString NewWidgetId = SetSubsystem->CreateWidget(TargetBlueprint, ParentName, WidgetType, NewWidgetName);
             if (!NewWidgetId.IsEmpty())
             {
-                // Auto-Focus the new widget
-                if (GEditor)
-                {
-                    UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
-                    if (AttentionSubsystem)
-                    {
-                        AttentionSubsystem->SetTargetWidget(NewWidgetName);
-                    }
-                }
-
                 Response->SetStringField(TEXT("status"), TEXT("success"));
                 Response->SetStringField(TEXT("new_widget_id"), NewWidgetId);
             }
@@ -149,8 +140,33 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         }
         else
         {
-            Response->SetStringField(TEXT("error"), TEXT("Missing parameters for create_widget (parent_name, widget_type, new_widget_name)."));
+            Response->SetStringField(TEXT("error"), TEXT("Missing parameters for create_widget (widget_type, new_widget_name)."));
         }
+    }
+    // NEW: set_active_widget
+    else if (Command == TEXT("set_active_widget"))
+    {
+         FString WidgetName;
+         if (Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+         {
+             if (GEditor)
+             {
+                 if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+                 {
+                     AttentionSubsystem->SetTargetWidget(WidgetName);
+                     Response->SetStringField(TEXT("status"), TEXT("success"));
+                     Response->SetStringField(TEXT("message"), FString::Printf(TEXT("Active Widget Scope set to '%s'. Future create_widget calls will default to this parent."), *WidgetName));
+                 }
+                 else
+                 {
+                      Response->SetStringField(TEXT("error"), TEXT("Failed to get UmgAttentionSubsystem."));
+                 }
+             }
+         }
+         else
+         {
+             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' parameter."));
+         }
     }
     else if (Command == TEXT("set_widget_properties"))
     {

@@ -7,8 +7,11 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
 
 [Demo Designed A RTS UI](https://youtu.be/O86VCzxyF5o)
+
 [Demo Recreating the UE5 editor](https://youtu.be/h_J70I0m4Ls)
+
 [Demo Recreating the UE5 editor in UMG editor](https://youtu.be/pq12x2MH1L4)
+
 ---
 
 ### 🚀 Quick Start
@@ -141,41 +144,15 @@ The system now primarily relies on the `UE5_UMG_MCP` plugin for communication be
 **Architecture Diagram:**
 
 ```mermaid
-flowchart TD
-    subgraph Client [External Client Gemini CLI]
-        A[User Input/Tool Call] --> B{JSON Command}
+flowchart LR
+    subgraph "Local Execution Environment"
+        CLI[Gemini CLI] --"StdIO (JSON-RPC)"--> PY[Python (UmgMcpServer.py)]
     end
 
-    subgraph Editor [Unreal Engine Editor]
-            subgraph Plugin [UE5_UMG_MCP Plugin]
-            C[TCP Server UUmgMcpBridge]
-            D{Command Dispatcher}
-            E[C++ Command Handlers]
-            F[Python Scripting Layer]
-            G[Unreal Engine Core API]
-
-            C -- Receives JSON --> D
-            D -- Dispatches --> E
-            D -- Dispatches --> F
-            E -- Interacts with --> G
-            F -- Calls C++ Functions --> G
-            F -- Executes Python Logic --> G
-        end
-
-        H[Unreal Editor Environment]
-        I[Unreal Python API]
-
-        D -- Queries for Tools --> H
-        H -- Exposes C++ BlueprintCallable --> I
-        I -- Exposes Python Functions --> H
-
-        C -- Listens on Configured Host/Port --> H
+    subgraph "Unreal Engine 5"
+        PY --"TCP Socket (JSON)"--> TCP[UmgMcpBridge (C++)]
+        TCP --> API[Unreal API / UMG]
     end
-
-    B -- Sends via TCP/IP --> C
-    E -- Returns JSON --> C
-    F -- Returns JSON --> C
-    C -- Sends JSON Response --> B
 ```
 
 ## API Status

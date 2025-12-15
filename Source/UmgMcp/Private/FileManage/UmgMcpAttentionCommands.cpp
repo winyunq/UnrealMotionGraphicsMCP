@@ -59,8 +59,16 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         if (Params && Params->HasField(TEXT("asset_path")))
         {
             FString AssetPath = Params->GetStringField(TEXT("asset_path"));
-            AttentionSubsystem->SetTargetUmgAsset(AssetPath);
-            Response->SetStringField(TEXT("status"), TEXT("success"));
+            bool bSuccess = AttentionSubsystem->SetTargetUmgAsset(AssetPath);
+            if (bSuccess)
+            {
+                Response->SetStringField(TEXT("status"), TEXT("success"));
+            }
+            else
+            {
+                Response->SetStringField(TEXT("status"), TEXT("error"));
+                Response->SetStringField(TEXT("message"), FString::Printf(TEXT("Failed to set target. Asset '%s' not found or invalid."), *AssetPath));
+            }
         }
         else
         {

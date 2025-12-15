@@ -82,7 +82,7 @@ UUmgMcpBridge::~UUmgMcpBridge()
 // Initialize subsystem
 void UUmgMcpBridge::Initialize(FSubsystemCollectionBase& Collection)
 {
-    UE_LOG(LogTemp, Display, TEXT("UmgMcpBridge: Initializing"));
+    UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Initializing"));
     
     bIsRunning = false;
     ListenerSocket = nullptr;
@@ -98,7 +98,7 @@ void UUmgMcpBridge::Initialize(FSubsystemCollectionBase& Collection)
 // Clean up resources when subsystem is destroyed
 void UUmgMcpBridge::Deinitialize()
 {
-    UE_LOG(LogTemp, Display, TEXT("UmgMcpBridge: Shutting down"));
+    UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Shutting down"));
     StopServer();
 }
 
@@ -256,9 +256,25 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
         Promise.SetValue(Result);
     });
     
-    // Wait for the result (this blocks the Server Thread, which is fine as it's a dedicated thread)
-    // TODO: Add timeout to prevent infinite hang if GameThread is stuck?
-    return Future.Get();
+    // Wait for the result with a timeout to prevent infinite hang
+    // This ensures we return a proper error to the client instead of letting the socket timeout
+    if (Future.WaitFor(FTimespan::FromSeconds(MCP_GAME_THREAD_TIMEOUT_DEFAULT)))
+    {
+        return Future.Get();
+    }
+    else
+    {
+        UE_LOG(LogUmgMcp, Error, TEXT("UmgMcpBridge: GameThread execution timed out (%.1fs) for command: %s"), MCP_GAME_THREAD_TIMEOUT_DEFAULT, *CommandType);
+        
+        TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
+        ErrorResponse->SetStringField(TEXT("status"), TEXT("error"));
+        ErrorResponse->SetStringField(TEXT("error"), FString::Printf(TEXT("Game Thread Timeout - The editor may be paused or busy (Waited %.1fs)."), MCP_GAME_THREAD_TIMEOUT_DEFAULT));
+        
+        FString ResultString;
+        TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ResultString);
+        FJsonSerializer::Serialize(ErrorResponse.ToSharedRef(), Writer);
+        return ResultString;
+    }
 }
 
 FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)

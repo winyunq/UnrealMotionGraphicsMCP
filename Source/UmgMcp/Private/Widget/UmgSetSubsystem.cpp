@@ -247,16 +247,43 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
 
     // Check if this is a request to create root widget (no existing root)
     bool bCreatingRootWidget = false;
+    UPanelWidget* ParentWidget = nullptr;
+
+    // IMPLICIT PARENTING LOGIC
+    FString ActualParentName = ParentName;
+    if (ActualParentName.IsEmpty())
+    {
+        // 1. Try Active Widget Scope from Attention Subsystem
+        if (GEditor)
+        {
+            if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+            {
+                FString ScopedWidgetName = AttentionSubsystem->GetTargetWidget();
+                if (!ScopedWidgetName.IsEmpty())
+                {
+                    ActualParentName = ScopedWidgetName;
+                    UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Implicit parent from Active Scope: '%s'"), *ActualParentName);
+                }
+            }
+        }
+
+        // 2. If still empty, try fallback to Root Widget
+        if (ActualParentName.IsEmpty() && WidgetBlueprint->WidgetTree->RootWidget)
+        {
+            ActualParentName = WidgetBlueprint->WidgetTree->RootWidget->GetName();
+             UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Implicit parent from Root Widget: '%s'"), *ActualParentName);
+        }
+    }
+
     if (!WidgetBlueprint->WidgetTree->RootWidget)
     {
         // If the tree is empty, ANY creation request must be for the root.
         // We are lenient here: if the widget type is a Panel (valid for root), we allow it regardless of what ParentName the AI sent.
-        // This handles cases where AI sends "None", "Null", or hallucinates a parent name.
         
         if (WidgetClass->IsChildOf(UPanelWidget::StaticClass()))
         {
             bCreatingRootWidget = true;
-            UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: No root widget exists. Auto-promoting '%s' to root widget (ignoring ParentName: '%s')."), *WidgetType, *ParentName);
+            UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: No root widget exists. Auto-promoting '%s' to root widget."), *WidgetType);
         }
         else
         {
@@ -264,25 +291,14 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
             return FString();
         }
     }
-
-    UPanelWidget* ParentWidget = nullptr;
     
     if (!bCreatingRootWidget)
     {
         // Normal case: creating a child widget, need to find parent
-        ParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ParentName)));
+        ParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ActualParentName)));
         if (!ParentWidget)
         {
-            // Check if root widget exists
-            if (!WidgetBlueprint->WidgetTree->RootWidget)
-            {
-                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: No root widget exists. Cannot create child widget '%s'. You must first create a root widget using a Panel type."), *WidgetName);
-                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: To create a root widget, use parent_name=\"\" or \"Root\" with a Panel widget type like VerticalBox or HorizontalBox."));
-            }
-            else
-            {
-                UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find ParentWidget with name '%s' in asset '%s'."), *ParentName, *WidgetBlueprint->GetPathName());
-            }
+            UE_LOG(LogUmgSet, Error, TEXT("CreateWidget: Failed to find ParentWidget with name '%s' in asset '%s'."), *ActualParentName, *WidgetBlueprint->GetPathName());
             return FString();
         }
     }
@@ -306,7 +322,7 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
     {
         // Add as child to parent
         ParentWidget->AddChild(NewWidget);
-        UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Successfully created '%s' as child of '%s'."), *WidgetName, *ParentName);
+        UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Successfully created '%s' as child of '%s'."), *WidgetName, *ActualParentName);
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);

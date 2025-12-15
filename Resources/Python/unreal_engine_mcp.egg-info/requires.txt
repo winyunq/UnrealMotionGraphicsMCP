@@ -1,6 +1,0 @@
-mcp[cli]>=1.4.1
-fastmcp>=0.2.0
-uvicorn
-fastapi
-pydantic>=2.6.1
-requests

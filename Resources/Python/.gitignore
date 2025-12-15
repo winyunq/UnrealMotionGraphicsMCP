@@ -1,11 +1,3 @@
-# Python
-__pycache__/
-*.pyc
-.venv/
 
-# Debugging
-debug_stdout.log
-debug_wrapper.py
-
-# Gemini Temporary Files
-Gemini*
+!Gemini_*.py
+!Gemini_*.log

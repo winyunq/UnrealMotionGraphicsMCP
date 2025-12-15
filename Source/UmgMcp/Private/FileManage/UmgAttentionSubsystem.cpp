@@ -70,14 +70,17 @@ void UUmgAttentionSubsystem::HandleAssetOpened(UObject* Asset, class IAssetEdito
 	}
 }
 
-void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
+bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
 {
-    if (AssetPath.IsEmpty())
+    // Validation: Strict check for package path format
+    // Must start with /Game, /Engine, or /PluginName (usually /Script or others, but for UMG it's mostly /Game)
+    // To be safe, we check if it starts with /
+    if (AssetPath.IsEmpty() || !AssetPath.StartsWith(TEXT("/")))
     {
-        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset called with empty AssetPath. Clearing target."));
+        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: Invalid AssetPath '%s'. Must start with '/'. Clearing target."), *AssetPath);
         AttentionTargetAssetPath.Empty();
         CachedTargetWidgetBlueprint = nullptr;
-        return;
+        return false;
     }
 
     UWidgetBlueprint* TargetBP = nullptr;
@@ -108,35 +111,44 @@ void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
     // 2. Fallback to LoadObject if not found in editor
     if (!TargetBP)
     {
-        TargetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+        // Use LoadObject but handle failure gracefully without blocking ensure
+        TargetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath, nullptr, LOAD_NoWarn);
     }
 
-    // 3. POLICY CHANGE: "Select = Ensure Exists"
-    // If the asset still doesn't exist, create it.
+    // 3. Conditional Creation
+    // Only create if it looks like a valid path but just missing
     if (!TargetBP)
     {
-        UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Asset '%s' not found. Creating new WidgetBlueprint..."), *AssetPath);
-        
-        FString PackageName = AssetPath;
-        FString AssetName = FPaths::GetBaseFilename(AssetPath);
-        FString PackagePath = FPaths::GetPath(AssetPath);
-
-        // Ensure AssetTools module is loaded
-        IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-        
-        // Create a factory for WidgetBlueprint
-        UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
-        
-        UObject* NewAsset = AssetTools.CreateAsset(AssetName, PackagePath, UWidgetBlueprint::StaticClass(), Factory);
-        TargetBP = Cast<UWidgetBlueprint>(NewAsset);
-        
-        if (TargetBP)
+        // Basic sanity check before creating: does it look like a valid package path?
+        if (FPackageName::IsValidPath(AssetPath))
         {
-             UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Successfully created new asset '%s'."), *AssetPath);
+            UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Asset '%s' not found. Creating new WidgetBlueprint..."), *AssetPath);
+            
+            FString PackageName = AssetPath;
+            FString AssetName = FPaths::GetBaseFilename(AssetPath);
+            FString PackagePath = FPaths::GetPath(AssetPath);
+
+            // Ensure AssetTools module is loaded
+            IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
+            
+            // Create a factory for WidgetBlueprint
+            UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
+            
+            UObject* NewAsset = AssetTools.CreateAsset(AssetName, PackagePath, UWidgetBlueprint::StaticClass(), Factory);
+            TargetBP = Cast<UWidgetBlueprint>(NewAsset);
+            
+            if (TargetBP)
+            {
+                 UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Successfully created new asset '%s'."), *AssetPath);
+            }
+            else
+            {
+                 UE_LOG(LogUmgAttention, Error, TEXT("SetTargetUmgAsset: Failed to create asset '%s'."), *AssetPath);
+            }
         }
         else
         {
-             UE_LOG(LogUmgAttention, Error, TEXT("SetTargetUmgAsset: Failed to create asset '%s'."), *AssetPath);
+             UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: Path '%s' is not a valid package path. Skipping creation."), *AssetPath);
         }
     }
 
@@ -151,6 +163,7 @@ void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         UmgAssetHistory.Remove(AssetPath);
         UmgAssetHistory.Insert(AssetPath, 0);
         UE_LOG(LogUmgAttention, Log, TEXT("Successfully cached UMG asset object."));
+        return true;
     }
     else
     {
@@ -158,6 +171,7 @@ void UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load or create UMG asset from path: %s. Clearing attention target."), *AssetPath);
         AttentionTargetAssetPath.Empty();
         CachedTargetWidgetBlueprint = nullptr;
+        return false;
     }
 }
 

@@ -1,5 +1,6 @@
 #include "Bridge/MCPServerRunnable.h"
 #include "Bridge/UmgMcpBridge.h"
+#include "UmgMcp.h" // Include specifically for LogUmgMcp
 #include "Sockets.h"
 #include "SocketSubsystem.h"
 #include "Interfaces/IPv4/IPv4Address.h"
@@ -16,7 +17,7 @@ FMCPServerRunnable::FMCPServerRunnable(UUmgMcpBridge* InBridge, TSharedPtr<FSock
     , ListenerSocket(InListenerSocket)
     , bRunning(true)
 {
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Created server runnable"));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Created server runnable"));
 }
 
 FMCPServerRunnable::~FMCPServerRunnable()
@@ -31,28 +32,28 @@ bool FMCPServerRunnable::Init()
 
 uint32 FMCPServerRunnable::Run()
 {
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Server thread starting..."));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Server thread starting..."));
     
     while (bRunning)
     {
-        // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Waiting for client connection..."));
+        // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Waiting for client connection..."));
         
         bool bPending = false;
         if (ListenerSocket->HasPendingConnection(bPending) && bPending)
         {
-            // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Client connection pending, accepting..."));
+            // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Client connection pending, accepting..."));
             
             ClientSocket = MakeShareable(ListenerSocket->Accept(TEXT("MCPClient")));
             if (ClientSocket.IsValid())
             {
-                // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Client connection accepted"));
+                // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Client connection accepted"));
                 
                 // Use the robust handler that supports large payloads and delimiters
                 HandleClientConnection(ClientSocket);
             }
             else
             {
-                // UE_LOG(LogTemp, Warning, TEXT("MCPServerRunnable: Failed to accept client connection"));
+                // UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Failed to accept client connection"));
             }
         }
         
@@ -60,7 +61,7 @@ uint32 FMCPServerRunnable::Run()
         FPlatformProcess::Sleep(0.1f);
     }
     
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Server thread stopping"));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Server thread stopping"));
     return 0;
 }
 
@@ -77,22 +78,22 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
 {
     if (!InClientSocket.IsValid())
     {
-        // UE_LOG(LogTemp, Error, TEXT("MCPServerRunnable: Invalid client socket passed to HandleClientConnection"));
+        UE_LOG(LogUmgMcp, Error, TEXT("MCPServerRunnable: Invalid client socket passed to HandleClientConnection"));
         return;
     }
 
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Starting to handle client connection"));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Starting to handle client connection"));
     
     // Set socket options for better connection stability
     InClientSocket->SetNonBlocking(false);
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Set socket to blocking mode"));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Set socket to blocking mode"));
     
     // Properly read full message with timeout
     const int32 MaxBufferSize = 4096;
     uint8 Buffer[MaxBufferSize];
     TArray<uint8> PendingData;
     
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Starting message receive loop"));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Starting message receive loop"));
     
     while (bRunning && InClientSocket.IsValid())
     {
@@ -121,7 +122,7 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
                         FString Message = UTF8_TO_TCHAR((const char*)PendingData.GetData());
                         
                         // Process
-                        // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Processing message (%d bytes)"), PendingData.Num() - 1);
+                        UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Processing message (%d bytes)"), PendingData.Num() - 1);
                         ProcessMessage(InClientSocket, Message);
                         
                         // Clear for next message
@@ -137,8 +138,8 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
         }
         else if (!bReadSuccess)
         {
-            // UE_LOG(LogTemp, Warning, TEXT("MCPServerRunnable: Connection closed or error occurred - Last error: %d"), 
-            //        (int32)ISocketSubsystem::Get()->GetLastErrorCode());
+            UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Connection closed or error occurred - Last error: %d"), 
+                   (int32)ISocketSubsystem::Get()->GetLastErrorCode());
             break;
         }
         
@@ -146,12 +147,12 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
         FPlatformProcess::Sleep(0.001f); // 1ms sleep
     }
     
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Exited message receive loop"));
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Exited message receive loop"));
 }
 
 void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FString& Message)
 {
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Processing message: %s"), *Message);
+    UE_LOG(LogUmgMcp, Display, TEXT("[UMGMCP-Message] Received: %s"), *Message);
     
     // Parse message as JSON
     TSharedPtr<FJsonObject> JsonMessage;
@@ -159,7 +160,7 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     
     if (!FJsonSerializer::Deserialize(Reader, JsonMessage) || !JsonMessage.IsValid())
     {
-        // UE_LOG(LogTemp, Warning, TEXT("MCPServerRunnable: Failed to parse message as JSON"));
+        UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Failed to parse message as JSON"));
         return;
     }
     
@@ -169,7 +170,7 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     
     if (!JsonMessage->TryGetStringField(TEXT("command"), CommandType))
     {
-        // UE_LOG(LogTemp, Warning, TEXT("MCPServerRunnable: Message missing 'command' field"));
+        UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Message missing 'command' field"));
         return;
     }
     
@@ -183,7 +184,7 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
         }
     }
     
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Executing command: %s"), *CommandType);
+    // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Executing command: %s"), *CommandType);
     
     // Execute command
     FString Response = Bridge->ExecuteCommand(CommandType, Params);
@@ -204,5 +205,5 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     uint8 Delimiter = 0;
     Client->Send(&Delimiter, 1, BytesSent);
     
-    // UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Sent response (%d bytes + null)"), Utf8Response.Length());
+    UE_LOG(LogUmgMcp, Display, TEXT("[UMGMCP-Message] Sent response: %s"), *Response);
 }

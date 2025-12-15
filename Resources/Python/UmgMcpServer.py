@@ -10,10 +10,18 @@ UMG asset using the 'Attention' tools, and all subsequent 'Sensing' and 'Action'
 tools operate implicitly on that target.
 """
 
-import logging
-import socket
-import json
+# Force unbuffered stdout to ensure MCP JSON-RPC messages are flushed immediately
+# This fixes the issue where Gemini CLI (via pipe) waits for buffer fill before processing responses.
 import sys
+try:
+    if hasattr(sys, 'stdout') and hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(line_buffering=True)
+except Exception as e:
+    pass
+
+import logging
+import asyncio
+import json
 import os
 
 from contextlib import asynccontextmanager
@@ -21,7 +29,7 @@ from typing import AsyncIterator, Dict, Any, Optional, List
 from mcp.server.fastmcp import FastMCP
 
 # Import configuration from our dedicated config file
-from mcp_config import UNREAL_HOST, UNREAL_PORT
+from mcp_config import UNREAL_HOST, UNREAL_PORT, SOCKET_TIMEOUT
 
 # Import the modular clients
 from FileManage import UMGAttention
@@ -42,172 +50,109 @@ logging.basicConfig(
 logger = logging.getLogger("UmgMcpServer")
 
 class UnrealConnection:
-    """Manages the socket connection to the UmgMcp plugin running inside Unreal Engine."""
+    """Manages the async socket connection to the UmgMcp plugin running inside Unreal Engine."""
     def __init__(self):
         logger.info(f"Unreal Motion Graphics UI Designer Mode Context Process Launching... Connecting to UmgMcp plugin at {UNREAL_HOST}:{UNREAL_PORT}...")
-        self.socket = None
-        self.connected = False
     
-    def connect(self) -> bool:
-        """Connect to the Unreal Engine instance."""
+    async def send_command(self, command: str, params: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+        """Send a command to Unreal Engine and get the response (Async Short-Lived)."""
+        reader = None
+        writer = None
+        
         try:
-            # Close any existing socket
-            if self.socket:
-                try:
-                    self.socket.close()
-                except:
-                    pass
-                self.socket = None
-            
             logger.info(f"Connecting to Unreal at {UNREAL_HOST}:{UNREAL_PORT}...")
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(30)  # 30 second timeout
+            # Async Open Connection (IOCP on Windows)
+            reader, writer = await asyncio.open_connection(UNREAL_HOST, UNREAL_PORT)
             
-            # Set socket options for better stability
-            self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-            
-            # Set larger buffer sizes
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)
-            
-            self.socket.connect((UNREAL_HOST, UNREAL_PORT))
-            self.connected = True
-            logger.info("Connected to Unreal Engine")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to connect to Unreal: {e}")
-            self.connected = False
-            return False
-    
-    def disconnect(self):
-        """Disconnect from the Unreal Engine instance."""
-        if self.socket:
-            try:
-                self.socket.close()
-            except:
-                pass
-        self.socket = None
-        self.connected = False
-
-    def receive_full_response(self, sock, buffer_size=4096) -> bytes:
-        """Receive a complete response from Unreal, handling chunked data and delimiters."""
-        chunks = []
-        sock.settimeout(0.3)  # 0.3 second timeout as requested
-        try:
-            while True:
-                chunk = sock.recv(buffer_size)
-                if not chunk:
-                    if not chunks:
-                        raise Exception("Connection closed before receiving data")
-                    break
-                chunks.append(chunk)
-                
-                # Check for null byte delimiter in the raw chunk
-                if b'\0' in chunk:
-                    # We found the end.
-                    # Combine all chunks
-                    data = b''.join(chunks)
-                    
-                    # Split by null byte
-                    parts = data.split(b'\0')
-                    valid_json_bytes = parts[0]
-                    
-                    logger.info(f"Received complete response with null delimiter ({len(valid_json_bytes)} bytes)")
-                    return valid_json_bytes
-                
-        except socket.timeout:
-            logger.warning("Socket timeout during receive")
-            if chunks:
-                # If we have some data already, try to use it
-                data = b''.join(chunks)
-                if b'\0' in data:
-                     parts = data.split(b'\0')
-                     return parts[0]
-            raise Exception("Timeout receiving Unreal response")
-        except Exception as e:
-            logger.error(f"Error during receive: {str(e)}")
-            raise
-    
-    def send_command(self, command: str, params: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
-        """Send a command to Unreal Engine and get the response."""
-        # Always reconnect for each command, since Unreal closes the connection after each command
-        # This is different from Unity which keeps connections alive
-        if self.socket:
-            try:
-                self.socket.close()
-            except:
-                pass
-            self.socket = None
-            self.connected = False
-        
-        if not self.connect():
-            logger.error("Failed to connect to Unreal Engine for command")
-            return None
-        
-        try:
             # Match Unity's command format exactly
             command_obj = {
-                "command": command,  # Use "command" to match C++ ProcessMessage expectation
-                "params": params or {}  # Use Unity's params or {} pattern
+                "command": command,
+                "params": params or {}
             }
             
             # Send with null delimiter
             command_json = json.dumps(command_obj)
-            logger.debug(f"Sending command: {command_json.strip()}")
+            logger.info(f"[UMGMCP-Message] Sending: {command_json.strip()[:200]}... (truncated)")
             
-            # Send JSON + Null Byte
-            self.socket.sendall(command_json.encode('utf-8') + b'\0')
+            # DEBUG-SOCKET:
+            sys.stderr.write(f"DEBUG: Async Sending {len(command_json)} bytes...\n")
+            sys.stderr.flush()
+
+            # Write data + null byte
+            writer.write(command_json.encode('utf-8') + b'\0')
+            await writer.drain()
             
-            # Read response using improved handler
-            response_data = self.receive_full_response(self.socket)
-            response = json.loads(response_data.decode('utf-8'))
+            # DEBUG-SOCKET:
+            sys.stderr.write("DEBUG: Async Drain completed.\n")
+            sys.stderr.flush()
+
+            # Force Flush / Shutdown Write to signal end of stream
+            if writer.can_write_eof():
+                writer.write_eof()
+                sys.stderr.write("DEBUG: Async write_eof() called.\n")
+            
+            # Read response
+            sys.stderr.write("DEBUG: Async Waiting for response (read 4096 chunks)...\n")
+            sys.stderr.flush()
+            
+            chunks = []
+            while True:
+                # Read chunk
+                chunk = await reader.read(4096)
+                if not chunk:
+                    break # EOF
+                
+                if b'\x00' in chunk:
+                    chunks.append(chunk[:chunk.find(b'\x00')])
+                    break
+                chunks.append(chunk)
+            
+            response_data = b"".join(chunks)
+            
+            sys.stderr.write(f"DEBUG: Async Received {len(response_data)} bytes.\n")
+            sys.stderr.flush()
+
+            response_str = response_data.decode('utf-8')
+            logger.info(f"[UMGMCP-Message] Received: {response_str}")
+            
+            if not response_str:
+                raise ConnectionError("Empty response from Unreal")
+
+            response = json.loads(response_str)
             
             # Log complete response for debugging
             logger.info(f"Complete response from Unreal: {response}")
             
-            # Check for both error formats: {"status": "error", ...} and {"success": false, ...}
+            # Check for error formats
             if response.get("status") == "error":
                 error_message = response.get("error") or response.get("message", "Unknown Unreal error")
                 logger.error(f"Unreal error (status=error): {error_message}")
-                # We want to preserve the original error structure but ensure error is accessible
                 if "error" not in response:
                     response["error"] = error_message
             elif response.get("success") is False:
-                # This format uses {"success": false, "error": "message"} or {"success": false, "message": "message"}
                 error_message = response.get("error") or response.get("message", "Unknown Unreal error")
                 logger.error(f"Unreal error (success=false): {error_message}")
-                # Convert to the standard format expected by higher layers
                 response = {
                     "status": "error",
                     "error": error_message
                 }
             
-            # Always close the connection after command is complete
-            # since Unreal will close it on its side anyway
-            try:
-                self.socket.close()
-            except:
-                pass
-            self.socket = None
-            self.connected = False
-            
             return response
             
         except Exception as e:
             logger.error(f"Error sending command: {e}")
-            # Always reset connection state on any error
-            self.connected = False
-            try:
-                self.socket.close()
-            except:
-                pass
-            self.socket = None
-            return {
-                "status": "error",
-                "error": str(e)
-            }
+            return {"status": "error", "error": str(e)}
+            
+        finally:
+            # Clean Close
+            if writer:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                    sys.stderr.write("DEBUG: Async Socket closed.\n")
+                except:
+                    pass
+            sys.stderr.flush()
 
 class ContextManager:
     """Manages the 'attention' context for the AI."""
@@ -234,34 +179,9 @@ _unreal_connection: UnrealConnection = None
 def get_unreal_connection() -> Optional[UnrealConnection]:
     """Get the connection to Unreal Engine."""
     global _unreal_connection
-    try:
-        if _unreal_connection is None:
-            _unreal_connection = UnrealConnection()
-            if not _unreal_connection.connect():
-                logger.warning("Could not connect to Unreal Engine")
-                _unreal_connection = None
-        else:
-            # Verify connection is still valid with a ping-like test
-            try:
-                # Simple test by sending an empty buffer to check if socket is still connected
-                _unreal_connection.socket.sendall(b'\x00')
-                logger.debug("Connection verified with ping test")
-            except Exception as e:
-                logger.warning(f"Existing connection failed: {e}")
-                _unreal_connection.disconnect()
-                _unreal_connection = None
-                # Try to reconnect
-                _unreal_connection = UnrealConnection()
-                if not _unreal_connection.connect():
-                    logger.warning("Could not reconnect to Unreal Engine")
-                    _unreal_connection = None
-                else:
-                    logger.info("Successfully reconnected to Unreal Engine")
-        
-        return _unreal_connection
-    except Exception as e:
-        logger.error(f"Error getting Unreal connection: {e}")
-        return None
+    if _unreal_connection is None:
+        _unreal_connection = UnrealConnection()
+    return _unreal_connection
 
 @asynccontextmanager
 async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
@@ -296,6 +216,7 @@ mcp = FastMCP(
 # =============================================================================
 
 PROMPTS_CONFIG = []
+TOOLS_CONFIG = {}
 
 def load_tool_and_prompt_config():
     """Load tool definitions and prompts from prompts.json."""
@@ -363,16 +284,16 @@ def register_tool(name: str, default_desc: str):
 # =============================================================================
 
 @register_tool("get_widget_schema", "Retrieves the schema for a widget type.")
-def get_widget_schema(widget_type: str) -> Dict[str, Any]:
+async def get_widget_schema(widget_type: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.get_widget_schema(widget_type)
+    return await umg_get_client.get_widget_schema(widget_type)
 
 @register_tool("get_creatable_widget_types", "Returns a list of creatable widget types.")
-def get_creatable_widget_types() -> Dict[str, Any]:
+async def get_creatable_widget_types() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -393,48 +314,61 @@ def get_creatable_widget_types() -> Dict[str, Any]:
 # =============================================================================
 
 @register_tool("get_target_umg_asset", "Gets the asset path of the UMG Editor user is focused on.")
-def get_target_umg_asset() -> Dict[str, Any]:
+async def get_target_umg_asset() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
-    return umg_attention_client.get_target_umg_asset()
+    return await umg_attention_client.get_target_umg_asset()
 
 @register_tool("get_last_edited_umg_asset", "Gets the last edited UMG asset path.")
-def get_last_edited_umg_asset() -> Dict[str, Any]:
+async def get_last_edited_umg_asset() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
-    return umg_attention_client.get_last_edited_umg_asset()
+    return await umg_attention_client.get_last_edited_umg_asset()
 
 @register_tool("get_recently_edited_umg_assets", "Gets a list of recently edited assets.")
-def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
+async def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
-    return umg_attention_client.get_recently_edited_umg_assets(max_count)
+    return await umg_attention_client.get_recently_edited_umg_assets(max_count)
+
+def normalize_project_path(path: str) -> str:
+    """
+    Normalizes a project path to the Unreal /Game/ format.
+    Example: 'Content/MyWidget' -> '/Game/MyWidget'
+    """
+    path = path.replace('\\', '/')
+    if path.startswith('Content/'):
+        return '/Game/' + path[8:]
+    return path
 
 @register_tool("set_target_umg_asset", "Sets the target UMG asset.")
-def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
+async def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
+    # Normalize path to ensure Unreal accepts it
+    asset_path = normalize_project_path(asset_path)
+    
     context_manager.set_target(asset_path) # Update local context
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
-    return umg_attention_client.set_target_umg_asset(asset_path)
+    return await umg_attention_client.set_target_umg_asset(asset_path)
 
 # =============================================================================
 #  Category: Sensing
 # =============================================================================
 
 @register_tool("get_widget_tree", "Fetches the complete widget hierarchy.")
-def get_widget_tree() -> Dict[str, Any]:
+async def get_widget_tree() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -446,47 +380,47 @@ def get_widget_tree() -> Dict[str, Any]:
     # or just let the plugin handle it.
     # Given the user's strong preference for implicit defaults, we just call the method.
     
-    return umg_get_client.get_widget_tree()
+    return await umg_get_client.get_widget_tree()
 
 @register_tool("query_widget_properties", "Queries specific properties of a widget.")
-def query_widget_properties(widget_name: str, properties: List[str]) -> Dict[str, Any]:
+async def query_widget_properties(widget_name: str, properties: List[str]) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.query_widget_properties(widget_name, properties)
+    return await umg_get_client.query_widget_properties(widget_name, properties)
 
 @register_tool("get_layout_data", "Gets bounding boxes for widgets.")
-def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
+async def get_layout_data(resolution_width: int = 1920, resolution_height: int = 1080) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.get_layout_data(resolution_width, resolution_height)
+    return await umg_get_client.get_layout_data(resolution_width, resolution_height)
 
 @register_tool("check_widget_overlap", "Checks for widget overlap.")
-def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
+async def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return umg_get_client.check_widget_overlap(widget_names)
+    return await umg_get_client.check_widget_overlap(widget_names)
 
 # =============================================================================
 #  Category: Action
 # =============================================================================
 
 @register_tool("create_widget", "Creates a new widget.")
-def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> Dict[str, Any]:
+async def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    result = umg_set_client.create_widget(widget_type, new_widget_name, parent_name)
+    result = await umg_set_client.create_widget(widget_type, new_widget_name, parent_name)
     
     # Invalidate Cache on Modification
     if result.get("status") == "success":
@@ -496,56 +430,56 @@ def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> D
     return result
 
 @register_tool("set_widget_properties", "Sets properties on a widget.")
-def set_widget_properties(widget_name: str, properties: Dict[str, Any]) -> Dict[str, Any]:
+async def set_widget_properties(widget_name: str, properties: Dict[str, Any]) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.set_widget_properties(widget_name, properties)
+    return await umg_set_client.set_widget_properties(widget_name, properties)
 
 @register_tool("delete_widget", "Deletes a widget.")
-def delete_widget(widget_name: str) -> Dict[str, Any]:
+async def delete_widget(widget_name: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.delete_widget(widget_name)
+    return await umg_set_client.delete_widget(widget_name)
 
 @register_tool("reparent_widget", "Moves a widget to a new parent.")
-def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
+async def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.reparent_widget(widget_name, new_parent_name)
+    return await umg_set_client.reparent_widget(widget_name, new_parent_name)
 
 @register_tool("save_asset", "Saves the UMG asset.")
-def save_asset() -> Dict[str, Any]:
+async def save_asset() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return umg_set_client.save_asset()
+    return await umg_set_client.save_asset()
 
 # =============================================================================
 #  Category: File Transformation (Explicit Path)
 # =============================================================================
 
 @register_tool("export_umg_to_json", "Decompiles UMG to JSON.")
-def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
+async def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_file_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return umg_file_client.export_umg_to_json(asset_path)
+    return await umg_file_client.export_umg_to_json(asset_path)
 
 @register_tool("apply_layout", "Applies a layout logic to a UMG asset.")
-def apply_layout(layout_content: str) -> Dict[str, Any]:
+async def apply_layout(layout_content: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -574,7 +508,7 @@ def apply_layout(layout_content: str) -> Dict[str, Any]:
     final_path = context_manager.get_target()
     if not final_path:
         # Try to get currently open asset from Unreal
-        resp = conn.send_command("get_target_umg_asset")
+        resp = await conn.send_command("get_target_umg_asset")
         if resp.get("status") == "success":
             data = resp.get("result", {}).get("data", {})
             if data:
@@ -588,7 +522,7 @@ def apply_layout(layout_content: str) -> Dict[str, Any]:
     logger.info(f"Resolved target asset path: {final_path}")
     
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return umg_trans_client.apply_json_to_umg(final_path, json_data)
+    return await umg_trans_client.apply_json_to_umg(final_path, json_data)
 
 # Deprecated: Kept for backward compatibility
 @mcp.tool()
@@ -619,53 +553,53 @@ def preview_html_conversion(html_content: str) -> Dict[str, Any]:
 # =============================================================================
 
 @register_tool("refresh_asset_registry", "Forces asset registry rescan.")
-def refresh_asset_registry(paths: Optional[List[str]] = None) -> Dict[str, Any]:
+async def refresh_asset_registry(paths: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     editor_client = UMGEditor.UMGEditor(conn)
-    return editor_client.refresh_asset_registry(paths)
+    return await editor_client.refresh_asset_registry(paths)
 
 @register_tool("get_actors_in_level", "Lists actors in level.")
-def get_actors_in_level() -> Dict[str, Any]:
+async def get_actors_in_level() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     editor_client = UMGEditor.UMGEditor(conn)
-    return editor_client.get_actors_in_level()
+    return await editor_client.get_actors_in_level()
 
 @register_tool("spawn_actor", "Spawns an actor.")
-def spawn_actor(actor_type: str, name: str, location: List[float] = None, rotation: List[float] = None) -> Dict[str, Any]:
+async def spawn_actor(actor_type: str, name: str, location: List[float] = None, rotation: List[float] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     editor_client = UMGEditor.UMGEditor(conn)
-    return editor_client.spawn_actor(actor_type, name, location, rotation)
+    return await editor_client.spawn_actor(actor_type, name, location, rotation)
 
 # =============================================================================
 #  Category: Blueprint (New)
 # =============================================================================
 
 @register_tool("create_blueprint", "Creates a Blueprint.")
-def create_blueprint(name: str, parent_class: str = "AActor") -> Dict[str, Any]:
+async def create_blueprint(name: str, parent_class: str = "AActor") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return bp_client.create_blueprint(name, parent_class)
+    return await bp_client.create_blueprint(name, parent_class)
 
 @register_tool("compile_blueprint", "Compiles a Blueprint.")
-def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
+async def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return bp_client.compile_blueprint(blueprint_name)
+    return await bp_client.compile_blueprint(blueprint_name)
 
 # =============================================================================
 

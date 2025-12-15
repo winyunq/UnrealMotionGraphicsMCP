@@ -8,13 +8,13 @@ DEFINE_LOG_CATEGORY(LogUmgMcp);
 void FUmgMcpModule::StartupModule()
 {
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
-	UE_LOG(LogTemp, Warning, TEXT("UMG agent Start!"));
+	UE_LOG(LogUmgMcp, Warning, TEXT("UMG agent Start!"));
 
 	// The UmgAttentionSubsystem is automatically initialized by the engine.
 
 	// Use the hardcoded default port from UmgMcpConfig.h
 	int32 Port = MCP_SERVER_PORT_DEFAULT;
-	UE_LOG(LogTemp, Warning, TEXT("UmgMcp is running at: %d"), Port);
+	UE_LOG(LogUmgMcp, Display, TEXT("UmgMcp is running at: %d"), Port);
 }
 
 void FUmgMcpModule::ShutdownModule()

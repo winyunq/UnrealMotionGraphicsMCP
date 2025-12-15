@@ -1,195 +1,201 @@
 {
-    "system_instruction": "You are an expert Unreal Engine UMG assistant. You can create and modify UMG widgets using the provided tools. Always assume the user wants to work with the currently open Widget Blueprint unless specified otherwise.",
+    "system_instruction": "You are an expert Unreal Engine UMG assistant. \n\n### CORE CONCEPT: THE 'ACTIVE TARGET'\nYour work revolves around an **'Active Target'**—the specific UMG Widget Blueprint you are currently editing. \n\n### GLOBAL TOOL BEHAVIOR\n**Unless explicitly stated otherwise**, all tools in the 'UMG' and 'Animation' categories implicitly operate on this **Active Target**. You DO NOT need to provide the 'asset_path' argument if the target is already set.\n\n### DEFAULT OPERATION MECHANISM\nThe system determines the **Active Target** using a 4-level Fallback Priority:\n1. **Explicit Parameter**: 'asset_path' provided in the tool call.\n2. **Cached Target**: Set via 'set_target_umg_asset'.\n3. **Editor Focus**: The currently focused asset in the UE Editor.\n4. **History**: The last edited asset.\n\n### WORKFLOW PROTOCOL\n1. **Establish Context**: Start by setting the **Active Target** (`set_target_umg_asset`) and optionally the **Active Widget** (`set_active_widget`).\n2. **Implicit Parenting**: `create_widget` automatically attaches to the **Active Widget** if no parent is specified. This enables fluent, breadth-first or depth-first tree construction.\n3. **Modify**: Issue commands like `create_widget` or `set_widget_properties` without repeating paths or parents if context is set.\n\n### IMPORTANT: CREATING WIDGETS\n- **Implicit Parent**: If you omit `parent_name`, the system uses the **Active Widget** (set via `set_active_widget`).\n- **Root Fallback**: If no Active Widget is set, it defaults to the **Root Widget**.\n- **Empty Tree**: If the tree is empty, the first widget MUST be a Panel (e.g. CanvasPanel) and becomes Root.",
     "tools": [
         {
             "name": "get_widget_schema",
-            "description": "\"What can this component do?\" - Retrieves the \"schema\" for a widget type, detailing its editable properties and their types.",
+            "description": "Retrieves the schema for a widget type (e.g., 'Button', 'CanvasPanel'). Defines available properties for `set_widget_properties`. \n**Scope**: Global System.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "get_creatable_widget_types",
-            "description": "\"What's in my toolbox?\" - Returns a list of all widget class names that can be created with the 'create_widget' tool.",
+            "description": "Returns a list of all widget classes that can be created. \n**Scope**: Global System.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "get_target_umg_asset",
-            "description": "\"What UMG is the user editing right now?\" - Gets the asset path of the UMG Editor the user is currently focused on.",
+            "description": "Gets the current **Active Target** path. Use this to confirm context.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "get_last_edited_umg_asset",
-            "description": "\"What was the user just working on?\" - Gets the asset path of the last UMG asset that was opened or saved.",
+            "description": "Gets the path of the last edited UMG asset from History.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "get_recently_edited_umg_assets",
-            "description": "\"What has the user been working on recently?\" - Gets a list of recently edited UMG assets.",
+            "description": "Gets a list of recently edited UMG assets.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "set_target_umg_asset",
-            "description": "Sets the UMG asset that should be considered the current attention target.",
+            "description": "Sets the **Active Target**. Updates the Cache. If the asset doesn't exist, it will be CREATED.",
+            "enabled": true,
+            "category": "UMG"
+        },
+        {
+            "name": "set_active_widget",
+            "description": "Sets the **Active Widget Scope**. Future `create_widget` calls without a `parent_name` will automatically attach to this widget. Use this to 'cd' into a container widget for batch operations.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "get_widget_tree",
-            "description": "\"What does this UI look like?\" - Fetches the complete widget hierarchy, which is the foundation for all AI reasoning.",
+            "description": "Fetches the full hierarchy of widgets. Use this to find `parent_name` for creation.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "query_widget_properties",
-            "description": "Queries a list of specific properties from a single widget by its name (e.g., 'Slot.Size').",
+            "description": "Reads specific properties (e.g., 'Slot.Size') from a widget.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "get_layout_data",
-            "description": "Gets screen-space bounding boxes for all widgets in the asset at a given resolution.",
+            "description": "Calculates screen-space bounding boxes for widgets.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "check_widget_overlap",
-            "description": "\"Are any widgets overlapping?\" - Efficiently checks for layout overlap between widgets in the asset.",
+            "description": "Checks for visual overlaps between widgets.",
             "enabled": false,
             "category": "UMG"
         },
         {
             "name": "create_widget",
-            "description": "Creates a new widget and attaches it to a parent. AI HINT: Uses the globally targeted asset implicitly. Use 'get_creatable_widget_types' for 'widget_type'.",
+            "description": "Adds a new widget. \n**Implicit Parent**: If `parent_name` is omitted, uses implicit parent (Active Widget -> Root).",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "set_widget_properties",
-            "description": "Sets one or more properties on a specific widget by its name in the currently targeted UMG asset. This is your primary modification tool. AI HINT: Use get_widget_schema to see available properties.",
+            "description": "Modifies properties of an existing widget.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "delete_widget",
-            "description": "Deletes a widget by its name from the UMG asset. AI HINT: Uses the globally targeted asset implicitly.",
+            "description": "Removes a widget from the tree.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "reparent_widget",
-            "description": "Moves a widget to be a child of a different parent. AI HINT: Uses the globally targeted asset implicitly.",
+            "description": "Moves a widget to a new parent.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "save_asset",
-            "description": "\"Save my work\" - Saves the UMG asset to disk. AI HINT: Uses the globally targeted asset implicitly.",
+            "description": "Saves the asset to disk.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "export_umg_to_json",
-            "description": "'Decompiles' a UMG .uasset file into a JSON string. Requires an explicit asset path.",
+            "description": "Converts the UMG asset to a JSON representation.",
             "enabled": true,
             "category": "System"
         },
         {
             "name": "apply_layout",
-            "description": "\"Design the UI\" - Applies a layout definition to a UMG asset. Smart Format Detection: HTML or JSON.",
+            "description": "Applies a bulk layout definition (HTML/JSON).",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "set_animation_scope",
-            "description": "Sets the current animation scope. Subsequent read/write operations will target this animation.",
+            "description": "Sets the **Active Animation Scope**. Subsequent animation commands implicit target this animation.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "set_widget_scope",
-            "description": "Sets the current widget scope within the active animation. Subsequent keyframe operations will target this widget.",
+            "description": "Sets the **Active Widget Scope** within the current animation.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "get_all_animations",
-            "description": "\"What animations are there?\" - Lists all animations in the current UMG asset.",
+            "description": "Lists all animations in the asset.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "get_animation_keyframes",
-            "description": "Gets the keyframe sequence (time points) for the specified animation. Useful for understanding the rhythm and timing.",
+            "description": "Gets keyframes for the current animation scope.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "get_animated_widgets",
-            "description": "Gets a list of widgets that are affected by the specified animation.",
+            "description": "Lists widgets affected by the current animation scope.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "get_animation_full_data",
-            "description": "Gets the complete data for an animation, including all tracks and keys. Use with caution on large animations.",
+            "description": "Gets full data for the current animation scope.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "get_widget_animation_data",
-            "description": "Gets the animation data specific to a single widget within an animation. Useful for fine-tuning a specific object's behavior.",
+            "description": "Gets animation data for a specific widget in the current animation scope.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "create_animation",
-            "description": "Creates a new animation in the current UMG asset.",
+            "description": "Creates a new animation.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "delete_animation",
-            "description": "Deletes an animation from the current UMG asset.",
+            "description": "Deletes an animation.",
             "enabled": true,
             "category": "Animation"
         },
         {
             "name": "set_property_keys",
-            "description": "Sets a sequence of keyframes for a specific property on the currently scoped widget.",
+            "description": "Sets keyframes on the scoped widget/property.",
             "enabled": false,
             "category": "Animation"
         },
         {
             "name": "remove_property_track",
-            "description": "Removes the entire track for a specific property from the currently scoped widget.",
+            "description": "Removes a property track from the scoped widget.",
             "enabled": false,
             "category": "Animation"
         },
         {
             "name": "remove_keys",
-            "description": "Removes keyframes at specific times for a property on the currently scoped widget.",
+            "description": "Removes keyframes from the scoped widget.",
             "enabled": false,
             "category": "Animation"
         },
         {
             "name": "refresh_asset_registry",
-            "description": "\"I can't find the file!\" - Forces Unreal to re-scan the disk for new assets.",
+            "description": "Forces Unreal to re-scan the disk for assets.",
             "enabled": true,
             "category": "System"
         },
         {
             "name": "get_actors_in_level",
-            "description": "\"What's in the scene?\" - Gets a list of all actors in the current level.",
+            "description": "Gets all actors in the current level.",
             "enabled": false,
             "category": "Level"
         },
         {
             "name": "spawn_actor",
-            "description": "Spawns a basic actor (StaticMeshActor, PointLight, etc.) in the level.",
+            "description": "Spawns an actor in the current level.",
             "enabled": false,
             "category": "Level"
         },
@@ -209,13 +215,13 @@
     "prompts": [
         {
             "name": "Analyze UMG Structure",
-            "description": "Ask AI to analyze the current widget hierarchy.",
-            "content": "Please inspect the current UMG widget tree using 'get_widget_tree'. Analyze the structure for performance bottlenecks, nesting depth, and naming conventions. Give a summary of what this UI likely does."
+            "description": "Analyze the structure of the **Active Target** UMG.",
+            "content": "Please inspect the **Active Target** widget tree using `get_widget_tree`. Analyze for performance, depth, and organization. Summary the UI's purpose."
         },
         {
             "name": "Generate Layout Code",
-            "description": "Ask AI to generate Python layout code for the current UMG.",
-            "content": "Please read the current UMG state and generate a Python script using 'create_widget' and 'set_widget_properties' that would recreate this exact structure. Organize the code into a function."
+            "description": "Generate Python code to recreate the **Active Target** UMG.",
+            "content": "Read the **Active Target** UMG state. Generate a Python script using `create_widget` and `set_widget_properties` to recreate this structure. Focus on the currently active assets."
         }
     ]
 }

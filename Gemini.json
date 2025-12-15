@@ -1,1 +1,0 @@
-{"widget_name": "HorizontalBox_24","widget_class": "/Script/UMG.HorizontalBox","children": [{"widget_name": "Button_0","widget_class": "/Script/UMG.Button"},{"widget_name": "ProgressBar_0","widget_class": "/Script/UMG.ProgressBar","properties": {"FillColorAndOpacity":{"r": 0,"g": 0.5,"b": 1,"a": 1}}},{"widget_name": "RichTextBlock_0","widget_class": "/Script/UMG.RichTextBlock"}]}

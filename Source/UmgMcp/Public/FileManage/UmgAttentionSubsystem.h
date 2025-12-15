@@ -50,8 +50,9 @@ public:
 	 * Explicitly sets the UMG asset to be the target for subsequent operations.
      * This updates both the path cache for conversation and the object cache for performance.
 	 * @param AssetPath The path of the asset to set as the target.
+     * @return bool True if the asset was successfully found or created, False if invalid path or error.
 	 */
-	void SetTargetUmgAsset(const FString& AssetPath);
+	bool SetTargetUmgAsset(const FString& AssetPath);
 
     /**
      * Gets the cached UWidgetBlueprint object.
