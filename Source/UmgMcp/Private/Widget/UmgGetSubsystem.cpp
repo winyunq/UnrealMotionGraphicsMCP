@@ -330,7 +330,7 @@ FString UUmgGetSubsystem::GetAssetFileSystemPath(const FString& AssetPath)
 
 FString UUmgGetSubsystem::GetWidgetSchema(const FString& WidgetType)
 {
-    UClass* WidgetClass = FindObject<UClass>(ANY_PACKAGE, *WidgetType);
+    UClass* WidgetClass = FindObject<UClass>(nullptr, *WidgetType);
     if (!WidgetClass)
     {
         WidgetClass = LoadObject<UClass>(nullptr, *WidgetType);
