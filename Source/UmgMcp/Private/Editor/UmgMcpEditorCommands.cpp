@@ -61,6 +61,10 @@ TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleCommand(const FString& Comm
     {
         return HandleRefreshAssetRegistry(Params);
     }
+    else if (CommandType == TEXT("list_assets"))
+    {
+        return HandleListAssets(Params);
+    }
     
     return FUmgMcpCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
@@ -341,6 +345,117 @@ TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleRefreshAssetRegistry(const 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("refreshed"), true);
     ResultObj->SetStringField(TEXT("message"), TEXT("Asset Registry refreshed successfully"));
+    
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleListAssets(const TSharedPtr<FJsonObject>& Params)
+{
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+    IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+    // Setup Filter
+    FARFilter Filter;
+    
+    // 1. Filter by Path
+    FString PackagePath = TEXT("/Game");
+    if (Params->TryGetStringField(TEXT("package_path"), PackagePath))
+    {
+        // Ensure path starts with /
+        if (!PackagePath.StartsWith(TEXT("/")))
+        {
+            PackagePath = TEXT("/") + PackagePath;
+        }
+    }
+    Filter.PackagePaths.Add(*PackagePath);
+    
+    // Recursive Paths?
+    bool bRecursivePaths = true;
+    if (Params->HasField(TEXT("recursive_paths")))
+    {
+        bRecursivePaths = Params->GetBoolField(TEXT("recursive_paths"));
+    }
+    Filter.bRecursivePaths = bRecursivePaths;
+
+#include "UObject/UObjectIterator.h"
+
+// ... (Existing includes)
+
+    // 2. Filter by Class
+    FString ClassName;
+    if (Params->TryGetStringField(TEXT("class_name"), ClassName) && !ClassName.IsEmpty())
+    {
+        // Handle short names (e.g., "Texture2D") vs Full Paths (e.g., "/Script/Engine.Texture2D")
+        if (ClassName.Contains(TEXT(".")))
+        {
+             // It's likely a full path
+             Filter.ClassPaths.Add(FTopLevelAssetPath(ClassName));
+        }
+        else
+        {
+            // Fuzzy Search: Find ANY class that contains the string
+            // This allows "Widget" to match "WidgetBlueprint", "UserWidget", etc.
+            bool bFoundAny = false;
+            
+            for (TObjectIterator<UClass> It; It; ++It)
+            {
+                UClass* Class = *It;
+                if (Class->GetName().Contains(ClassName)) 
+                {
+                    Filter.ClassPaths.Add(Class->GetClassPathName());
+                    bFoundAny = true;
+                }
+            }
+            
+            if (!bFoundAny)
+            {
+                // Fallback: If nothing in memory matched, try the standard guesses just in case
+                Filter.ClassPaths.Add(FTopLevelAssetPath(FName("/Script/Engine"), FName(*ClassName)));
+                Filter.ClassPaths.Add(FTopLevelAssetPath(FName("/Script/UMG"), FName(*ClassName)));
+            }
+        }
+
+        // Also support "recursive classes"
+        bool bRecursiveClasses = true; 
+        if (Params->HasField(TEXT("recursive_classes")))
+        {
+            bRecursiveClasses = Params->GetBoolField(TEXT("recursive_classes"));
+        }
+        Filter.bRecursiveClasses = bRecursiveClasses;
+    }
+
+    // 3. Search
+    TArray<FAssetData> AssetList;
+    AssetRegistry.GetAssets(Filter, AssetList);
+
+    // 4. Limit results to avoid exploding the context window
+    int32 MaxCount = 100; 
+    if (Params->HasField(TEXT("max_count")))
+    {
+        MaxCount = Params->GetIntegerField(TEXT("max_count"));
+    }
+
+    // 5. Build Response
+    TArray<TSharedPtr<FJsonValue>> AssetsArray;
+    int32 Count = 0;
+    
+    for (const FAssetData& Asset : AssetList)
+    {
+        if (Count >= MaxCount) break;
+
+        TSharedPtr<FJsonObject> AssetObj = MakeShared<FJsonObject>();
+        AssetObj->SetStringField(TEXT("name"), Asset.AssetName.ToString());
+        AssetObj->SetStringField(TEXT("path"), Asset.GetObjectPathString());
+        AssetObj->SetStringField(TEXT("class"), Asset.AssetClassPath.ToString());
+        
+        AssetsArray.Add(MakeShared<FJsonValueObject>(AssetObj));
+        Count++;
+    }
+    
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetArrayField(TEXT("assets"), AssetsArray);
+    ResultObj->SetNumberField(TEXT("count"), Count);
+    ResultObj->SetNumberField(TEXT("total_found"), AssetList.Num());
     
     return ResultObj;
 }

@@ -340,7 +340,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("spawn_actor") ||
                  CommandType == TEXT("delete_actor") ||
                  CommandType == TEXT("set_actor_transform") ||
-                 CommandType == TEXT("refresh_asset_registry"))
+                 CommandType == TEXT("refresh_asset_registry") ||
+                 CommandType == TEXT("list_assets"))
         {
             ResultJson = EditorCommands->HandleCommand(CommandType, Params);
         }

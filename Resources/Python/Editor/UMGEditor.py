@@ -43,6 +43,23 @@ class UMGEditor:
         
         return self.client.send_command("set_actor_transform", params)
 
+    def list_assets(self, class_name: str = None, package_path: str = None, 
+                   max_count: int = 100) -> Dict[str, Any]:
+        """Lists assets in the project matching the criteria."""
+        params = {
+            "max_count": max_count
+        }
+        if class_name:
+            params["class_name"] = class_name
+        if package_path:
+            params["package_path"] = package_path
+        
+        # We implicitly default to recursive=true for both paths and classes in the C++ layer
+        # unless specified otherwise, but for simplicity we don't even expose false here
+        # to keep the AI interface clean.
+            
+        return self.client.send_command("list_assets", params)
+
     def refresh_asset_registry(self, paths: List[str] = None) -> Dict[str, Any]:
         """Refreshes the asset registry to discover new assets."""
         params = {}

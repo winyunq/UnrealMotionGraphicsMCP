@@ -32,4 +32,5 @@ private:
 
     // Asset Registry
     TSharedPtr<FJsonObject> HandleRefreshAssetRegistry(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleListAssets(const TSharedPtr<FJsonObject>& Params);
 };

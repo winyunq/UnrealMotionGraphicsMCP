@@ -205,6 +205,30 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         }
     }
 
+    // 1.5 Special handling for Blueprint Asset Paths (e.g. /Game/UI/MyWidget)
+    // If we failed to find it as a direct class, and it looks like a content path, try appending _C
+    // This allows users/AI to pass the Asset Path (from list_assets) directly without knowing about _C.
+    if (!WidgetClass && WidgetType.StartsWith(TEXT("/Game")))
+    {
+        FString ClassPath = WidgetType;
+        if (!ClassPath.EndsWith(TEXT("_C")))
+        {
+            ClassPath += TEXT("_C");
+        }
+        
+        WidgetClass = FindObject<UClass>(nullptr, *ClassPath);
+        if (!WidgetClass)
+        {
+            // Note: LoadObject might trigger a load of the package
+            WidgetClass = LoadObject<UClass>(nullptr, *ClassPath);
+        }
+        
+        if (WidgetClass)
+        {
+            UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Resolved Blueprint Asset '%s' to Class '%s'"), *WidgetType, *ClassPath);
+        }
+    }
+
     // 2. If not found or simple name, try native UMG paths
     if (!WidgetClass)
     {

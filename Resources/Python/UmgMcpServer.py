@@ -579,6 +579,21 @@ async def spawn_actor(actor_type: str, name: str, location: List[float] = None, 
     editor_client = UMGEditor.UMGEditor(conn)
     return await editor_client.spawn_actor(actor_type, name, location, rotation)
 
+@register_tool("list_assets", "Lists assets in the project content.")
+async def list_assets(class_name: str = None, package_path: str = None, max_count: int = 50) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    # Default path logic handled in Client/C++ to allow cleaner API here
+    # If package_path is None, the system defaults to root /Game
+    conn = get_unreal_connection()
+    editor_client = UMGEditor.UMGEditor(conn)
+    return await editor_client.list_assets(class_name=class_name, package_path=package_path, max_count=max_count)
+
+# =============================================================================
+#  Category: Blueprint (New)
+# =============================================================================
+
 # =============================================================================
 #  Category: Blueprint (New)
 # =============================================================================
@@ -602,8 +617,128 @@ async def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
     return await bp_client.compile_blueprint(blueprint_name)
 
 # =============================================================================
+#  Category: Animation & Sequencer (Merged from UmgSequencerServer)
+# =============================================================================
+
+from Animation import UMGSequencer
+
+# --- Attention & Context ---
+
+@register_tool("set_animation_scope", "Sets the current animation scope.")
+async def set_animation_scope(animation_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    # The client method returns the coroutine from conn.send_command
+    return await sequencer_client.set_animation_scope(animation_name)
+
+@register_tool("set_widget_scope", "Sets the current widget scope.")
+async def set_widget_scope(widget_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.set_widget_scope(widget_name)
+
+# --- Read (Sensing) ---
+
+@register_tool("get_all_animations", "Lists all animations.")
+async def get_all_animations() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_all_animations()
+
+@register_tool("get_animation_keyframes", "Gets keyframes for an animation.")
+async def get_animation_keyframes(animation_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_animation_keyframes(animation_name)
+
+@register_tool("get_animated_widgets", "Gets widgets affected by animation.")
+async def get_animated_widgets(animation_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_animated_widgets(animation_name)
+
+@register_tool("get_animation_full_data", "Gets complete animation data.")
+async def get_animation_full_data(animation_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_animation_full_data(animation_name)
+
+@register_tool("get_widget_animation_data", "Gets data for a specific widget in animation.")
+async def get_widget_animation_data(animation_name: str, widget_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_widget_animation_data(animation_name, widget_name)
+
+# --- Write (Action) ---
+
+@register_tool("create_animation", "Creates a new animation.")
+async def create_animation(animation_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.create_animation(asset_path=None, animation_name=animation_name)
+
+@register_tool("delete_animation", "Deletes an animation.")
+async def delete_animation(animation_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.delete_animation(asset_path=None, animation_name=animation_name)
+
+@register_tool("set_property_keys", "Sets keyframes for a property.")
+async def set_property_keys(property_name: str, keys: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.set_property_keys(property_name, keys)
+
+@register_tool("remove_property_track", "Removes a property track.")
+async def remove_property_track(property_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.remove_property_track(property_name)
+
+@register_tool("remove_keys", "Removes specific keys.")
+async def remove_keys(property_name: str, times: List[float]) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.remove_keys(property_name, times)
 
 
+# =============================================================================
 
 # =============================================================================
 
@@ -626,7 +761,8 @@ def load_prompts():
             data = json.load(f)
 
         # 1. Register Action Prompts (from specific categories)
-        target_categories = ["UMG Editor", "Blueprint Logic"]
+        # Added "Animation Sequencer" to the list
+        target_categories = ["UMG Editor", "Blueprint Logic", "Animation Sequencer"]
         
         for category in target_categories:
             if category in data:
@@ -641,15 +777,18 @@ def load_prompts():
                         return p_func
 
                     # Register with MCP
-                    # Sanitize name for ID if needed, but FastMCP usually allows spaces in decorator? 
-                    # FastMCP uses the function name as the tool name by default, OR the 'name' argument.
-                    # We'll use the 'name' argument.
                     safe_name = name.lower().replace(" ", "_")
                     mcp.prompt(name=safe_name, description=name)(make_prompt_func(prompt_text))
                     logger.info(f"Registered prompt: {safe_name}")
 
         # 2. Register System Info (Documentation)
-        # We look for "Server Documentation" -> "UMG Info"
+        # We look for "Server Documentation" -> "UMG Info" or "Sequencer Info"
+        # We can combine them or just expose the main one.
+        # User requested merging, so let's try to expose Sequencer Info as well if possible, or append it.
+        # For now, I'll stick to the original structure but check if Sequencer Info is there and maybe register it separately
+        # or just assume the user updates prompts.json to include everything in "UMG Info" if they want a single prompt.
+        # But wait, I can register a separate prompt for sequencer info.
+        
         doc_category = data.get("Server Documentation", [])
         for item in doc_category:
             if item.get("name") == "UMG Info":
@@ -661,7 +800,17 @@ def load_prompts():
                     return info_text
                 
                 logger.info("Registered 'info' prompt from JSON.")
-                break
+            
+            # Register sequencer info as 'sequencer_info' if available
+            elif item.get("name") == "Sequencer Info":
+                seq_info_text = item.get("prompt", "")
+                
+                @mcp.prompt(name="sequencer_info")
+                def sequencer_info():
+                    """Detailed documentation for Sequencer tools."""
+                    return seq_info_text
+                
+                logger.info("Registered 'sequencer_info' prompt from JSON.")
 
     except Exception as e:
         logger.error(f"Failed to load prompts from JSON: {e}")
