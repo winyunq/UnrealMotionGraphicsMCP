@@ -172,6 +172,9 @@ flowchart LR
 | | `get_animation_keyframes` | ⏳ | 获取动画的关键帧数据。 |
 | | `get_animated_widgets` | ⏳ | 获取受动画影响的控件列表。 |
 
+> [!WARNING]
+> **已知问题 (Known Issue):** UMG 动画功能 (`set_property_keys`, `set_animation_data`) 目前处于实验阶段，尚未通过全面验证。可能会遇到运行时错误或崩溃。请谨慎使用。
+
 ## 故障排除与已知问题
 
 > [!WARNING]

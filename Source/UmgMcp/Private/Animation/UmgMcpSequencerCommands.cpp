@@ -11,6 +11,7 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "FileManage/UmgAttentionSubsystem.h"
 #include "Blueprint/WidgetTree.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 
 // Sequencer Includes
 #include "Tracks/MovieSceneFloatTrack.h"
@@ -348,22 +349,29 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
     // Force a recompile to ensure the class generated includes the new animation property
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
+    // Force open/refresh the asset editor
+    if (GEditor)
+    {
+        if (auto* AssetSub = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+        {
+            AssetSub->OpenEditorForAsset(Blueprint);
+        }
+    }
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Successfully created animation '%s'."), *NewAnimation->GetName());
+    
+    // Attempt to set focus (this sets internal state for AI context)
     if (GEditor)
     {
         if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
             Sub->SetTargetAnimation(AnimationName);
     }
-
-    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Successfully created animation '%s'."), *NewAnimation->GetName());
-
+    
+    // ... Result construction ...
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("name"), NewAnimation->GetName());
-    
-    // Add Debug Context
-    FString ContextPath = Blueprint->GetPathName();
-    FString ContextPtr = FString::Printf(TEXT("%p"), Blueprint);
-    Result->SetStringField(TEXT("context_path"), ContextPath);
-    Result->SetStringField(TEXT("context_ptr"), ContextPtr);
+    Result->SetStringField(TEXT("context_path"), Blueprint->GetPathName());
+    Result->SetStringField(TEXT("context_ptr"), FString::Printf(TEXT("%p"), Blueprint));
     
     return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
 }
@@ -632,6 +640,16 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    
+    // Refresh Editor
+    if (GEditor)
+    {
+        if (auto* AssetSub = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+        {
+            AssetSub->OpenEditorForAsset(Blueprint);
+        }
+    }
+    
     return FUmgMcpCommonUtils::CreateSuccessResponse();
 }
 
@@ -701,6 +719,16 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
     if (bFound)
     {
         FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+        
+        // Refresh Editor
+        if (GEditor)
+        {
+            if (auto* AssetSub = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+            {
+                AssetSub->OpenEditorForAsset(Blueprint);
+            }
+        }
+
         return FUmgMcpCommonUtils::CreateSuccessResponse();
     }
     
