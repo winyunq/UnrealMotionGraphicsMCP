@@ -17,11 +17,10 @@
 #include "Sections/MovieSceneFloatSection.h"
 #include "Channels/MovieSceneFloatChannel.h"
 #include "Channels/MovieSceneChannelProxy.h"
-
 // Additional Sequencer Includes
 #include "Tracks/MovieSceneColorTrack.h"
 #include "Sections/MovieSceneColorSection.h"
-#include "Tracks/MovieSceneVectorTrack.h"
+#include "Tracks/MovieSceneVectorTrack.h" 
 #include "Sections/MovieSceneVectorSection.h"
 
 // Define a log category for Sequencer commands
@@ -59,9 +58,339 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::HandleCommand(const FString& C
     return FUmgMcpCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown sequencer command: %s"), *Command));
 }
 
-// ... (Keep existing Attention section)
-// ... (Keep existing Read section: GetAllAnimations, GetAnimationKeyframes, GetAnimatedWidgets, GetAnimationFullData, GetWidgetAnimationData)
-// ... (Keep existing Write section: CreateAnimation, DeleteAnimation)
+// =============================================================================
+//  Attention (Context)
+// =============================================================================
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetAnimationScope(const TSharedPtr<FJsonObject>& Params)
+{
+    // POLICY CHANGE: "Select = Ensure Exists"
+    // As per user request, selecting an animation should ensure it exists (create if missing) and then focus it.
+    // CreateAnimation already implements "Find or Create + Focus", so we simply delegate to it.
+    return CreateAnimation(Params);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetWidgetScope(const TSharedPtr<FJsonObject>& Params)
+{
+    FString WidgetName;
+    if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) || WidgetName.IsEmpty())
+    {
+        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+    }
+
+    if (GEditor)
+    {
+        UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+        if (AttentionSubsystem)
+        {
+            AttentionSubsystem->SetTargetWidget(WidgetName);
+            return FUmgMcpCommonUtils::CreateSuccessResponse();
+        }
+    }
+
+    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Failed to access UmgAttentionSubsystem"));
+}
+
+// =============================================================================
+//  Read (Sensing)
+// =============================================================================
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAllAnimations(const TSharedPtr<FJsonObject>& Params)
+{
+    UE_LOG(LogUmgSequencer, Log, TEXT("GetAllAnimations: Called."));
+
+    FString ErrorMessage;
+    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
+    if (!Blueprint) 
+    {
+        UE_LOG(LogUmgSequencer, Error, TEXT("GetAllAnimations: Failed to get blueprint. %s"), *ErrorMessage);
+        return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
+    }
+
+    TArray<TSharedPtr<FJsonValue>> AnimationsArray;
+    for (UWidgetAnimation* Animation : Blueprint->Animations)
+    {
+        if (Animation)
+        {
+            TSharedPtr<FJsonObject> AnimObject = MakeShared<FJsonObject>();
+            AnimObject->SetStringField(TEXT("name"), Animation->GetName());
+            AnimObject->SetNumberField(TEXT("start_time"), Animation->GetStartTime());
+            AnimObject->SetNumberField(TEXT("end_time"), Animation->GetEndTime());
+            AnimationsArray.Add(MakeShared<FJsonValueObject>(AnimObject));
+        }
+    }
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("GetAllAnimations: Found %d animations."), AnimationsArray.Num());
+
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetArrayField(TEXT("animations"), AnimationsArray);
+    return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationKeyframes(const TSharedPtr<FJsonObject>& Params)
+{
+    UE_LOG(LogUmgSequencer, Log, TEXT("GetAnimationKeyframes: Called."));
+
+    FString ErrorMessage;
+    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
+    if (!Blueprint) return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
+
+    FString AnimationName;
+    if (!Params->TryGetStringField(TEXT("animation_name"), AnimationName) || AnimationName.IsEmpty())
+    {
+        // Try context
+        if (GEditor)
+        {
+            if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+                AnimationName = Sub->GetTargetAnimation();
+        }
+    }
+
+    if (AnimationName.IsEmpty()) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'animation_name'"));
+
+    UWidgetAnimation* TargetAnimation = nullptr;
+    for (UWidgetAnimation* Anim : Blueprint->Animations)
+    {
+        if (Anim && Anim->GetName() == AnimationName)
+        {
+            TargetAnimation = Anim;
+            break;
+        }
+    }
+    if (!TargetAnimation) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Animation not found"));
+
+    UMovieScene* MovieScene = TargetAnimation->GetMovieScene();
+    if (!MovieScene) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("MovieScene is null"));
+
+    TArray<TSharedPtr<FJsonValue>> TracksArray;
+
+    // Iterate over bindings to find widgets, then tracks
+    for (const FWidgetAnimationBinding& Binding : TargetAnimation->AnimationBindings)
+    {
+        FGuid ObjectGuid = Binding.AnimationGuid;
+        FString WidgetName = Binding.WidgetName.ToString();
+
+        // Find tracks for this object
+        for (const UMovieSceneTrack* Track : MovieScene->GetTracks())
+        {
+             // Check if this track is bound to this object
+             // Note: MovieScene tracks are bound to GUIDs. We need to check if this track relates to our ObjectGuid.
+             // However, GetTracks() returns all tracks. We need to filter.
+             // Actually, usually we ask the MovieScene for tracks bound to a GUID.
+        }
+        
+        // Correct approach: Iterate all bindings, then ask MovieScene for tracks for that binding
+        for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieSceneFloatTrack::StaticClass(), ObjectGuid))
+        {
+             if (const UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track))
+             {
+                 TSharedPtr<FJsonObject> TrackObj = MakeShared<FJsonObject>();
+                 TrackObj->SetStringField(TEXT("widget_name"), WidgetName);
+                 TrackObj->SetStringField(TEXT("property_name"), FloatTrack->GetPropertyName().ToString());
+
+                 TArray<TSharedPtr<FJsonValue>> KeysArray;
+                 
+                 // Assuming section 0 for simplicity
+                 if (FloatTrack->GetAllSections().Num() > 0)
+                 {
+                     if (const UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(FloatTrack->GetAllSections()[0]))
+                     {
+                         TArrayView<const FFrameNumber> Times = Section->GetChannel().GetData().GetTimes();
+                         TArrayView<const FMovieSceneFloatValue> Values = Section->GetChannel().GetData().GetValues();
+                         
+                         FFrameRate TickResolution = MovieScene->GetTickResolution();
+
+                         for (int32 i = 0; i < Times.Num(); ++i)
+                         {
+                             TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
+                             double Time = (double)Times[i].Value / (double)TickResolution.Numerator * (double)TickResolution.Denominator; // Simplified conversion
+                             KeyObj->SetNumberField(TEXT("time"), Time);
+                             KeyObj->SetNumberField(TEXT("value"), Values[i].Value);
+                             KeysArray.Add(MakeShared<FJsonValueObject>(KeyObj));
+                         }
+                     }
+                 }
+                 TrackObj->SetArrayField(TEXT("keys"), KeysArray);
+                 TracksArray.Add(MakeShared<FJsonValueObject>(TrackObj));
+             }
+        }
+    }
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("GetAnimationKeyframes: Found %d tracks for animation '%s'."), TracksArray.Num(), *AnimationName);
+
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetArrayField(TEXT("tracks"), TracksArray);
+    return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimatedWidgets(const TSharedPtr<FJsonObject>& Params)
+{
+    UE_LOG(LogUmgSequencer, Log, TEXT("GetAnimatedWidgets: Called."));
+
+    FString ErrorMessage;
+    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
+    if (!Blueprint) return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
+
+    FString AnimationName;
+    if (!Params->TryGetStringField(TEXT("animation_name"), AnimationName) || AnimationName.IsEmpty())
+    {
+         if (GEditor)
+        {
+            if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+                AnimationName = Sub->GetTargetAnimation();
+        }
+    }
+    if (AnimationName.IsEmpty()) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'animation_name'"));
+
+    UWidgetAnimation* TargetAnimation = nullptr;
+    for (UWidgetAnimation* Anim : Blueprint->Animations)
+    {
+        if (Anim && Anim->GetName() == AnimationName)
+        {
+            TargetAnimation = Anim;
+            break;
+        }
+    }
+    if (!TargetAnimation) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Animation not found"));
+
+    TArray<TSharedPtr<FJsonValue>> WidgetsArray;
+    for (const FWidgetAnimationBinding& Binding : TargetAnimation->AnimationBindings)
+    {
+        TSharedPtr<FJsonObject> WidgetObj = MakeShared<FJsonObject>();
+        WidgetObj->SetStringField(TEXT("widget_name"), Binding.WidgetName.ToString());
+        WidgetObj->SetStringField(TEXT("guid"), Binding.AnimationGuid.ToString());
+        WidgetObj->SetBoolField(TEXT("is_root"), Binding.bIsRootWidget);
+        WidgetsArray.Add(MakeShared<FJsonValueObject>(WidgetObj));
+    }
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("GetAnimatedWidgets: Found %d bound widgets for animation '%s'."), WidgetsArray.Num(), *AnimationName);
+
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetArrayField(TEXT("widgets"), WidgetsArray);
+    return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationFullData(const TSharedPtr<FJsonObject>& Params)
+{
+    // Re-use GetAnimationKeyframes for now as it provides the bulk of the data
+    return GetAnimationKeyframes(Params);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetWidgetAnimationData(const TSharedPtr<FJsonObject>& Params)
+{
+    // TODO: Filter GetAnimationKeyframes by widget
+    return FUmgMcpCommonUtils::CreateSuccessResponse();
+}
+
+// =============================================================================
+//  Write (Action)
+// =============================================================================
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedPtr<FJsonObject>& Params)
+{
+    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Called."));
+
+    FString ErrorMessage;
+    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
+    if (!Blueprint) 
+    {
+        UE_LOG(LogUmgSequencer, Error, TEXT("CreateAnimation: Failed to get target blueprint. Error: %s"), *ErrorMessage);
+        return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
+    }
+
+    FString AnimationName;
+    if (!Params->TryGetStringField(TEXT("animation_name"), AnimationName) || AnimationName.IsEmpty())
+    {
+        AnimationName = FString::Printf(TEXT("UnrealMotionGraphicsMCP_%d"), Blueprint->Animations.Num());
+        UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: No name provided. Auto-generated name: %s"), *AnimationName);
+    }
+    else
+    {
+        UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Request to create animation named: %s"), *AnimationName);
+    }
+
+    // Check existence
+    for (UWidgetAnimation* Animation : Blueprint->Animations)
+    {
+        if (Animation && Animation->GetName() == AnimationName)
+        {
+            UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Animation '%s' already exists. Setting focus."), *AnimationName);
+            // Focus and return
+            if (GEditor)
+            {
+                if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+                    Sub->SetTargetAnimation(AnimationName);
+            }
+            return FUmgMcpCommonUtils::CreateSuccessResponse();
+        }
+    }
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Creating new UWidgetAnimation object..."));
+    UWidgetAnimation* NewAnimation = NewObject<UWidgetAnimation>(Blueprint, FName(*AnimationName), RF_Public | RF_Transactional);
+    NewAnimation->MovieScene = NewObject<UMovieScene>(NewAnimation, FName("MovieScene"), RF_Transactional);
+    
+    // Ensure MovieScene has a valid display name (though UMG usually uses the Animation name)
+    // NewAnimation->MovieScene->SetDisplayLabel(AnimationName);
+
+    Blueprint->Modify();
+    Blueprint->Animations.Add(NewAnimation);
+    
+    // CRITICAL FIX: Assign a GUID to the new animation so it's recognized as a variable.
+    // This prevents "Ensure condition failed: WidgetBP->WidgetVariableNameToGuidMap.Contains(Animation->GetFName())"
+    FGuid NewAnimGuid = FGuid::NewGuid();
+    Blueprint->WidgetVariableNameToGuidMap.Add(NewAnimation->GetFName(), NewAnimGuid);
+    
+    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Animation added to Blueprint with GUID %s. Notifying Editor..."), *NewAnimGuid.ToString());
+
+    // Notify Editor
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    
+    // Force a recompile to ensure the class generated includes the new animation property
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    if (GEditor)
+    {
+        if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+            Sub->SetTargetAnimation(AnimationName);
+    }
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Successfully created animation '%s'."), *NewAnimation->GetName());
+
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("name"), NewAnimation->GetName());
+    
+    // Add Debug Context
+    FString ContextPath = Blueprint->GetPathName();
+    FString ContextPtr = FString::Printf(TEXT("%p"), Blueprint);
+    Result->SetStringField(TEXT("context_path"), ContextPath);
+    Result->SetStringField(TEXT("context_ptr"), ContextPtr);
+    
+    return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
+}
+
+TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteAnimation(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ErrorMessage;
+    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
+    if (!Blueprint) return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
+
+    FString AnimationName;
+    if (!Params->TryGetStringField(TEXT("animation_name"), AnimationName) || AnimationName.IsEmpty())
+    {
+        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'animation_name'"));
+    }
+
+    int32 RemovedCount = Blueprint->Animations.RemoveAll([&](UWidgetAnimation* Anim) {
+        return Anim && Anim->GetName() == AnimationName;
+    });
+
+    if (RemovedCount > 0)
+    {
+        Blueprint->Modify();
+        return FUmgMcpCommonUtils::CreateSuccessResponse();
+    }
+    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Animation not found"));
+}
 
 // Helper to determine value type from JSON Key object
 enum class EKeyType { Float, Vector2D, Color, Unknown };
@@ -85,20 +414,16 @@ static EKeyType DetectKeyType(const TSharedPtr<FJsonObject>& KeyObj)
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedPtr<FJsonObject>& Params)
 {
     UE_LOG(LogUmgSequencer, Log, TEXT("SetPropertyKeys: Called."));
-
+    
     FString ErrorMessage;
     UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
-    if (!Blueprint) 
-    {
-        return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
-    }
+    if (!Blueprint) return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
 
     // 1. Resolve Context
     FString AnimationName, WidgetName;
     if (Params->HasField(TEXT("animation_name"))) Params->TryGetStringField(TEXT("animation_name"), AnimationName);
     if (Params->HasField(TEXT("widget_name"))) Params->TryGetStringField(TEXT("widget_name"), WidgetName);
 
-    // Fallback to Attention Subsystem if missing
     if (GEditor && (AnimationName.IsEmpty() || WidgetName.IsEmpty()))
     {
         if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
@@ -162,7 +487,6 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
         UWidget* Widget = Blueprint->WidgetTree->FindWidget(FName(*WidgetName));
         if (!Widget) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Widget not found in tree"));
         
-        // Ensure variable + GUID
         if (!Widget->bIsVariable || !Blueprint->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
         {
             if (!Widget->bIsVariable) Widget->bIsVariable = true;
@@ -171,7 +495,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
                 Blueprint->WidgetVariableNameToGuidMap.Add(Widget->GetFName(), FGuid::NewGuid());
             }
             Blueprint->Modify();
-            FKismetEditorUtilities::CompileBlueprint(Blueprint); // Recompile to generate property
+            FKismetEditorUtilities::CompileBlueprint(Blueprint); 
         }
 
         WidgetGuid = MovieScene->AddPossessable(WidgetName, Widget->GetClass());
@@ -259,41 +583,46 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
     }
     else if (KeyType == EKeyType::Vector2D)
     {
-        // Use VectorTrack (User confirmed header availability)
-        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneVectorTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
         if (!Track)
         {
-            Track = MovieScene->AddTrack(UMovieSceneVectorTrack::StaticClass(), WidgetGuid);
-            Cast<UMovieSceneVectorTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
-            // Default to 2 channels
-            Cast<UMovieSceneVectorTrack>(Track)->SetNumChannelsUsed(2); 
+            Track = MovieScene->AddTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid);
+            Cast<UMovieSceneDoubleVectorTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
+            Cast<UMovieSceneDoubleVectorTrack>(Track)->SetNumChannelsUsed(2); 
         }
         Track->Modify();
 
         bool bSectionAdded = false;
-        UMovieSceneSection* Section = Cast<UMovieSceneVectorTrack>(Track)->FindOrAddSection(0, bSectionAdded);
+        UMovieSceneSection* Section = Cast<UMovieSceneDoubleVectorTrack>(Track)->FindOrAddSection(0, bSectionAdded);
         Section->SetRange(TRange<FFrameNumber>::All());
-        auto* VectorSection = Cast<UMovieSceneVectorSection>(Section);
-        // Ensure channels 0 and 1 are active
-        VectorSection->SetChannelsUsed(2);
-
-        for (const auto& Val : *KeysPtr)
+        
+        auto* VectorSection = Cast<UMovieSceneDoubleVectorSection>(Section);
+        if (VectorSection)
         {
-            auto KeyObj = Val->AsObject();
-            double Time = KeyObj->GetNumberField(TEXT("time"));
-            auto ValueObj = KeyObj->GetObjectField(TEXT("value"));
-            
-            double X = ValueObj->GetNumberField(TEXT("x"));
-            double Y = ValueObj->GetNumberField(TEXT("y"));
+            VectorSection->SetChannelsUsed(2);
 
-            FFrameNumber Frame = (Time * TickResolution).RoundToFrame();
-            
-            // Channel 0 = X, Channel 1 = Y
-            // Note: VectorTrack usually takes floats or doubles depending on version. 
-            // AddLinearKey overloads should handle it.
-            VectorSection->GetChannel(0).AddLinearKey(Frame, X);
-            VectorSection->GetChannel(1).AddLinearKey(Frame, Y);
-            UpdateRange(Frame);
+            for (const auto& Val : *KeysPtr)
+            {
+                auto KeyObj = Val->AsObject();
+                double Time = KeyObj->GetNumberField(TEXT("time"));
+                auto ValueObj = KeyObj->GetObjectField(TEXT("value"));
+                
+                double X = ValueObj->GetNumberField(TEXT("x"));
+                double Y = ValueObj->GetNumberField(TEXT("y"));
+
+                FFrameNumber Frame = (Time * TickResolution).RoundToFrame();
+                
+                // Use ChannelProxy to get mutable access to channels (Fix for C2662)
+                FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
+                TArrayView<FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
+                
+                if (Channels.Num() >= 2)
+                {
+                    Channels[0]->AddLinearKey(Frame, X);
+                    Channels[1]->AddLinearKey(Frame, Y);
+                }
+                UpdateRange(Frame);
+            }
         }
     }
 
@@ -353,16 +682,10 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
     // Remove Track
     bool bFound = false;
     
-    // We need to search all tracks bound to this GUID that match the property name
-    // Since we don't know the exact class (Float/Vector/Color), we check PropertyName
-    // Note: MovieScene->FindTrack requires a class. We can iterate bindings.
-    
-    // Hacky: Try finding specific types. Ideally iterating all tracks would be better but UE API is strict.
-    // Let's check Float, Vector, Color
     TArray<TSubclassOf<UMovieSceneTrack>> TrackTypes = { 
         UMovieSceneFloatTrack::StaticClass(), 
         UMovieSceneColorTrack::StaticClass(), 
-        UMovieSceneVectorTrack::StaticClass() 
+        UMovieSceneDoubleVectorTrack::StaticClass() 
     };
 
     for (auto Class : TrackTypes)
@@ -370,7 +693,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
         UMovieSceneTrack* Track = MovieScene->FindTrack(Class, WidgetGuid, FName(*PropertyName));
         if (Track)
         {
-            MovieScene->RemoveTrack(Track);
+            MovieScene->RemoveTrack(*Track);
             bFound = true;
         }
     }
@@ -394,20 +717,6 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemoveKeys(const TSharedPtr<FJ
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetAnimationData(const TSharedPtr<FJsonObject>& Params)
 {
     // Level 2 API: Batch process
-    /*
-    {
-        "widget_name": "MyButton",
-        "animation_name": "Anim1",
-        "tracks": [
-            { "property": "RenderOpacity", "keys": [...] },
-            { "property": "RenderTransform.Translation", "keys": [...] }
-        ]
-    }
-    */
-    
-    // We delegate to SetPropertyKeys for each track
-    // We construct a fake Params object for each call
-    
     FString WidgetName, AnimationName;
     if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName)) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing widget_name"));
     if (!Params->TryGetStringField(TEXT("animation_name"), AnimationName)) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing animation_name"));
@@ -424,10 +733,9 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetAnimationData(const TShared
         TSharedPtr<FJsonObject> SubParams = MakeShared<FJsonObject>();
         SubParams->SetStringField(TEXT("widget_name"), WidgetName);
         SubParams->SetStringField(TEXT("animation_name"), AnimationName);
-        SubParams->SetStringField(TEXT("property_name"), TrackObj->GetStringField(TEXT("property"))); // "property" in input -> "property_name" in SetPropertyKeys
+        SubParams->SetStringField(TEXT("property_name"), TrackObj->GetStringField(TEXT("property"))); 
         SubParams->SetArrayField(TEXT("keys"), TrackObj->GetArrayField(TEXT("keys")));
 
-        // Optional: asset_path if needed
         if (Params->HasField(TEXT("asset_path"))) SubParams->SetStringField(TEXT("asset_path"), Params->GetStringField(TEXT("asset_path")));
 
         SetPropertyKeys(SubParams);
