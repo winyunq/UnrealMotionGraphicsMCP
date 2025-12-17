@@ -36,4 +36,7 @@ private:
     TSharedPtr<FJsonObject> SetPropertyKeys(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> RemovePropertyTrack(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> RemoveKeys(const TSharedPtr<FJsonObject>& Params);
+    
+    // Level 2 API
+    TSharedPtr<FJsonObject> SetAnimationData(const TSharedPtr<FJsonObject>& Params);
 };
