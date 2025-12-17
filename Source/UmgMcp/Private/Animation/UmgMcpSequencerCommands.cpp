@@ -21,8 +21,8 @@
 // Additional Sequencer Includes
 #include "Tracks/MovieSceneColorTrack.h"
 #include "Sections/MovieSceneColorSection.h"
-#include "Tracks/MovieSceneDoubleVectorTrack.h"
-#include "Sections/MovieSceneDoubleVectorSection.h"
+#include "Tracks/MovieSceneVectorTrack.h"
+#include "Sections/MovieSceneVectorSection.h"
 
 // Define a log category for Sequencer commands
 DEFINE_LOG_CATEGORY_STATIC(LogUmgSequencer, Log, All);
@@ -259,21 +259,21 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
     }
     else if (KeyType == EKeyType::Vector2D)
     {
-        // Use DoubleVectorTrack for UE5
-        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
+        // Use VectorTrack (User confirmed header availability)
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneVectorTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
         if (!Track)
         {
-            Track = MovieScene->AddTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid);
-            Cast<UMovieSceneDoubleVectorTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
+            Track = MovieScene->AddTrack(UMovieSceneVectorTrack::StaticClass(), WidgetGuid);
+            Cast<UMovieSceneVectorTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
             // Default to 2 channels
-            Cast<UMovieSceneDoubleVectorTrack>(Track)->SetNumChannelsUsed(2); 
+            Cast<UMovieSceneVectorTrack>(Track)->SetNumChannelsUsed(2); 
         }
         Track->Modify();
 
         bool bSectionAdded = false;
-        UMovieSceneSection* Section = Cast<UMovieSceneDoubleVectorTrack>(Track)->FindOrAddSection(0, bSectionAdded);
+        UMovieSceneSection* Section = Cast<UMovieSceneVectorTrack>(Track)->FindOrAddSection(0, bSectionAdded);
         Section->SetRange(TRange<FFrameNumber>::All());
-        auto* VectorSection = Cast<UMovieSceneDoubleVectorSection>(Section);
+        auto* VectorSection = Cast<UMovieSceneVectorSection>(Section);
         // Ensure channels 0 and 1 are active
         VectorSection->SetChannelsUsed(2);
 
@@ -289,6 +289,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
             FFrameNumber Frame = (Time * TickResolution).RoundToFrame();
             
             // Channel 0 = X, Channel 1 = Y
+            // Note: VectorTrack usually takes floats or doubles depending on version. 
+            // AddLinearKey overloads should handle it.
             VectorSection->GetChannel(0).AddLinearKey(Frame, X);
             VectorSection->GetChannel(1).AddLinearKey(Frame, Y);
             UpdateRange(Frame);
@@ -360,7 +362,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
     TArray<TSubclassOf<UMovieSceneTrack>> TrackTypes = { 
         UMovieSceneFloatTrack::StaticClass(), 
         UMovieSceneColorTrack::StaticClass(), 
-        UMovieSceneDoubleVectorTrack::StaticClass() 
+        UMovieSceneVectorTrack::StaticClass() 
     };
 
     for (auto Class : TrackTypes)
