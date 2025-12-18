@@ -157,8 +157,22 @@ UBlueprint* FUmgMcpCommonUtils::FindBlueprint(const FString& BlueprintName)
 
 UBlueprint* FUmgMcpCommonUtils::FindBlueprintByName(const FString& BlueprintName)
 {
-    // The correct object path for a Blueprint asset is /Game/Path/AssetName.AssetName
-    FString ObjectPath = FString::Printf(TEXT("/Game/Blueprints/%s.%s"), *BlueprintName, *BlueprintName);
+    FString ObjectPath;
+    if (BlueprintName.StartsWith(TEXT("/")))
+    {
+        // Assert it's a full path, append the asset name if needed or assume user provided package path
+        // Standard convention: /Path/To/Package.AssetName
+        // If user provided /Path/To/Package, we construct /Path/To/Package.PackageName (assuming asset name = package name)
+        
+        FString PackageName = BlueprintName;
+        FString AssetName = FPaths::GetBaseFilename(BlueprintName);
+        ObjectPath = FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName);
+    }
+    else
+    {
+        // Simple name, assume it's in default location
+        ObjectPath = FString::Printf(TEXT("/Game/Blueprints/%s.%s"), *BlueprintName, *BlueprintName);
+    }
 
     // First, try to load the object directly, as it's the fastest method.
     UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *ObjectPath);

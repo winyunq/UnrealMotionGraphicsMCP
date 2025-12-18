@@ -1,5 +1,7 @@
 #include "Blueprint/UmgMcpBlueprintCommands.h"
 #include "Bridge/UmgMcpCommonUtils.h"
+#include "FileManage/UmgAttentionSubsystem.h"
+#include "WidgetBlueprint.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Factories/BlueprintFactory.h"
@@ -356,17 +358,33 @@ TSharedPtr<FJsonObject> FUmgMcpBlueprintCommands::HandleSetPhysicsProperties(con
 TSharedPtr<FJsonObject> FUmgMcpBlueprintCommands::HandleCompileBlueprint(const TSharedPtr<FJsonObject>& Params)
 {
     // Get required parameters
+    // Get required parameters
     FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    UBlueprint* Blueprint = nullptr;
+
+    // 1. Try explicit parameter
+    if (Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
     {
-        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        Blueprint = FUmgMcpCommonUtils::FindBlueprint(BlueprintName);
+    }
+    // 2. Try Context (Attention System)
+    else if (GEditor)
+    {
+        UUmgAttentionSubsystem* AttentionSystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+        if (AttentionSystem)
+        {
+             Blueprint = AttentionSystem->GetCachedTargetWidgetBlueprint();
+             if (Blueprint)
+             {
+                 BlueprintName = Blueprint->GetName();
+                 UE_LOG(LogTemp, Display, TEXT("HandleCompileBlueprint: Using cached target '%s'"), *BlueprintName);
+             }
+        }
     }
 
-    // Find the blueprint
-    UBlueprint* Blueprint = FUmgMcpCommonUtils::FindBlueprint(BlueprintName);
     if (!Blueprint)
     {
-        return FUmgMcpCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter and no active target set."));
     }
 
     // Compile the blueprint

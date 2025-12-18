@@ -304,3 +304,47 @@ FString UUmgAttentionSubsystem::GetTargetWidget() const
 {
 	return CurrentWidgetName;
 }
+
+void UUmgAttentionSubsystem::SetTargetGraph(const FString& GraphName)
+{
+    CurrentGraphName = GraphName;
+    // Reset cursor when switching graphs, or maybe try to find the "End" of the graph?
+    // For now, simpler is safer: reset to empty so we don't link across graphs.
+    LastEditedNodeId.Empty(); 
+    CurrentNodePosition = FVector2D(0, 0); 
+    UE_LOG(LogUmgAttention, Log, TEXT("Context: Focused Graph set to '%s'"), *CurrentGraphName);
+}
+
+FString UUmgAttentionSubsystem::GetTargetGraph() const
+{
+    // If empty, default to "EventGraph" as a sensible default for UMG
+    if (CurrentGraphName.IsEmpty())
+    {
+        return TEXT("EventGraph");
+    }
+    return CurrentGraphName;
+}
+
+void UUmgAttentionSubsystem::SetCursorNode(const FString& NodeId)
+{
+    LastEditedNodeId = NodeId;
+    UE_LOG(LogUmgAttention, Log, TEXT("Context: Cursor Node set to '%s'"), *LastEditedNodeId);
+}
+
+FString UUmgAttentionSubsystem::GetCursorNode() const
+{
+    return LastEditedNodeId;
+}
+
+FVector2D UUmgAttentionSubsystem::GetAndAdvanceCursorPosition()
+{
+    FVector2D Result = CurrentNodePosition;
+    // Simple auto-layout strategy: move right by 250 units
+    CurrentNodePosition.X += 250.0f;
+    return Result;
+}
+
+void UUmgAttentionSubsystem::SetCursorPosition(const FVector2D& NewPosition)
+{
+    CurrentNodePosition = NewPosition;
+}

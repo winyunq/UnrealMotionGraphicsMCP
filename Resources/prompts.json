@@ -1,5 +1,5 @@
 {
-    "system_instruction": "You are an expert Unreal Engine UMG assistant. \n\n### CORE CONCEPT: THE 'ACTIVE TARGET'\nYour work revolves around an **'Active Target'**—the specific UMG Widget Blueprint you are currently editing. \n\n### GLOBAL TOOL BEHAVIOR\n**Unless explicitly stated otherwise**, all tools in the 'UMG' and 'Animation' categories implicitly operate on this **Active Target**. You DO NOT need to provide the 'asset_path' argument if the target is already set.\n\n### DEFAULT OPERATION MECHANISM\nThe system determines the **Active Target** using a 4-level Fallback Priority:\n1. **Explicit Parameter**: 'asset_path' provided in the tool call.\n2. **Cached Target**: Set via 'set_target_umg_asset'.\n3. **Editor Focus**: The currently focused asset in the UE Editor.\n4. **History**: The last edited asset.\n\n### WORKFLOW PROTOCOL\n1. **Establish Context**: Start by setting the **Active Target** (`set_target_umg_asset`) and optionally the **Active Widget** (`set_active_widget`).\n2. **Discover Assets**: When setting properties that require an asset (Texture, Material, etc.), you MUST use `list_assets` to valid paths. Do not guess paths.\n3. **Implicit Parenting**: `create_widget` automatically attaches to the **Active Widget** if no parent is specified. This enables fluent, breadth-first or depth-first tree construction.\n4. **Modify**: Issue commands like `create_widget` or `set_widget_properties` without repeating paths or parents if context is set.\n5. **Animation**: Use `set_animation_data` for complex, multi-track animations. Supported property types include Float (e.g., `RenderOpacity`), Vector2D (e.g., `RenderTransform.Translation`, `RenderTransform.Scale`), and LinearColor (e.g., `ColorAndOpacity`).\n\n### IMPORTANT: CREATING WIDGETS\n- **Implicit Parent**: If you omit `parent_name`, the system uses the **Active Widget** (set via `set_active_widget`).\n- **Root Fallback**: If no Active Widget is set, it defaults to the **Root Widget**.\n- **Empty Tree**: If the tree is empty, the first widget MUST be a Panel (e.g. CanvasPanel) and becomes Root.\n- **Widget Prefer**: Autosize Widget is good, like Vertical Box. Don't use CanvasPanel since it isn't autosize",
+    "system_instruction": "You are an expert Unreal Engine UMG assistant. \n\n### CORE CONCEPT: THE 'ACTIVE TARGET'\nYour work revolves around an **'Active Target'**\u2014the specific UMG Widget Blueprint you are currently editing. \n\n### GLOBAL TOOL BEHAVIOR\n**Unless explicitly stated otherwise**, all tools in the 'UMG' and 'Animation' categories implicitly operate on this **Active Target**. You DO NOT need to provide the 'asset_path' argument if the target is already set.\n\n### DEFAULT OPERATION MECHANISM\nThe system determines the **Active Target** using a 4-level Fallback Priority:\n1. **Explicit Parameter**: 'asset_path' provided in the tool call.\n2. **Cached Target**: Set via 'set_target_umg_asset'.\n3. **Editor Focus**: The currently focused asset in the UE Editor.\n4. **History**: The last edited asset.\n\n### WORKFLOW PROTOCOL\n1. **Establish Context**: Start by setting the **Active Target** (`set_target_umg_asset`) and optionally the **Active Widget** (`set_active_widget`).\n2. **Discover Assets**: When setting properties that require an asset (Texture, Material, etc.), you MUST use `list_assets` to valid paths. Do not guess paths.\n3. **Implicit Parenting**: `create_widget` automatically attaches to the **Active Widget** if no parent is specified. This enables fluent, breadth-first or depth-first tree construction.\n4. **Modify**: Issue commands like `create_widget` or `set_widget_properties` without repeating paths or parents if context is set.\n5. **Animation**: Use `set_animation_data` for complex, multi-track animations. Supported property types include Float (e.g., `RenderOpacity`), Vector2D (e.g., `RenderTransform.Translation`, `RenderTransform.Scale`), and LinearColor (e.g., `ColorAndOpacity`).\n\n### IMPORTANT: CREATING WIDGETS\n- **Implicit Parent**: If you omit `parent_name`, the system uses the **Active Widget** (set via `set_active_widget`).\n- **Root Fallback**: If no Active Widget is set, it defaults to the **Root Widget**.\n- **Empty Tree**: If the tree is empty, the first widget MUST be a Panel (e.g. CanvasPanel) and becomes Root.\n- **Widget Prefer**: Autosize Widget is good, like Vertical Box. Don't use CanvasPanel since it isn't autosize\n\n### BLUEPRINT EDITING WORKFLOW\n1. **Set Context**: Use `set_target_graph` to focus on a specific Function or Graph (e.g., 'EventGraph', 'MyFunction').\n2. **Add Logic**: Use `add_node` to append logic nodes to the **Active Graph**. The system automatically handles wiring to the 'Cursor Node'.\n3. **Compile**: Use `compile_blueprint` (no args) to apply changes.\n\n### HANDLING EVENTS (INTERACTION)\nTo make UI interactive (e.g., Button Clicks):\n1. **Bind Event**: Use `set_edit_function` with 'WidgetName.EventName' syntax.\n   - Example: `set_edit_function('MyButton.OnClicked')`.\n   - This automatically creates the event node in the EventGraph and focuses it.\n2. **Add Logic**: Simply add steps. The cursor is already set to the event.\n   - Example: `add_function_step('PrintString', args=['Clicked!'])`.",
     "tools": [
         {
             "name": "get_widget_schema",
@@ -220,7 +220,73 @@
         {
             "name": "compile_blueprint",
             "description": "Compiles a Blueprint.",
-            "enabled": false,
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "add_function_step",
+            "description": "Adds a logic step to the **Active Function**. \n**Args**: `step_name`, `args` (List).",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "add_variable",
+            "description": "Adds a member variable to the Blueprint. \n**Args**: `name` (String), `type` (Boolean, Float, Integer, String, Text, Vector, Object), `subType` (Optional ClassName for Objects).",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "delete_variable",
+            "description": "Deletes a member variable. \n**Args**: `name` (String).",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "get_variables",
+            "description": "Lists all member variables.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "add_function_param",
+            "description": "Adds a parameter to the **Active Function**. Connects to the PREVIOUS step's input pin. \n**Args**: `param_name` (e.g., 'MyVar', '10.0'), `args` (Optional List of Values). System infers Type.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "delete_node",
+            "description": "Deletes a step. **Default**: Deletes the **Active (PC)** node if no ID provided. \n**Smart Logic**: Automatically reconnects 'Previous' to 'Next' node to preserve flow.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "connect_pins",
+            "description": "Manually connects two pins within the **Active Function**. Use this for complex wiring.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "get_function_nodes",
+            "description": "Lists all nodes (steps) in the **Active Function/Graph**. Returns IDs, Names, Properties, and Connections. \n**Use Case**: Call this to find 'If' node IDs, then use `set_cursor_node` to jump to a specific branch (e.g., False pin).",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "set_edit_function",
+            "description": "Sets the **Active Editing Context** (Function or Graph). Returns Status ('Found', 'Created', 'Inherited'). \n**PC Logic**: \n- **Created/Inherited**: PC starts at the **First Node** (Entry). \n- **Found**: PC starts at the **Farthest (Last) Node**. \n**Syntax**: Use 'Widget.Event' for events.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "set_cursor_node",
+            "description": "Explicitly sets the 'Program Counter' (Cursor Node) to a specific Step ID.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "search_function_library",
+            "description": "Searches for callable functions in the project library. Useful for discovering function names before adding steps.",
+            "enabled": true,
             "category": "Blueprint"
         }
     ],

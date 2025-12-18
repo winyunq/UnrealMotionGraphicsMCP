@@ -84,6 +84,44 @@ public:
 	 */
 	FString GetTargetWidget() const;
 
+	/**
+	 * Sets the target graph name (e.g. "EventGraph" or function name).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+	void SetTargetGraph(const FString& GraphName);
+
+	/**
+	 * Gets the current target graph name.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+	FString GetTargetGraph() const;
+
+    /**
+     * Sets the "Cursor" node ID (Program Counter).
+     * New nodes will be auto-connected to this node if possible.
+     */
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+    void SetCursorNode(const FString& NodeId);
+
+    /**
+     * Gets the current Cursor node ID.
+     */
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+    FString GetCursorNode() const;
+
+    /**
+     * Gets the suggested position for the next node (auto-layout).
+     * This advances the cursor position automatically.
+     */
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+    FVector2D GetAndAdvanceCursorPosition();
+
+    /**
+     * Resets the cursor position to a specific location.
+     */
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+    void SetCursorPosition(const FVector2D& NewPosition);
+
 private:
 	void HandleAssetOpened(UObject* Asset, class IAssetEditorInstance* EditorInstance);
 
@@ -98,6 +136,11 @@ private:
 
 	// The name of the widget currently in focus.
 	FString CurrentWidgetName;
+
+    // -- Blueprint Graph Context --
+    FString CurrentGraphName;
+    FString LastEditedNodeId; // The "Program Counter"
+    FVector2D CurrentNodePosition; // The visual cursor
 
 protected:
 	TArray<FString> UmgAssetHistory;

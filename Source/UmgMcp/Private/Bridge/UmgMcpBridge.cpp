@@ -56,6 +56,8 @@
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "FileManage/UmgMcpFileTransformationCommands.h"
 #include "Animation/UmgMcpSequencerCommands.h"
+#include "Blueprint/UmgBlueprintGraphSubsystem.h"
+#include "FileManage/UmgAttentionSubsystem.h"
 
 
 
@@ -298,6 +300,109 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         {
             ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
         }
+        else if (CommandType == TEXT("set_target_graph") ||
+                 CommandType == TEXT("get_target_graph") ||
+                 CommandType == TEXT("set_cursor_node") ||
+                 CommandType == TEXT("get_cursor_node"))
+        {
+              // Handle new Stateful Attention commands directly via Subsystem
+              if (GEditor)
+              {
+                  UUmgAttentionSubsystem* AttentionSystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+                  if (AttentionSystem)
+                  {
+                       ResultJson = MakeShareable(new FJsonObject);
+                       if (CommandType == TEXT("set_target_graph") || CommandType == TEXT("set_edit_function"))
+                       {
+                           FString GraphName;
+                           // Support both 'graph_name' (legacy) and 'function_name' (new)
+                           if (!Params->TryGetStringField(TEXT("graph_name"), GraphName))
+                           {
+                               Params->TryGetStringField(TEXT("function_name"), GraphName);
+                           }
+                           
+                           if (!GraphName.IsEmpty())
+                           {
+                               // Function Creation / Event Binding Logic
+                               UUmgBlueprintGraphSubsystem* BPSystem = GEditor->GetEditorSubsystem<UUmgBlueprintGraphSubsystem>();
+                               UWidgetBlueprint* TargetBP = AttentionSystem->GetCachedTargetWidgetBlueprint();
+                               
+                               if (BPSystem && TargetBP)
+                               {
+                                   FString TargetNodeId;
+                                   FString ActualGraphName;
+                                   FString FunctionStatus;
+
+                                   FString ComponentName;
+                                   FString EventName;
+                                   
+                                   // Check for "Component.Event" syntax
+                                   if (GraphName.Split(TEXT("."), &ComponentName, &EventName))
+                                   {
+                                        // It's a Component Event!
+                                        TargetNodeId = BPSystem->EnsureComponentEventExists(TargetBP, ComponentName, EventName, FunctionStatus);
+                                        ActualGraphName = TEXT("EventGraph");
+                                   }
+                                   else
+                                   {
+                                       // It's a regular Function
+                                       // Pass full params to allow signature definition if creation is needed
+                                       FString ParamString;
+                                       TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ParamString);
+                                       FJsonSerializer::Serialize(Params.ToSharedRef(), Writer);
+                                       
+                                       TargetNodeId = BPSystem->EnsureFunctionExists(TargetBP, GraphName, FunctionStatus, ParamString);
+                                       ActualGraphName = GraphName;
+                                   }
+
+                                   // Set Context
+                                   AttentionSystem->SetTargetGraph(ActualGraphName);
+                                   if (!TargetNodeId.IsEmpty())
+                                   {
+                                       AttentionSystem->SetCursorNode(TargetNodeId);
+                                   }
+                                   
+                                   ResultJson->SetStringField(TEXT("target_graph"), ActualGraphName);
+                                   ResultJson->SetStringField(TEXT("cursor_node"), TargetNodeId);
+                                   ResultJson->SetStringField(TEXT("status"), FunctionStatus); // Found, Created, Inherited
+                                   ResultJson->SetBoolField(TEXT("success"), true);
+                               }
+                               else
+                               {
+                                   // Fallback if systems missing (unlikely)
+                                   AttentionSystem->SetTargetGraph(GraphName);
+                                   ResultJson->SetBoolField(TEXT("success"), true);
+                               }
+                           }
+                           else
+                           {
+                               ResultJson->SetBoolField(TEXT("success"), false);
+                               ResultJson->SetStringField(TEXT("error"), TEXT("Missing function_name or graph_name"));
+                           }
+                       }
+                       else if (CommandType == TEXT("get_target_graph"))
+                       {
+                            ResultJson->SetStringField(TEXT("target_graph"), AttentionSystem->GetTargetGraph());
+                            ResultJson->SetBoolField(TEXT("success"), true);
+                       }
+                       else if (CommandType == TEXT("set_cursor_node"))
+                       {
+                           FString NodeId;
+                           if (Params->TryGetStringField(TEXT("node_id"), NodeId))
+                           {
+                               AttentionSystem->SetCursorNode(NodeId);
+                               ResultJson->SetStringField(TEXT("cursor_node"), NodeId);
+                               ResultJson->SetBoolField(TEXT("success"), true);
+                           }
+                       }
+                       else if (CommandType == TEXT("get_cursor_node"))
+                       {
+                            ResultJson->SetStringField(TEXT("cursor_node"), AttentionSystem->GetCursorNode());
+                            ResultJson->SetBoolField(TEXT("success"), true);
+                       }
+                  }
+              }
+        }
         // Widget Commands
         else if (CommandType == TEXT("get_widget_tree") ||
                  CommandType == TEXT("query_widget_properties") ||
@@ -359,6 +464,129 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("get_actor_material_info"))
         {
             ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
+        }
+        // Low-level Graph Manipulation (New)
+        else if (CommandType == TEXT("manage_blueprint_graph"))
+        {
+             if (GEditor)
+             {
+                 UUmgBlueprintGraphSubsystem* GraphSystem = GEditor->GetEditorSubsystem<UUmgBlueprintGraphSubsystem>();
+                 UUmgAttentionSubsystem* AttentionSystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
+                 
+                 if (GraphSystem && AttentionSystem)
+                 {
+                     // 1. Resolve Target Blueprint
+                     // We *should* use the one from Attention System if not specified? 
+                     // Or just pass the Attention System's cached one.
+                     UWidgetBlueprint* TargetBP = AttentionSystem->GetCachedTargetWidgetBlueprint();
+                     
+                     // Fallback: Check if payload specifies an asset?
+                     // For now, Strict Stateful mode: Must have target set in Attention.
+                     
+                     if (TargetBP)
+                     {
+                         // 2. Inject Context (Current Graph) and Auto-Wiring Info
+                         FString GraphName;
+                         // Helper to get writable copy or modify existing
+                         TSharedPtr<FJsonObject> ModifiedParams = MakeShareable(new FJsonObject());
+                         // Copy existing fields
+                         for (auto& Elem : Params->Values)
+                         {
+                             ModifiedParams->SetField(Elem.Key, Elem.Value);
+                         }
+
+                         FString SubAction;
+                         Params->TryGetStringField(TEXT("action"), SubAction);
+
+                          
+                          if (SubAction.IsEmpty())
+                          {
+                              Params->TryGetStringField(TEXT("subAction"), SubAction);
+                          }
+
+                          // Ensure "subAction" is present for the subsystem
+                          ModifiedParams->SetStringField(TEXT("subAction"), SubAction);
+
+                          if (!Params->HasField(TEXT("graphName")))
+                          {
+                             ModifiedParams->SetStringField(TEXT("graphName"), AttentionSystem->GetTargetGraph());
+                         }
+                         
+                         // Auto-Layout & Auto-Connect for 'create_node', 'add_node', 'add_param'
+                         if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param"))
+                         {
+                             if (!Params->HasField(TEXT("x")) || !Params->HasField(TEXT("y")))
+                             {
+                                 FVector2D Pos = AttentionSystem->GetAndAdvanceCursorPosition();
+                                 if (!Params->HasField(TEXT("x"))) ModifiedParams->SetNumberField(TEXT("x"), Pos.X);
+                                 if (!Params->HasField(TEXT("y"))) ModifiedParams->SetNumberField(TEXT("y"), Pos.Y);
+                             }
+                             
+                             if (!Params->HasField(TEXT("autoConnectToNodeId")))
+                             {
+                                 FString CursorNode = AttentionSystem->GetCursorNode();
+                                 if (!CursorNode.IsEmpty())
+                                 {
+                                     ModifiedParams->SetStringField(TEXT("autoConnectToNodeId"), CursorNode);
+                                 }
+                             }
+                         }
+                          else if (SubAction == TEXT("delete_node"))
+                          {
+                              if (!Params->HasField(TEXT("nodeId")))
+                              {
+                                  FString CursorNode = AttentionSystem->GetCursorNode();
+                                  if (!CursorNode.IsEmpty())
+                                  {
+                                      ModifiedParams->SetStringField(TEXT("nodeId"), CursorNode);
+                                  }
+                              }
+                          }
+
+                         // Serialize Payload
+                         FString PayloadString;
+                         TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&PayloadString);
+                         FJsonSerializer::Serialize(ModifiedParams.ToSharedRef(), Writer);
+                         
+                         FString ResultString = GraphSystem->HandleBlueprintGraphAction(TargetBP, CommandType, PayloadString);
+                         
+                         // Deserialize result
+                         TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResultString);
+                         FJsonSerializer::Deserialize(Reader, ResultJson);
+                         
+                         // 3. Post-Action: Update Attention Context
+                         if (ResultJson.IsValid() && ResultJson->GetBoolField(TEXT("success")))
+                         {
+                             if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param"))
+                             {
+                                 FString NewNodeId;
+                                 if (ResultJson->TryGetStringField(TEXT("nodeId"), NewNodeId))
+                                 {
+                                     AttentionSystem->SetCursorNode(NewNodeId);
+                                     // AttentionSystem->GetAndAdvanceCursorPosition(); // Already advanced in Pre-step? 
+                                     // Currently GetAndAdvance advances it. So it was done.
+                                     // If explicit X/Y was provided, we should probably sync our cursor to it?
+                                     // For now, assume flow.
+                                 }
+                             }
+                             else if (SubAction == TEXT("delete_node"))
+                             {
+                                 FString NewCursor;
+                                 if (ResultJson->TryGetStringField(TEXT("newCursorNode"), NewCursor))
+                                 {
+                                     AttentionSystem->SetCursorNode(NewCursor);
+                                 }
+                             }
+                         }
+                     }
+                     else
+                     {
+                         ResultJson = MakeShareable(new FJsonObject);
+                         ResultJson->SetStringField(TEXT("error"), TEXT("No target Blueprint set in Attention Subsystem. Use set_target_umg_asset first."));
+                         ResultJson->SetBoolField(TEXT("success"), false);
+                     }
+                 }
+             }
         }
         else
         {
