@@ -38,7 +38,7 @@ from Widget import UMGSet
 from FileManage import UMGFileTransformation
 from Bridge import UMGHTMLParser
 from Editor import UMGEditor
-from Blueprint import UMGBlueprint
+
 
 
 # Configure logging
@@ -535,18 +535,7 @@ def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
     """[Deprecated] Use apply_layout instead."""
     return apply_layout(html_content)
 
-# @mcp.tool()
-def preview_html_conversion(html_content: str) -> Dict[str, Any]:
-    """
-    "Debug HTML" - Returns the UMG JSON that WOULD be generated from the given HTML.
-    Use this to verify how your HTML tags map to UMG properties before applying.
-    """
-    try:
-        parser = UMGHTMLParser.UMGHTMLParser()
-        json_data = parser.parse(html_content)
-        return {"status": "success", "data": json_data}
-    except Exception as e:
-        return {"status": "error", "error": f"HTML Parsing Failed: {str(e)}"}
+
 
 # =============================================================================
 #  Category: Editor & Level (New)
@@ -598,88 +587,100 @@ async def list_assets(class_name: str = None, package_path: str = None, max_coun
 #  Category: Blueprint (New)
 # =============================================================================
 
-@register_tool("create_blueprint", "Creates a new Blueprint asset.")
-async def create_blueprint(name: str, parent_class: str = "AActor") -> Dict[str, Any]:
-    """
-    (Description loaded from prompts.json)
-    """
-    conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return await bp_client.create_blueprint(name, parent_class)
+
 
 @register_tool("compile_blueprint", "Compiles a Blueprint.")
-async def compile_blueprint(blueprint_name: str) -> Dict[str, Any]:
+async def compile_blueprint(blueprint_name: str = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return await bp_client.compile_blueprint(blueprint_name)
+    return await conn.send_command("compile_blueprint", {"blueprint_name": blueprint_name})
 
-@register_tool("add_function_step", "Adds a logical step to the active function (Forward Execution).")
-async def add_function_step(step_name: str, args: List[Any] = None) -> Dict[str, Any]:
+
+@register_tool("add_step", "Adds an Executable Node to the current Program Counter.")
+@register_tool("add_step", "Adds an Executable Node to the current Program Counter.")
+async def add_step(name: str, args: List[Any] = None, comment: str = None, input_wires: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
-    Wrapper for manage_blueprint_graph(add_function_step).
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
     
-    # Construct Payload
-    payload = {}
-    payload["nodeName"] = step_name
+    # Direct Protocol Construction
+    payload = {
+        "subAction": "add_function_step",
+        "nodeName": name,  # C++ will now handle "PrintString" mapping internally
+        "comment": comment
+    }
+    
+    if args:
+         payload["extraArgs"] = args
+         
+    if input_wires:
+        payload["inputWires"] = input_wires
+
+    # We reuse 'manage_blueprint_graph' for all graph ops
+    return await conn.send_command("manage_blueprint_graph", payload)
+
+
+@register_tool("prepare_value", "Places a Non-Executable Data Node (e.g. variable getter, literal).")
+async def prepare_value(name: str, args: List[Any] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    
+    payload = {
+        "subAction": "create_node",
+        # Pass 'name' as nodeName to trigger C++ Natural Inference (simulating add_step behavior)
+        "nodeName": name, 
+        "autoConnectToNodeId": "" # Explicitly disable auto-connect for pure nodes
+    }
     if args:
         payload["extraArgs"] = args
-    
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "add_function_step", payload)
-
-@register_tool("get_variable_node", "Gets a variable value.")
-async def get_variable_node(name: str) -> Dict[str, Any]:
-    """
-    (Description loaded from prompts.json)
-    """
-    conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    
-    payload = {
-        "nodeType": "Get",
-        "variableName": name,
-        "nodeName": f"Get {name}"
-    }
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "create_node", payload)
-
-@register_tool("set_variable_node", "Sets a variable value.")
-async def set_variable_node(name: str, value: Any = None) -> Dict[str, Any]:
-    """
-    (Description loaded from prompts.json)
-    """
-    conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    
-    payload = {
-        "nodeType": "Set",
-        "variableName": name,
-        "nodeName": f"Set {name}"
-    }
-    if value is not None:
-        payload["extraArgs"] = [value]
         
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "create_node", payload)
+    return await conn.send_command("manage_blueprint_graph", payload)
 
-@register_tool("add_function_param", "Adds a parameter to the previous step (Backward Data).")
-async def add_function_param(param_name: str, args: List[Any] = None) -> Dict[str, Any]:
+
+@register_tool("connect_data_to_pin", "Connects a Data Node to a target pin.")
+async def connect_data_to_pin(source: str, target: str) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
     
-    payload = {}
-    payload["nodeName"] = param_name
-    if args:
-        payload["extraArgs"] = args
-    
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "add_step_param", payload)
+    # Parse Source (NodeID:Pin)
+    if ":" in source:
+        source_id, source_pin = source.split(":", 1)
+    else:
+        source_id = source
+        source_pin = "Return Value"
+
+    # Parse Target (NodeID:Pin)
+    if ":" in target:
+        target_id, target_pin = target.split(":", 1)
+    else:
+        target_id = target
+        target_pin = "InPin"
+
+    payload = {
+        "subAction": "connect_pins",
+        "nodeIdA": source_id,
+        "pinNameA": source_pin,
+        "nodeIdB": target_id,
+        "pinNameB": target_pin
+    }
+    return await conn.send_command("manage_blueprint_graph", payload)
+
+
+@register_tool("get_function_nodes", "Lists all nodes in the active function.")
+async def get_function_nodes() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    return await conn.send_command("manage_blueprint_graph", {"subAction": "get_nodes"})
+
 
 @register_tool("add_variable", "Adds a member variable.")
 async def add_variable(name: str, type: str, subType: str = None) -> Dict[str, Any]:
@@ -687,13 +688,17 @@ async def add_variable(name: str, type: str, subType: str = None) -> Dict[str, A
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
     
-    payload = {"name": name, "type": type}
+    payload = {
+        "subAction": "add_variable",
+        "name": name,
+        "type": type
+    }
     if subType:
         payload["subType"] = subType
     
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "add_variable", payload)
+    return await conn.send_command("manage_blueprint_graph", payload)
+
 
 @register_tool("delete_variable", "Deletes a member variable.")
 async def delete_variable(name: str) -> Dict[str, Any]:
@@ -701,8 +706,8 @@ async def delete_variable(name: str) -> Dict[str, Any]:
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "delete_variable", {"name": name})
+    return await conn.send_command("manage_blueprint_graph", {"subAction": "delete_variable", "name": name})
+
 
 @register_tool("get_variables", "Lists member variables.")
 async def get_variables() -> Dict[str, Any]:
@@ -710,8 +715,8 @@ async def get_variables() -> Dict[str, Any]:
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "get_variables", {})
+    return await conn.send_command("manage_blueprint_graph", {"subAction": "get_variables"})
+
 
 @register_tool("delete_node", "Deletes a node.")
 async def delete_node(node_id: str) -> Dict[str, Any]:
@@ -719,23 +724,8 @@ async def delete_node(node_id: str) -> Dict[str, Any]:
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "delete_node", {"nodeId": node_id})
+    return await conn.send_command("manage_blueprint_graph", {"subAction": "delete_node", "nodeId": node_id})
 
-@register_tool("connect_pins", "Connects two pins.")
-async def connect_pins(source_node_id: str, source_pin: str, target_node_id: str, target_pin: str) -> Dict[str, Any]:
-    """
-    (Description loaded from prompts.json)
-    """
-    conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
-    payload = {
-        "nodeIdA": source_node_id,
-        "pinNameA": source_pin,
-        "nodeIdB": target_node_id,
-        "pinNameB": target_pin
-    }
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "connect_pins", payload)
 
 # --- Stateful Blueprint Tools ---
 
@@ -745,47 +735,9 @@ async def set_edit_function(function_name: str) -> Dict[str, Any]:
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    # We reuse set_target_graph under the hood for now as it maps to Attention System's graph name
-    # But C++ side might need update if we change command string?
-    # Actually wait, set_target_graph is a DIRECT command, not via manage_blueprint_graph.
-    # Does UmgMcp Router handle "set_edit_function"? NO.
-    # So we must map "set_edit_function" (py tool) -> "set_target_graph" (protocol command).
-    
-    return await conn.send_command("set_target_graph", {"graph_name": function_name})
-    """
-    (Description loaded from prompts.json)
-    """
-    # This might need to bridge to C++ AttentionSubsystem via a specific command
-    # For now, we reuse the generic 'manage_blueprint_graph' channel or Assume Attention
-    # has its own setter. 
-    # Current C++ implementation of UMGAttentionSubsystem::SetTargetGraph is valid.
-    # But we need a python client wrapper for it. 
-    # Let's add it to UMGAttention.py first? 
-    # Or just use send_command("set_target_graph", ...) if server supports it.
-    # Since I haven't updated C++ router to support "set_target_graph" explicitly,
-    # I will rely on the generic "execute_python" fallback if necessary,
-    # BUT wait, the standard pattern in this project is:
-    # Python Client method -> send_command("cmd") -> C++ Router -> Subsystem.
-    # 
-    # I need to ensure C++ Router handles "set_target_graph".
-    # I did NOT update UmgMcp.cpp Router.
-    # 
-    # Workaround: I will implement a "call_python" or similar in this tool
-    # to invoke the subsystem directly using `unreal` library IF this server runs inside Unreal?
-    # NO, this server is EXTERNAL. It talks to Unreal via TCP.
-    # 
-    # So I MUST verify if C++ Router handles `set_target_graph`.
-    # It likely DOES NOT.
-    # 
-    # ACTION: I will update `UmgMcp.cpp` (The Main Module) to route these new commands.
-    # But first let's finish registering the tool assuming it will work.
-    
-    conn = get_unreal_connection()
-    # We use UMGAttention client
-    umg_attention_client = UMGAttention.UMGAttention(conn)
-    # I need to add set_target_graph to UMGAttention.py first.
-    # For now, let's just send the raw command and hope I patch C++ later.
-    return await conn.send_command("set_target_graph", {"graph_name": graph_name})
+    # Direct Attention Command
+    return await conn.send_command("set_edit_function", {"function_name": function_name})
+
 
 @register_tool("set_cursor_node", "Explicitly sets the 'Program Counter'.")
 async def set_cursor_node(node_id: str) -> Dict[str, Any]:
@@ -795,20 +747,21 @@ async def set_cursor_node(node_id: str) -> Dict[str, Any]:
     conn = get_unreal_connection()
     return await conn.send_command("set_cursor_node", {"node_id": node_id})
 
+
 @register_tool("search_function_library", "Searches for callable functions.")
 async def search_function_library(query: str = "", class_name: str = "") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    bp_client = UMGBlueprint.UMGBlueprint(conn)
+    
     payload = {}
     if query:
         payload["query"] = query
     if class_name:
         payload["className"] = class_name
         
-    return await bp_client.manage_blueprint_graph("manage_blueprint_graph", "search_function_library", payload)
+    return await conn.send_command("manage_blueprint_graph", {"subAction": "search_function_library", **payload})
 
 # =============================================================================
 #  Category: Animation & Sequencer (Merged from UmgSequencerServer)

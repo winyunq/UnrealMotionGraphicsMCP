@@ -28,3 +28,9 @@ class UMGAttention:
         This allows programmatically setting the active UMG context.
         """
         return self.client.send_command("set_target_umg_asset", {"asset_path": asset_path})
+
+    def set_target_graph(self, graph_name: str) -> Dict[str, Any]:
+        """
+        Sets the active graph context (e.g., 'EventGraph', 'Construct').
+        """
+        return self.client.send_command("set_target_graph", {"graph_name": graph_name})

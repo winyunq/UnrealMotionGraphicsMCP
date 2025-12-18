@@ -170,6 +170,23 @@ flowchart LR
 | **File Transformation** | `export_umg_to_json` | ✅ |
 | | `apply_json_to_umg` | ✅ |
 | | `apply_layout` | ✅ |
+ 
+ ## UMG Blueprint API Status (New)
+ 
+ | Category | API Name | Status | Description |
+ |---|---|:---:|---|
+ | **Context & Attention** | `set_edit_function` | ✅ | Set the current edit context (Function/Event). Supports auto-creating Custom Events. |
+ | | `set_cursor_node` | ✅ | Explicitly set the "Cursor" node (Program Counter). |
+ | **Sensing & Querying** | `get_function_nodes` | ✅ | Get nodes in **Current Context Scope** (Filtered to connected graph to avoid global noise). |
+ | | `get_variables` | ✅ | Get list of member variables. |
+ | | `search_function_library` | ✅ | Search callable libraries (C++/BP). Supports Fuzzy Search. |
+ | **Actions & Modifications** | `add_step(name)` | ✅ | **Core**: Add executable node by Name (e.g. "PrintString"). Auto-Wiring & Auto-Layout supported. |
+ | | `prepare_value(name)` | ✅ | Add Data Node by Name (e.g. "MakeLiteralString", "GetVariable"). |
+ | | `connect_data_to_pin` | ✅ | Connect pins precisely (Supports `NodeID:PinName` format). |
+ | | `add_variable` | ✅ | Add new member variable. |
+ | | `delete_variable` | ✅ | Delete member variable. |
+ | | `delete_node` | ✅ | Delete specific node. |
+ | | `compile_blueprint` | ✅ | Compile and apply changes. |
 
 ## UMG Sequencer API Status
 

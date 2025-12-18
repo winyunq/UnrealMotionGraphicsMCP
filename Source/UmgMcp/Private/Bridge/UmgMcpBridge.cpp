@@ -56,7 +56,7 @@
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "FileManage/UmgMcpFileTransformationCommands.h"
 #include "Animation/UmgMcpSequencerCommands.h"
-#include "Blueprint/UmgBlueprintGraphSubsystem.h"
+#include "Blueprint/UmgBlueprintFunctionSubsystem.h"
 #include "FileManage/UmgAttentionSubsystem.h"
 
 
@@ -303,7 +303,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         else if (CommandType == TEXT("set_target_graph") ||
                  CommandType == TEXT("get_target_graph") ||
                  CommandType == TEXT("set_cursor_node") ||
-                 CommandType == TEXT("get_cursor_node"))
+                 CommandType == TEXT("get_cursor_node") ||
+                 CommandType == TEXT("set_edit_function"))
         {
               // Handle new Stateful Attention commands directly via Subsystem
               if (GEditor)
@@ -324,7 +325,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                            if (!GraphName.IsEmpty())
                            {
                                // Function Creation / Event Binding Logic
-                               UUmgBlueprintGraphSubsystem* BPSystem = GEditor->GetEditorSubsystem<UUmgBlueprintGraphSubsystem>();
+                               UUmgBlueprintFunctionSubsystem* BPSystem = GEditor->GetEditorSubsystem<UUmgBlueprintFunctionSubsystem>();
                                UWidgetBlueprint* TargetBP = AttentionSystem->GetCachedTargetWidgetBlueprint();
                                
                                if (BPSystem && TargetBP)
@@ -352,7 +353,16 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                                        FJsonSerializer::Serialize(Params.ToSharedRef(), Writer);
                                        
                                        TargetNodeId = BPSystem->EnsureFunctionExists(TargetBP, GraphName, FunctionStatus, ParamString);
-                                       ActualGraphName = GraphName;
+                                       
+                                       // Check if it was resolved to an Event (Custom Event or Component Event)
+                                       if (FunctionStatus.Contains(TEXT("Event")))
+                                       {
+                                           ActualGraphName = TEXT("EventGraph");
+                                       }
+                                       else
+                                       {
+                                           ActualGraphName = GraphName;
+                                       }
                                    }
 
                                    // Set Context
@@ -470,7 +480,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         {
              if (GEditor)
              {
-                 UUmgBlueprintGraphSubsystem* GraphSystem = GEditor->GetEditorSubsystem<UUmgBlueprintGraphSubsystem>();
+                 UUmgBlueprintFunctionSubsystem* GraphSystem = GEditor->GetEditorSubsystem<UUmgBlueprintFunctionSubsystem>();
                  UUmgAttentionSubsystem* AttentionSystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
                  
                  if (GraphSystem && AttentionSystem)
@@ -512,8 +522,9 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                              ModifiedParams->SetStringField(TEXT("graphName"), AttentionSystem->GetTargetGraph());
                          }
                          
-                         // Auto-Layout & Auto-Connect for 'create_node', 'add_node', 'add_param'
-                         if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param"))
+                         // Auto-Layout & Auto-Connect
+                         if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param") ||
+                             SubAction == TEXT("add_function_step") || SubAction == TEXT("add_step_param"))
                          {
                              if (!Params->HasField(TEXT("x")) || !Params->HasField(TEXT("y")))
                              {
@@ -557,16 +568,28 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                          // 3. Post-Action: Update Attention Context
                          if (ResultJson.IsValid() && ResultJson->GetBoolField(TEXT("success")))
                          {
-                             if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param"))
+                             if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param") ||
+                                 SubAction == TEXT("add_function_step"))
                              {
                                  FString NewNodeId;
                                  if (ResultJson->TryGetStringField(TEXT("nodeId"), NewNodeId))
                                  {
-                                     AttentionSystem->SetCursorNode(NewNodeId);
-                                     // AttentionSystem->GetAndAdvanceCursorPosition(); // Already advanced in Pre-step? 
-                                     // Currently GetAndAdvance advances it. So it was done.
-                                     // If explicit X/Y was provided, we should probably sync our cursor to it?
-                                     // For now, assume flow.
+                                     // Only update Cursor (PC) if it's an Exec node
+                                     bool bIsExec = false; 
+                                     if (ResultJson->TryGetBoolField(TEXT("isExec"), bIsExec))
+                                     {
+                                         if (bIsExec)
+                                         {
+                                             AttentionSystem->SetCursorNode(NewNodeId);
+                                         }
+                                     }
+                                     else 
+                                     {
+                                         // Fallback for older/other commands: assume Exec if not specified? 
+                                         // Or assume Exec for 'add_function_step' specifically.
+                                         // But since we updated CreateNodeInstance, it should be there.
+                                         AttentionSystem->SetCursorNode(NewNodeId);
+                                     }
                                  }
                              }
                              else if (SubAction == TEXT("delete_node"))

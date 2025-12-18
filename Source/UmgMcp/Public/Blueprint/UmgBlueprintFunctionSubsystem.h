@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "EditorSubsystem.h"
 #include "Dom/JsonObject.h"
-#include "UmgBlueprintGraphSubsystem.generated.h"
+#include "UmgBlueprintFunctionSubsystem.generated.h"
 
 class UWidgetBlueprint;
 
@@ -16,7 +16,7 @@ class UWidgetBlueprint;
  * (UmgAttentionSubsystem).
  */
 UCLASS()
-class UMGMCP_API UUmgBlueprintGraphSubsystem : public UEditorSubsystem
+class UMGMCP_API UUmgBlueprintFunctionSubsystem : public UEditorSubsystem
 {
 	GENERATED_BODY()
 
@@ -79,5 +79,8 @@ private:
 
     // Internal execution methods
 	FString ExecuteGraphAction(UWidgetBlueprint* WidgetBlueprint, const TSharedPtr<FJsonObject>& Payload);
+
+    // Fuzzy search helper
+    TArray<FString> GetFuzzySuggestions(const FString& SearchName, UClass* WidgetClass);
 #endif
 };

@@ -157,6 +157,23 @@ flowchart LR
 | | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。 |
 | | `apply_layout` | ✅ | 将HTML/XML布局应用到UMG资产。 |
 
+## UMG Blueprint API 实现状态 (New)
+
+| 分类 | API 名称 | 状态 | 描述 |
+|---|---|:---:|---|
+| **上下文与注意力** | `set_edit_function` | ✅ | 设置当前编辑的函数或事件 (Context)。支持自动创建 Custom Event。 |
+| | `set_cursor_node` | ✅ | 显式设置当前“光标”节点 (Program Counter)。 |
+| **感知与查询** | `get_function_nodes` | ✅ | 获取**当前上下文关联**的节点列表（自动过滤非连接节点，避免全局噪音）。 |
+| | `get_variables` | ✅ | 获取蓝图中的成员变量列表。 |
+| | `search_function_library` | ✅ | 搜索可调用的函数库 (C++/Blueprint Function Library)。支持模糊匹配。 |
+| **操作与修改** | `add_step(name)` | ✅ | **核心**: 添加功能节点 (通过名称，如 "PrintString")。支持自动连线与布局。 |
+| | `prepare_value(name)` | ✅ | 添加纯数据节点 (通过名称，如 "MakeLiteralString", "GetVariable")。 |
+| | `connect_data_to_pin` | ✅ | 精确连接引脚 (支持 `NodeID:PinName` 格式)。 |
+| | `add_variable` | ✅ | 添加新的成员变量。 |
+| | `delete_variable` | ✅ | 删除成员变量。 |
+| | `delete_node` | ✅ | 删除指定的节点。 |
+| | `compile_blueprint` | ✅ | 编译并应用蓝图修改。 |
+
 ## UMG Sequencer API 实现状态
 
 | 分类 | API 名称 | 状态 | 描述 |
