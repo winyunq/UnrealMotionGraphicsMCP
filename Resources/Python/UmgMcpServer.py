@@ -470,16 +470,16 @@ async def save_asset() -> Dict[str, Any]:
 # =============================================================================
 
 @register_tool("export_umg_to_json", "Decompiles UMG to JSON.")
-async def export_umg_to_json(asset_path: str) -> Dict[str, Any]:
+async def export_umg_to_json(asset_path: str, widget_name: str = "Root") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_file_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return await umg_file_client.export_umg_to_json(asset_path)
+    return await umg_file_client.export_umg_to_json(asset_path, widget_name)
 
 @register_tool("apply_layout", "Applies a layout logic to a UMG asset.")
-async def apply_layout(layout_content: str) -> Dict[str, Any]:
+async def apply_layout(layout_content: str, widget_name: str = "Root") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -522,7 +522,7 @@ async def apply_layout(layout_content: str) -> Dict[str, Any]:
     logger.info(f"Resolved target asset path: {final_path}")
     
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return await umg_trans_client.apply_json_to_umg(final_path, json_data)
+    return await umg_trans_client.apply_json_to_umg(final_path, json_data, widget_name)
 
 # Deprecated: Kept for backward compatibility
 @mcp.tool()

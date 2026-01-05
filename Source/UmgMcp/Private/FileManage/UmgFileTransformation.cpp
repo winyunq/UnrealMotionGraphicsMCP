@@ -26,7 +26,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogUmgMcp, Log, All);
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget);
 static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson);
 
-bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData);
+bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName);
 
 /**
  * Normalizes JSON keys from camelCase to PascalCase to match C++ UPROPERTY names.
@@ -209,7 +209,7 @@ TSharedPtr<FJsonObject> UUmgFileTransformation::ExportWidgetToJson(UWidget* Widg
     return WidgetJson;
 }
 
-FString UUmgFileTransformation::ExportUmgAssetToJsonString(const FString& AssetPath)
+FString UUmgFileTransformation::ExportUmgAssetToJsonString(const FString& AssetPath, const FString& TargetWidgetName)
 {
     FString PackageName = FPackageName::ObjectPathToPackageName(AssetPath);
     
@@ -227,19 +227,31 @@ FString UUmgFileTransformation::ExportUmgAssetToJsonString(const FString& AssetP
         return FString();
     }
 
-    UWidget* RootWidget = WidgetBlueprint->WidgetTree->RootWidget;
-
-    if (!RootWidget)
+    UWidget* TargetWidget = nullptr;
+    if (TargetWidgetName.IsEmpty() || TargetWidgetName.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
     {
-        UE_LOG(LogUmgMcp, Warning, TEXT("ExportUmgAssetToJsonString: Root widget not found in UWidgetBlueprint '%s'. This may be an empty UI."), *AssetPath);
-        return FString();
+        TargetWidget = WidgetBlueprint->WidgetTree->RootWidget;
+        if (!TargetWidget)
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("ExportUmgAssetToJsonString: Root widget not found in UWidgetBlueprint '%s'. This may be an empty UI."), *AssetPath);
+            return FString();
+        }
+    }
+    else
+    {
+        TargetWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetWidgetName));
+        if (!TargetWidget)
+        {
+             UE_LOG(LogUmgMcp, Error, TEXT("ExportUmgAssetToJsonString: Target widget '%s' not found in '%s'."), *TargetWidgetName, *AssetPath);
+             return FString();
+        }
     }
 
-    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToJson(RootWidget);
+    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToJson(TargetWidget);
 
     if (!RootJsonObject.IsValid())
     {
-        UE_LOG(LogUmgMcp, Error, TEXT("ExportUmgAssetToJsonString: Failed to convert root widget of '%s' to FJsonObject."), *AssetPath);
+        UE_LOG(LogUmgMcp, Error, TEXT("ExportUmgAssetToJsonString: Failed to convert widget '%s' of '%s' to FJsonObject."), *TargetWidget->GetName(), *AssetPath);
         return FString();
     }
 
@@ -249,7 +261,7 @@ FString UUmgFileTransformation::ExportUmgAssetToJsonString(const FString& AssetP
     if (FJsonSerializer::Serialize(RootJsonObject.ToSharedRef(), JsonWriter))
     {
         JsonWriter->Close();
-        UE_LOG(LogUmgMcp, Log, TEXT("Successfully exported UMG asset '%s' to JSON."), *AssetPath);
+        UE_LOG(LogUmgMcp, Log, TEXT("Successfully exported UMG asset '%s' (Target: %s) to JSON."), *AssetPath, *TargetWidget->GetName());
         return JsonString;
     }
     else
@@ -260,14 +272,14 @@ FString UUmgFileTransformation::ExportUmgAssetToJsonString(const FString& AssetP
     }
 }
 
-bool UUmgFileTransformation::ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData)
+bool UUmgFileTransformation::ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
 {
     // Dispatch the task to the game thread asynchronously ("fire and forget").
     // The original implementation used a blocking wait which could cause the editor to freeze or deadlock.
     // We capture parameters by value to ensure they are valid when the task eventually executes.
-    FFunctionGraphTask::CreateAndDispatchWhenReady([AssetPath, JsonData]()
+    FFunctionGraphTask::CreateAndDispatchWhenReady([AssetPath, JsonData, TargetWidgetName]()
     {
-        ApplyJsonToUmgAsset_GameThread(AssetPath, JsonData);
+        ApplyJsonToUmgAsset_GameThread(AssetPath, JsonData, TargetWidgetName);
     }, TStatId(), nullptr, ENamedThreads::GameThread);
 
     // Return true to indicate the task was successfully dispatched.
@@ -277,7 +289,7 @@ bool UUmgFileTransformation::ApplyJsonStringToUmgAsset(const FString& AssetPath,
 
 
 // This function is executed on the game thread to ensure thread safety when dealing with UObjects.
-bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData)
+bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
 {
     // 0. Handle default workspace: if AssetPath is empty, use default path
     FString FinalAssetPath = AssetPath;
@@ -374,44 +386,103 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
     WidgetBlueprint->Modify();
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Blueprint marked as modified."));
 
-    // 5. Clear the existing widget tree to rebuild it from the JSON data.
-    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Clearing existing widget tree."));
-    
-    // Remove RootWidget first
-    if (WidgetBlueprint->WidgetTree->RootWidget)
+    // 5. Clear the existing widget tree OR find target widget
+    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Preparing to apply JSON. Target: %s"), *TargetWidgetName);
+
+    UWidget* TargetWidget = nullptr;
+    bool bReplacingRoot = true;
+
+    if (!TargetWidgetName.IsEmpty() && !TargetWidgetName.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
     {
-        WidgetBlueprint->WidgetTree->RemoveWidget(WidgetBlueprint->WidgetTree->RootWidget);
-        WidgetBlueprint->WidgetTree->RootWidget = nullptr;
+        TargetWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetWidgetName));
+        if (!TargetWidget)
+        {
+             UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Target widget '%s' to replace not found."), *TargetWidgetName);
+             return false;
+        }
+        bReplacingRoot = false;
     }
 
-    // Ensure all other widgets are removed (e.g. orphaned widgets)
-    TArray<UWidget*> RemainingWidgets;
-    WidgetBlueprint->WidgetTree->GetAllWidgets(RemainingWidgets);
-    if (RemainingWidgets.Num() > 0)
+    if (bReplacingRoot)
     {
-        UE_LOG(LogUmgMcp, Warning, TEXT("ApplyJsonToUmgAsset_GameThread: Found %d orphaned widgets after removing root. Cleaning up..."), RemainingWidgets.Num());
-        for (UWidget* Widget : RemainingWidgets)
+        // Remove RootWidget first
+        if (WidgetBlueprint->WidgetTree->RootWidget)
         {
-            WidgetBlueprint->WidgetTree->RemoveWidget(Widget);
+            WidgetBlueprint->WidgetTree->RemoveWidget(WidgetBlueprint->WidgetTree->RootWidget);
+            WidgetBlueprint->WidgetTree->RootWidget = nullptr;
+        }
+
+        // Ensure all other widgets are removed (only if full replacement)
+        TArray<UWidget*> RemainingWidgets;
+        WidgetBlueprint->WidgetTree->GetAllWidgets(RemainingWidgets);
+        if (RemainingWidgets.Num() > 0)
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("ApplyJsonToUmgAsset_GameThread: Found %d orphaned widgets after removing root. Cleaning up..."), RemainingWidgets.Num());
+            for (UWidget* Widget : RemainingWidgets)
+            {
+                WidgetBlueprint->WidgetTree->RemoveWidget(Widget);
+            }
+        }
+        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Existing widget tree cleared."));
+
+        // 6. Recursively create the new widget tree from the JSON data.
+        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Starting recursive widget creation from JSON."));
+        UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
+        if (!NewRootWidget)
+        {
+            UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget from JSON for asset '%s'."), *FinalAssetPath);
+            return false;
+        }
+        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New widget tree created."));
+
+        // 7. Set the new root widget on the widget tree.
+        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Setting new root widget."));
+        WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
+        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New root widget set: %s"), *NewRootWidget->GetName());
+    }
+    else
+    {
+        // Replacing a specific child widget
+        UWidget* OldWidget = TargetWidget;
+        UPanelWidget* ParentPanel = OldWidget->GetParent();
+
+        if (!ParentPanel)
+        {
+            UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Target widget '%s' has no parent (and is not RootWidget). Cannot replace."), *TargetWidgetName);
+            return false;
+        }
+
+        int32 ChildIndex = ParentPanel->GetChildIndex(OldWidget);
+        if (ChildIndex == -1) 
+        {
+             UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Could not find index of '%s' in parent."), *TargetWidgetName);
+             return false;
+        }
+        
+        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Replacing widget '%s' at index %d."), *TargetWidgetName, ChildIndex);
+
+        // Remove old widget
+        ParentPanel->RemoveChild(OldWidget);
+        WidgetBlueprint->WidgetTree->RemoveWidget(OldWidget); // Also remove from tree registry? Or does Panel remove do it? Usually safer to trust Panel, but let's be sure. Actually Panel Remove returns bool.
+
+        // Create new widget (adds to ParentPanel at end)
+        UWidget* NewWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, ParentPanel);
+        if (!NewWidget)
+        {
+            UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create new widget from JSON."));
+            return false;
+        }
+        
+        // Correct the order (move from end to ChildIndex)
+        // Note: NewWidget is currently at valid index (Count-1)
+        int32 CurrentIndex = ParentPanel->GetChildIndex(NewWidget);
+        if (CurrentIndex != ChildIndex)
+        {
+            ParentPanel->RemoveChild(NewWidget);
+            ParentPanel->InsertChildAt(ChildIndex, NewWidget);
+             UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Moved new widget to correct index %d."), ChildIndex);
         }
     }
-    
-    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Existing widget tree cleared."));
-
-    // 6. Recursively create the new widget tree from the JSON data.
-    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Starting recursive widget creation from JSON."));
-    UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
-    if (!NewRootWidget)
-    {
-        UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget from JSON for asset '%s'."), *FinalAssetPath);
-        return false;
-    }
-    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New widget tree created."));
-
-    // 7. Set the new root widget on the widget tree.
-    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Setting new root widget."));
-    WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
-    UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New root widget set: %s"), *NewRootWidget->GetName());
 
     // 7.5. Verify widget tree integrity before marking as modified
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Verifying widget tree integrity."));

@@ -38,14 +38,15 @@ public:
      * @param AssetPath The Unreal Engine asset path (e.g., "/Game/MyWidget.MyMyWidget").
      * @return The JSON string representation of the UMG asset, or an empty string if failed.
      */
-    static FString ExportUmgAssetToJsonString(const FString& AssetPath);
+    static FString ExportUmgAssetToJsonString(const FString& AssetPath, const FString& TargetWidgetName = TEXT(""));
 
     /**
      * Applies JSON data to a UMG asset, creating or modifying it.
      * This function will parse the JSON and reconstruct/update the UMG widget tree.
      * @param AssetPath The Unreal Engine asset path to create/modify.
      * @param JsonData The JSON string data to apply.
+     * @param TargetWidgetName Optional. The name of the specific widget to replace. If empty or "Root", the entire widget tree (RootWidget) is replaced.
      * @return True if the operation was successful, false otherwise.
      */
-    static bool ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData);
+    static bool ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName = TEXT(""));
 };

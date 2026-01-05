@@ -13,7 +13,10 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
         FString AssetPath;
         if (Params->TryGetStringField(TEXT("asset_path"), AssetPath))
         {
-            FString JsonOutput = UUmgFileTransformation::ExportUmgAssetToJsonString(AssetPath);
+            FString TargetWidgetName;
+            Params->TryGetStringField(TEXT("widget_name"), TargetWidgetName); // Optional
+
+            FString JsonOutput = UUmgFileTransformation::ExportUmgAssetToJsonString(AssetPath, TargetWidgetName);
             if (!JsonOutput.IsEmpty())
             {
                 ResultJson->SetStringField(TEXT("output"), JsonOutput);
@@ -37,7 +40,10 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
         FString JsonData;
         if (Params->TryGetStringField(TEXT("asset_path"), AssetPath) && Params->TryGetStringField(TEXT("json_data"), JsonData))
         {
-            bool bSuccess = UUmgFileTransformation::ApplyJsonStringToUmgAsset(AssetPath, JsonData);
+            FString TargetWidgetName;
+            Params->TryGetStringField(TEXT("widget_name"), TargetWidgetName); // Optional
+
+            bool bSuccess = UUmgFileTransformation::ApplyJsonStringToUmgAsset(AssetPath, JsonData, TargetWidgetName);
             if (bSuccess)
             {
                 ResultJson->SetStringField(TEXT("message"), TEXT("JSON data applied to UMG asset successfully."));
