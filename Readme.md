@@ -81,6 +81,29 @@ The plugin's Python environment is managed by `uv`. In most cases, it should wor
 
 ---
 
+### 🧪 Experimental: Gemini CLI Skill Support
+
+We are experimenting with the **Gemini CLI Skill** system as an alternative to the standard MCP approach. 
+The Skill architecture allows the Python tools to be loaded directly by the CLI runtime, potentially **optimizing context usage** by dynamically enabling/disabling tools via `prompts.json` and avoiding the overhead of managing a separate MCP server process.
+
+> **Note**: The MCP server (configured above) is still the stable and recommended way to use this plugin. Use Skill mode if you want to test the latest integration capabilities.
+
+#### Configuration (Skill Mode)
+
+To enable Skill mode, add the following to your `settings.json` (replacing `<YOUR_PROJECT_PATH>`):
+
+```json
+  "skills": {
+    "unreal_umg": {
+      "path": "<YOUR_PROJECT_PATH>/Plugins/UmgMcp/Resources/Python/UmgMcpSkills.py",
+      "type": "local",
+      "description": "Direct control of Unreal Engine UMG via Python Skills. Auto-loads tools from prompts.json."
+    }
+  },
+```
+
+---
+
 ## English
 
 This project provides a powerful, command-line driven workflow for managing Unreal Engine's UMG UI assets. By treating **human-readable `.json` files as the sole Source of Truth**, it fundamentally solves the challenge of versioning binary `.uasset` files in Git.

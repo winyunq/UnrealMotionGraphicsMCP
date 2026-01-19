@@ -6,8 +6,14 @@
 
 
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
-[一个简单的RTS界面](https://www.bilibili.com/video/BV1mCUpBwEnc)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)![QQ Group](https://img.shields.io/badge/QQ%20Group-788672683-blue.svg)
+
+[一个简单的RTS界面演示](https://www.bilibili.com/video/BV1mCUpBwEnc)
+
+[演示 UMG MCP 布局、动画序列与蓝图](https://www.bilibili.com/video/BV14aqHBhEwJ/)
+
+[演示 UMG MCP 模仿 UE5 编辑器布局](https://www.bilibili.com/video/BV1KiS1BFEcE/)
+
 ---
 
 ### 🚀 快速开始
@@ -72,6 +78,28 @@
     .\.venv\Scripts\activate
     uv pip install -e .
     ```
+
+---
+
+### 🧪 实验性功能：Gemini CLI Skill 支持
+
+我们正在尝试 **Gemini CLI Skill** 方案。相比于 MCP 方案，Skill 方案允许工具逻辑直接被 CLI 加载，能够通过 `prompts.json` 动态管理启用的工具，**更好地解决工具过多导致的上下文溢出问题**，从而避免系统变得难以使用。
+
+> **注意**: 在 CLI 中，现有的 MCP 系统表现已经非常稳定。Skill 模式目前作为实验性功能提供。
+
+#### 配置方法 (Skill 模式)
+
+在 `settings.json` 中添加以下配置 (请替换 `<您的项目路径>`):
+
+```json
+  "skills": {
+    "unreal_umg": {
+      "path": "<您的项目路径>/Plugins/UmgMcp/Resources/Python/UmgMcpSkills.py",
+      "type": "local",
+      "description": "通过 Python Skill 直接控制 Unreal Engine UMG。"
+    }
+  },
+```
 
 ---
 
