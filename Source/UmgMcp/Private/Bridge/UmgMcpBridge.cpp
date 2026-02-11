@@ -56,6 +56,7 @@
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "FileManage/UmgMcpFileTransformationCommands.h"
 #include "Animation/UmgMcpSequencerCommands.h"
+#include "Material/UmgMcpMaterialCommands.h" // Add Material Commands
 #include "Blueprint/UmgBlueprintFunctionSubsystem.h"
 #include "FileManage/UmgAttentionSubsystem.h"
 
@@ -69,6 +70,7 @@ UUmgMcpBridge::UUmgMcpBridge()
     EditorCommands = MakeShared<FUmgMcpEditorCommands>();
     BlueprintCommands = MakeShared<FUmgMcpBlueprintCommands>();
     SequencerCommands = MakeShared<FUmgMcpSequencerCommands>();
+    MaterialCommands = MakeShared<FUmgMcpMaterialCommands>();
 }
 
 UUmgMcpBridge::~UUmgMcpBridge()
@@ -79,6 +81,7 @@ UUmgMcpBridge::~UUmgMcpBridge()
     EditorCommands.Reset();
     BlueprintCommands.Reset();
     SequencerCommands.Reset();
+    MaterialCommands.Reset();
 }
 
 // Initialize subsystem
@@ -475,6 +478,11 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         {
             ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
         }
+        // Material Commands (New 5 Pillars)
+        else if (CommandType.StartsWith(TEXT("material_")))
+        {
+             ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
+        }
         // Low-level Graph Manipulation (New)
         else if (CommandType == TEXT("manage_blueprint_graph"))
         {
@@ -610,6 +618,11 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                      }
                  }
              }
+        }
+        // --- Material Commands ---
+        else if (CommandType.StartsWith(TEXT("material_")))
+        {
+            ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
         }
         else
         {

@@ -38,6 +38,7 @@ from Widget import UMGSet
 from FileManage import UMGFileTransformation
 from Bridge import UMGHTMLParser
 from Editor import UMGEditor
+from Material import UMGMaterial
 
 
 

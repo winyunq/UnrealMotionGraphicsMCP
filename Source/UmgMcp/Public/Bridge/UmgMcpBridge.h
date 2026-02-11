@@ -23,6 +23,7 @@ class FUmgMcpAttentionCommands;
 class FUmgMcpWidgetCommands; // Forward declaration for Widget Commands
 class FUmgMcpFileTransformationCommands; // Forward declaration for File Transformation Commands
 class FUmgMcpSequencerCommands; // Forward declaration for Sequencer Commands
+class FUmgMcpMaterialCommands; // Forward declaration for Material Commands
 
 /**
  * @brief The central communication hub for the UMG MCP plugin.
@@ -63,6 +64,7 @@ private:
     TSharedPtr<FUmgMcpWidgetCommands> WidgetCommands;
     TSharedPtr<FUmgMcpFileTransformationCommands> FileTransformationCommands;
     TSharedPtr<FUmgMcpSequencerCommands> SequencerCommands; // Add Sequencer Commands
+    TSharedPtr<FUmgMcpMaterialCommands> MaterialCommands;
 
     // Server state variables
     bool bIsRunning;

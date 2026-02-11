@@ -39,7 +39,8 @@ public class UmgMcp : ModuleRules
 				"UnrealEd",
 				"UMG", // Add this line
 				"MovieScene",
-				"MovieSceneTracks"
+				"MovieSceneTracks",
+				"MaterialEditor"
 			}
 		);
 		
@@ -55,7 +56,9 @@ public class UmgMcp : ModuleRules
 				"BlueprintGraph",
 				"Projects",
 				"AssetRegistry",
-				"UMGEditor" // Moved from PublicDependencyModuleNames
+				"UMGEditor", // Moved from PublicDependencyModuleNames
+				"MaterialEditor" // For Material Editing Libraries
+
 			}
 		);
 		

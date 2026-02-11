@@ -349,6 +349,14 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Successfully created '%s' as child of '%s'."), *WidgetName, *ActualParentName);
     }
 
+    // CRITICAL FIX: Register the new widget with a GUID in the Blueprint
+    // The UMG Compiler expects every variable widget to have a mapped GUID.
+    if (NewWidget->bIsVariable)
+    {
+        FGuid NewGuid = FGuid::NewGuid();
+        WidgetBlueprint->WidgetVariableNameToGuidMap.Add(NewWidget->GetFName(), NewGuid);
+    }
+
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     return NewWidget->GetName();
 }

@@ -138,8 +138,11 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
         }
         else if (!bReadSuccess)
         {
-            UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Connection closed or error occurred - Last error: %d"), 
-                   (int32)ISocketSubsystem::Get()->GetLastErrorCode());
+            int32 LastError = (int32)ISocketSubsystem::Get()->GetLastErrorCode();
+            if (LastError != 0)
+            {
+                UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Connection error occurred - Last error: %d"), LastError);
+            }
             break;
         }
         
