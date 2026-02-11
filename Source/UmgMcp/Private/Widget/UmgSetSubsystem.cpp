@@ -141,16 +141,60 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     WidgetBlueprint->Modify();
     FoundWidget->Modify();
 
-    // Apply widget properties (excluding Slot)
+    // REFINED STRATEGY: Intercept Brush.ResourceObject specifically as it's the #1 cause of failure.
+    if (NormalizedProperties->HasField(TEXT("Brush")))
+    {
+        TSharedPtr<FJsonObject> BrushObj = NormalizedProperties->GetObjectField(TEXT("Brush"));
+        if (BrushObj->HasField(TEXT("ResourceObject")))
+        {
+            FString Path = BrushObj->GetStringField(TEXT("ResourceObject"));
+            UObject* MatAsset = LoadObject<UObject>(nullptr, *Path);
+            if (MatAsset)
+            {
+                // We use reflection to set it directly to avoid converter issues
+                if (FProperty* BrushProp = FoundWidget->GetClass()->FindPropertyByName(TEXT("Brush")))
+                {
+                    void* BrushPtr = BrushProp->ContainerPtrToValuePtr<void>(FoundWidget);
+                    if (UScriptStruct* BrushStruct = CastField<FStructProperty>(BrushProp)->Struct)
+                    {
+                         if (FProperty* ResProp = BrushStruct->FindPropertyByName(TEXT("ResourceObject")))
+                         {
+                             CastField<FObjectProperty>(ResProp)->SetObjectPropertyValue(ResProp->ContainerPtrToValuePtr<void>(BrushPtr), MatAsset);
+                             BrushObj->RemoveField(TEXT("ResourceObject")); // Done
+                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Apply widget properties (excluding Slot)
     if (NormalizedProperties->Values.Num() > 0)
     {
-        if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedProperties.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0))
+        for (const auto& Pair : NormalizedProperties->Values)
         {
-            UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: JsonObjectToUStruct reported issues applying some properties to '%s'."), *WidgetName);
-        }
-        else
-        {
-            UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Successfully applied widget properties to '%s'."), *WidgetName);
+            FProperty* Prop = FoundWidget->GetClass()->FindPropertyByName(FName(*Pair.Key));
+            if (!Prop) continue;
+
+            // SPECIAL CASE: Auto-resolve Object Pointers from paths
+            if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Prop))
+            {
+                if (Pair.Value->Type == EJson::String)
+                {
+                    FString ObjectPath = Pair.Value->AsString();
+                    UObject* ResolvedObj = LoadObject<UObject>(nullptr, *ObjectPath);
+                    if (ResolvedObj)
+                    {
+                        ObjProp->SetObjectPropertyValue(ObjProp->ContainerPtrToValuePtr<void>(FoundWidget), ResolvedObj);
+                        continue;
+                    }
+                }
+            }
+
+            // Fallback: Use standard converter for this specific field
+            TSharedPtr<FJsonObject> SinglePropJson = MakeShared<FJsonObject>();
+            SinglePropJson->SetField(Pair.Key, Pair.Value);
+            FJsonObjectConverter::JsonObjectToUStruct(SinglePropJson.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0);
         }
     }
     
@@ -158,21 +202,10 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     if (SlotProperties.IsValid() && FoundWidget->Slot)
     {
         UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Applying Slot properties to Slot object (class: %s)"), *FoundWidget->Slot->GetClass()->GetName());
-        
         FoundWidget->Slot->Modify();
-        
-        if (!FJsonObjectConverter::JsonObjectToUStruct(SlotProperties.ToSharedRef(), FoundWidget->Slot->GetClass(), FoundWidget->Slot, 0, 0))
-        {
-            UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: Issues applying Slot properties to '%s'."), *WidgetName);
-        }
-        else
-        {
-            UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Successfully applied Slot properties to '%s'."), *WidgetName);
-        }
-    }
-    else if (SlotProperties.IsValid() && !FoundWidget->Slot)
-    {
-        UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: Slot properties specified but widget '%s' has no Slot object."), *WidgetName);
+
+        // Standard converter is usually fine for Slots (mostly numeric/enums)
+        FJsonObjectConverter::JsonObjectToUStruct(SlotProperties.ToSharedRef(), FoundWidget->Slot->GetClass(), FoundWidget->Slot, 0, 0);
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);

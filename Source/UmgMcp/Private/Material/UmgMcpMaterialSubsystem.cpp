@@ -358,9 +358,18 @@ FExpressionInput* FindInputProperty(UObject* Owner, const FString& PinName)
             if (bMatch)
             {
                 FStructProperty* StructProp = CastField<FStructProperty>(Prop);
-                if (StructProp && StructProp->Struct->GetName().Contains(TEXT("Input")))
+                if (StructProp && StructProp->Struct)
                 {
-                    return StructProp->ContainerPtrToValuePtr<FExpressionInput>(Target);
+                    FString StructName = StructProp->Struct->GetName();
+                    // Precise match for material input types to avoid access violations
+                    if (StructName.Equals(TEXT("ExpressionInput")) || 
+                        StructName.Equals(TEXT("ScalarMaterialInput")) || 
+                        StructName.Equals(TEXT("VectorMaterialInput")) || 
+                        StructName.Equals(TEXT("ColorMaterialInput")) ||
+                        StructName.Contains(TEXT("MaterialInput")))
+                    {
+                        return StructProp->ContainerPtrToValuePtr<FExpressionInput>(Target);
+                    }
                 }
             }
         }
@@ -1141,24 +1150,29 @@ FString UUmgMcpMaterialSubsystem::GetNodeInfo(const FString& NodeHandle)
                 FString PropName = Prop->GetName();
                 if (UniquePins.Contains(PropName)) continue;
 
-                // Check if it's a Material Input (usually FExpressionInput subclasses)
+                // Check if it's a Material Input (avoid broad "Input" match)
                 FStructProperty* StructProp = CastField<FStructProperty>(Prop);
-                if (StructProp && StructProp->Struct->GetName().Contains(TEXT("Input")))
+                if (StructProp && StructProp->Struct)
                 {
-                    UniquePins.Add(PropName);
-                    
-                    TSharedPtr<FJsonObject> PinObj = MakeShareable(new FJsonObject());
-                    PinObj->SetStringField(TEXT("name"), Prop->GetDisplayNameText().ToString());
-                    PinObj->SetStringField(TEXT("id"), PropName);
-                    PinsArray.Add(MakeShareable(new FJsonValueObject(PinObj)));
-
-                    FExpressionInput* InputPtr = StructProp->ContainerPtrToValuePtr<FExpressionInput>(Target);
-                    if (InputPtr && InputPtr->Expression)
+                    FString StructName = StructProp->Struct->GetName();
+                    if (StructName.Equals(TEXT("ExpressionInput")) || 
+                        StructName.Contains(TEXT("MaterialInput")))
                     {
-                        FString SourceHandle = InputPtr->Expression->GetName();
-                        if (!InputPtr->Expression->Desc.IsEmpty())
-                            SourceHandle = InputPtr->Expression->Desc;
-                        ConnectionsObject->SetStringField(PropName, SourceHandle);
+                        UniquePins.Add(PropName);
+                        
+                        TSharedPtr<FJsonObject> PinObj = MakeShareable(new FJsonObject());
+                        PinObj->SetStringField(TEXT("name"), Prop->GetDisplayNameText().ToString());
+                        PinObj->SetStringField(TEXT("id"), PropName);
+                        PinsArray.Add(MakeShareable(new FJsonValueObject(PinObj)));
+
+                        FExpressionInput* InputPtr = StructProp->ContainerPtrToValuePtr<FExpressionInput>(Target);
+                        if (InputPtr && InputPtr->Expression)
+                        {
+                            FString SourceHandle = InputPtr->Expression->GetName();
+                            if (!InputPtr->Expression->Desc.IsEmpty())
+                                SourceHandle = InputPtr->Expression->Desc;
+                            ConnectionsObject->SetStringField(PropName, SourceHandle);
+                        }
                     }
                 }
             }
