@@ -1,37 +1,44 @@
-[Click here for English version](Readme.md)
+[English version please click here](Readme.md)
 
 # UE5-UMG-MCP 🤖📄
 
-**一个以版本控制为核心的AI协同UMG工作流**
+**版本受控的 AI 辅助 UMG 工作流**
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)
 
+[Demo 设计 RTS UI](https://youtu.be/O86VCzxyF5o)
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)![QQ Group](https://img.shields.io/badge/QQ%20Group-788672683-blue.svg)
+[Demo 在 UMG 窗口中复现 UE5 编辑器预览](https://youtu.be/h_J70I0m4Ls)
 
-[一个简单的RTS界面演示](https://www.bilibili.com/video/BV1mCUpBwEnc)
+[Demo 在 UMG 编辑器中操作 UMG 控件](https://youtu.be/pq12x2MH1L4)
 
-[演示 UMG MCP 布局、动画序列与蓝图](https://www.bilibili.com/video/BV14aqHBhEwJ/)
-
-[演示 UMG MCP 模仿 UE5 编辑器布局](https://www.bilibili.com/video/BV1KiS1BFEcE/)
+[与 Gemini 3 对话编辑 UMG 文件](https://youtu.be/93_Fiil9nd8)
 
 ---
 
 ### 🚀 快速开始
 
-本指南包含安装 `UmgMcp` 插件并连接到 Gemini CLI 的两个核心步骤。
+本指南涵盖了安装 `UmgMcp` 插件并将其连接到 Gemini CLI 的两个步骤。
+
+*   **前提条件：** Unreal Engine 5.6 或更高版本。
+
+#### 1. 安装插件 (Install the Plugin)
+
+1.  **进入项目的 Plugins 文件夹：** `YourProject/Plugins/`（如果不存在则创建）。
+2.  **直接克隆仓库**到此目录：
 
     ```bash
     git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
     ```
 
-3.  **重启Unreal编辑器。** 这将允许引擎检测并编译新插件。
+3.  **重启 Unreal Editor。** 这允许引擎检测并编译新插件。
 
-#### 2. 连接 Gemini CLI
+#### 2. 连接 Gemini CLI (Connect the Gemini CLI)
 
 告诉 Gemini 如何找到并启动 MCP 服务器。
 
-1.  **编辑您的 `settings.json` 文件** (通常位于 `C:\Users\您的用户名\.gemini\`)。
-2.  **将工具定义添加**到 `tools` 对象中。
+1.  **编辑您的 `settings.json`** 文件（通常位于 `C:\Users\用户名\.gemini\`）。
+2.  **将工具定义添加**到 `mcpServers` 对象中。
 
     ```json
     "mcpServers": {
@@ -40,39 +47,32 @@
         "args": [
           "run",
           "--directory",
-          "D:\\您的项目路径\\Plugins\\UmgMcp\\Resources\\Python",
+          "D:\\Path\\To\\YourUnrealProject\\Plugins\\UmgMcp\\Resources\\Python",
           "UmgMcpServer.py"
-        ]
-      },
-      "UmgSequencer": {
-        "command": "uv",
-        "args": [
-          "run",
-          "--directory",
-          "D:\\您的项目路径\\Plugins\\UmgMcp\\Resources\\Python",
-          "UmgSequencerServer.py"
         ]
       }
     }
     ```
-    **重要提示:** 您 **必须** 将路径替换为您机器上克隆仓库后 `Resources/Python` 文件夹的**绝对路径**。
 
-完成！当您启动 Gemini CLI 时，它会自动在后台启动 MCP 服务器。
+    **注意：** 您**必须**将路径替换为您机器上克隆仓库中 `Resources/Python` 文件夹的正确**绝对路径**。
+
+就是这样！当您启动 Gemini CLI 时，它将自动在后台启动 MCP 服务器。
 
 #### 测试连接
 
-重启 Gemini CLI 并打开您的 Unreal 项目后，您可以直接调用任何工具函数来测试连接：
+重启 Gemini CLI 并打开 Unreal 项目后，您可以通过调用任何工具函数来测试连接：
+
 ```python
   cd Resources/Python/APITest
   python UE5_Editor_Imitation.py
 ```
 
-#### Python 环境 (可选)
+#### Python 环境（可选）
 
-插件的 Python 环境由 `uv` 管理，在大多数情况下会自动运行。如果您遇到与 Python 依赖相关的问题（例如 `uv` 命令找不到或模块导入错误），可以手动设置环境：
+插件的 Python 环境由 `uv` 管理。在大多数情况下，它应该会自动工作。如果您遇到与 Python 依赖项相关的问题（例如找不到 `uv` 命令或模块导入错误），您可以手动设置环境：
 
-1.  进入目录: `cd 您的Unreal项目/Plugins/UmgMcp/Resources/Python`
-2.  运行设置:
+1.  导航到目录：`cd YourUnrealProject/Plugins/UmgMcp/Resources/Python`
+2.  运行设置：
     ```bash
     uv venv
     .\.venv\Scripts\activate
@@ -83,72 +83,81 @@
 
 ### 🧪 实验性功能：Gemini CLI Skill 支持
 
-我们正在尝试 **Gemini CLI Skill** 方案。相比于 MCP 方案，Skill 方案允许工具逻辑直接被 CLI 加载，能够通过 `prompts.json` 动态管理启用的工具，**更好地解决工具过多导致的上下文溢出问题**，从而避免系统变得难以使用。
+我们正在尝试使用 **Gemini CLI Skill** 系统作为标准 MCP 方法的替代方案。
+Skill 架构允许 Python 工具直接由 CLI 运行时加载，通过 `prompts.json` 动态启用/禁用工具，潜在地**优化上下文使用**，并避免管理独立 MCP 服务器进程的开销。
 
-> **注意**: 在 CLI 中，现有的 MCP 系统表现已经非常稳定。Skill 模式目前作为实验性功能提供。
+> **注意**：上面配置的 MCP 服务器仍然是使用此插件的稳定且推荐的方式。如果您想测试最新的集成能力，请使用 Skill 模式。
 
-#### 配置方法 (Skill 模式)
+#### 配置 (Skill 模式)
 
-在 `settings.json` 中添加以下配置 (请替换 `<您的项目路径>`):
+要启用 Skill 模式，请将以下内容添加到您的 `settings.json` 中（替换 `<YOUR_PROJECT_PATH>`）：
 
 ```json
   "skills": {
     "unreal_umg": {
-      "path": "<您的项目路径>/Plugins/UmgMcp/Resources/Python/UmgMcpSkills.py",
+      "path": "<YOUR_PROJECT_PATH>/Plugins/UmgMcp/Resources/Python/UmgMcpSkills.py",
       "type": "local",
-      "description": "通过 Python Skill 直接控制 Unreal Engine UMG。"
+      "description": "通过 Python Skills 直接控制 Unreal Engine UMG。从 prompts.json 自动加载工具。"
     }
   },
 ```
 
 ---
 
-## 提示词管理器 (Prompt Manager)
+## 简体中文 (Chinese)
 
-这是一个可视化的 Web 工具，用于配置 MCP 服务器的系统提示词、工具描述以及用户模板。
+本项目为管理 Unreal Engine 的 UMG UI 资产提供了一个强大的、命令行驱动的工作流。通过将 **人类可读的 `.json` 文件视为唯一的真理源 (Source of Truth)**，它从根本上解决了在 Git 中对二进制 `.uasset` 文件进行版本控制的挑战。
 
-### 功能亮点
+受 `blender-mcp` 等工具的启发，该系统允许开发人员、UI 设计师和 AI 助手以编程方式与 UMG 资产进行交互，从而实现真正的 Git 协作、自动化 UI 生成和迭代。
 
-1.  **系统提示词编辑**：直接修改 AI 的全局指令。
+---
+
+## Prompt 管理器 (Prompt Manager)
+
+一个用于配置系统指令、工具描述和用户提示模板的可视化 Web 工具。
+
+### 功能
+
+1.  **系统指令编辑器**：修改针对 AI 上下文的全局指令。
 2.  **工具管理**：
-    *   **启用/禁用**：通过开关（Toggle）来启用或禁用特定的 MCP 工具。禁用工具后，该工具将不会注册到 MCP 服务器，从而**压缩上下文窗口**，避免 AI 被无关工具干扰。
-    *   **编辑描述**：修改工具的提示词（Description），使其更适合您的特定工作流。
-3.  **用户模板 (Prompts)**：添加预置的 Prompts，供 MCP 客户端直接调用。
+    *   **启用/禁用**：开启或关闭特定的 MCP 工具。禁用的工具不会在 MCP 服务器上注册，从而有效地**压缩上下文窗口**，防止 AI 分心。
+    *   **编辑描述**：自定义工具描述（提示词），使其更符合您的工作流。
+3.  **用户模板 (Prompts)**：添加可重用的提示词模板，方便 MCP 客户端快速访问。
 
-### 运行方法
+### 如何运行
 
-在 Python 环境下运行以下命令：
+在您的 Python 环境中执行以下命令：
 ```bash
 python Resources/Python/PromptManager/server.py
 ```
 浏览器将自动打开 `http://localhost:8085`。
 
-### 使用建议
+### 使用提示
 
-提示词是 AI 工具效能的关键。通过 Prompt Manager，您可以根据需求定制 AI 的行为：
+Prompt 对 AI 工具的有效性至关重要。使用 Prompt 管理器来为 AI 量身定制其行为：
 
-*   **一键部署模式**：如果您希望 AI 专注于根据设计生成 UI，可以关闭除了 `apply_layout` 和 `export_umg_to_json` 之外的所有工具。
-*   **教学模式**：如果您希望 AI 作为导师指导您学习 UMG，可以只保留只读工具（如 `get_widget_tree`, `get_widget_schema`），防止 AI 自动修改您的资产。
-*   **上下文优化**：对于上下文窗口较小的模型，建议关闭您当前任务不需要的工具，以提高响应速度和准确性。
+*   **一键部署模式**：如果您希望 AI 仅专注于根据设计生成 UI，请禁用除 `apply_layout` 和 `export_umg_to_json` 之外的所有工具。
+*   **导师模式**：如果您希望 AI 只是进行指导而不做逻辑更改，请仅保留只读工具（例如 `get_widget_tree`, `get_widget_schema`）。
+*   **上下文优化**：对于上下文窗口较小的模型，禁用当前不使用的工具以提高速度和准确性。
 
-欢迎贡献高效的提示词配置，让 AI 更聪明地工作！
+欢迎贡献有效的 Prompt 配置！
 
 ---
 
-### AI 作者与免责声明
+### AI 署名与免责声明
 
-本项目在 **Gemini AI** 的大力协助下开发。因此：
-*   **实验性质**: 这是一个实验性项目。其可靠性不作保证。
-*   **商业用途**: 在未经过彻底的独立验证并充分理解其局限性之前，不建议用于商业用途。
-*   **免责声明**: 使用风险自负。开发者和AI对因使用本项目而产生的任何后果概不负责。
+本项目是在 **Gemini (一种 AI)** 的显著协助下开发的。因此：
+*   **实验性质**：这是一个实验性项目，不保证其可靠性。
+*   **商业用途**：在没有经过彻底的独立验证和了解其局限性的情况下，不建议用于商业用途。
+*   **免责声明**：使用风险自负。开发人员和 AI 对因使用本项目而产生的任何后果概不负责。
 
 ---
 
 ### 当前技术架构概览
 
-该系统现在主要依赖 `UE5_UMG_MCP` 插件，用于外部客户端（如本CLI）与Unreal Engine编辑器之间的通信。
+系统目前主要依靠 `UE5_UMG_MCP` 插件在外部客户端（如本 CLI）与 Unreal Engine 编辑器之间进行通信。
 
-**架构图:** 
+**架构图：**
 
 ```mermaid
 flowchart LR
@@ -164,61 +173,82 @@ flowchart LR
 
 ## API 实现状态
 
-| 分类 | API 名称 | 状态 | 描述 |
-|---|---|:---:|---|
-| **上下文与注意力** | `get_target_umg_asset` | ✅ | 获取当前操作的UMG资产。 |
-| | `set_target_umg_asset` | ✅ | 设置全局操作的UMG资产目标。 |
-| | `get_last_edited_umg_asset` | ✅ | 获取最后编辑的UMG资产。 |
-| | `get_recently_edited_umg_assets` | ✅ | 获取最近编辑过的UMG资产列表。 |
-| **感知与查询** | `get_widget_tree` | ✅ | 获取资产的完整控件树结构。 |
-| | `query_widget_properties` | ✅ | 查询特定控件的一个或多个属性值。 |
-| | `get_creatable_widget_types` | ✅ | 获取所有可以被创建的控件类型列表。 |
-| | `get_widget_schema` | ✅ | 获取指定控件类型的属性结构信息。 |
-| | `get_layout_data` | ✅ | 获取所有控件在给定分辨率下的屏幕布局数据。 |
-| | `check_widget_overlap` | ✅ | 检查UI布局中是否有控件发生重叠。 |
-| **操作与修改** | `create_widget` | ✅ | 创建一个新的控件并附加到父控件。 |
-| | `delete_widget` | ✅ | 根据名称删除一个控件。 |
-| | `set_widget_properties` | ✅ | 设置一个或多个控件属性。 |
-| | `reparent_widget` | ✅ | 将一个控件移动到新的父控件下。 |
-| | `save_asset` | ✅ | 保存当前的UMG资产。 |
-| **文件转换** | `export_umg_to_json` | ✅ | 将UMG资产导出为JSON字符串。 |
-| | `apply_json_to_umg` | ✅ | 将JSON数据应用到UMG资产。 |
-| | `apply_layout` | ✅ | 将HTML/XML布局应用到UMG资产。 |
+| 分类               | API 名称                         | 状态  |
+| ------------------ | -------------------------------- | :---: |
+| **上下文与注意力** | `get_target_umg_asset`           |   ✅   |
+|                    | `set_target_umg_asset`           |   ✅   |
+|                    | `get_last_edited_umg_asset`      |   ✅   |
+|                    | `get_recently_edited_umg_assets` |   ✅   |
+| **感知与查询**     | `get_widget_tree`                |   ✅   |
+|                    | `query_widget_properties`        |   ✅   |
+|                    | `get_creatable_widget_types`     |   ✅   |
+|                    | `get_widget_schema`              |   ✅   |
+|                    | `get_layout_data`                |   ✅   |
+|                    | `check_widget_overlap`           |   ✅   |
+| **动作与修改**     | `create_widget`                  |   ✅   |
+|                    | `delete_widget`                  |   ✅   |
+|                    | `set_widget_properties`          |   ✅   |
+|                    | `reparent_widget`                |   ✅   |
+|                    | `save_asset`                     |   ✅   |
+| **文件转换**       | `export_umg_to_json`             |   ✅   |
+|                    | `apply_json_to_umg`              |   ✅   |
+|                    | `apply_layout`                   |   ✅   |
 
-## UMG Blueprint API 实现状态 (New)
+## UMG 蓝图 (Blueprint) API 实现状态 (New)
 
-| 分类 | API 名称 | 状态 | 描述 |
-|---|---|:---:|---|
-| **上下文与注意力** | `set_edit_function` | ✅ | 设置当前编辑的函数或事件 (Context)。支持自动创建 Custom Event。 |
-| | `set_cursor_node` | ✅ | 显式设置当前“光标”节点 (Program Counter)。 |
-| **感知与查询** | `get_function_nodes` | ✅ | 获取**当前上下文关联**的节点列表（自动过滤非连接节点，避免全局噪音）。 |
-| | `get_variables` | ✅ | 获取蓝图中的成员变量列表。 |
-| | `search_function_library` | ✅ | 搜索可调用的函数库 (C++/Blueprint Function Library)。支持模糊匹配。 |
-| **操作与修改** | `add_step(name)` | ✅ | **核心**: 添加功能节点 (通过名称，如 "PrintString")。支持自动连线与布局。 |
-| | `prepare_value(name)` | ✅ | 添加纯数据节点 (通过名称，如 "MakeLiteralString", "GetVariable")。 |
-| | `connect_data_to_pin` | ✅ | 精确连接引脚 (支持 `NodeID:PinName` 格式)。 |
-| | `add_variable` | ✅ | 添加新的成员变量。 |
-| | `delete_variable` | ✅ | 删除成员变量。 |
-| | `delete_node` | ✅ | 删除指定的节点。 |
-| | `compile_blueprint` | ✅ | 编译并应用蓝图修改。 |
+| 分类               | API 名称                  | 状态  | 描述                                                           |
+| ------------------ | ------------------------- | :---: | -------------------------------------------------------------- |
+| **上下文与注意力** | `set_edit_function`       |   ✅   | 设置当前编辑上下文（函数/事件）。支持自动创建自定义事件。      |
+|                    | `set_cursor_node`         |   ✅   | 显式设置“光标”节点（程序计数器）。                             |
+| **感知与查询**     | `get_function_nodes`      |   ✅   | 获取**当前上下文作用域**内的节点（过滤掉无关节点以减少噪音）。 |
+|                    | `get_variables`           |   ✅   | 获取成员变量列表。                                             |
+|                    | `search_function_library` |   ✅   | 搜索可调用的库 (C++/BP)。支持模糊搜索。                        |
+| **动作与修改**     | `add_step(name)`          |   ✅   | **核心**：根据名称添加可执行节点。支持自动连线与布局。         |
+|                    | `prepare_value(name)`     |   ✅   | 添加数据节点（例如 GetVariable）。                             |
+|                    | `connect_data_to_pin`     |   ✅   | 精确连接引脚（支持 `NodeID:PinName` 格式）。                   |
+|                    | `add_variable`            |   ✅   | 添加新的成员变量。                                             |
+|                    | `delete_variable`         |   ✅   | 删除成员变量。                                                 |
+|                    | `delete_node`             |   ✅   | 删除特定节点。                                                 |
+|                    | `compile_blueprint`       |   ✅   | 编译并应用更改。                                               |
 
-## UMG Sequencer API 实现状态
+## UMG 动画 (Sequencer) API 实现状态
 
-| 分类 | API 名称 | 状态 | 描述 |
-|---|---|:---:|---|
-| **动画管理** | `get_all_animations` | ✅ | 获取所有动画列表。 |
-| | `create_animation` | ✅ | 创建新的动画序列。 |
-| | `delete_animation` | ✅ | 删除指定的动画序列。 |
-| | `set_animation_scope` | ✅ | 设置后续命令的目标动画。 |
-| | `set_widget_scope` | ✅ | 设置后续命令的目标控件。 |
-| **轨道与关键帧** | `set_property_keys` | ✅ | 设置属性的关键帧（目前仅支持浮点）。 |
-| | `remove_property_track` | ⏳ | 移除属性轨道。 |
-| | `remove_keys` | ⏳ | 移除特定关键帧。 |
-| | `get_animation_keyframes` | ⏳ | 获取动画的关键帧数据。 |
-| | `get_animated_widgets` | ⏳ | 获取受动画影响的控件列表。 |
+| 命令                      |   状态   | 描述                               |
+| :------------------------ | :------: | :--------------------------------- |
+| `set_animation_scope`     | ✅ 已实现 | 设置后续命令的目标动画             |
+| `set_widget_scope`        | ✅ 已实现 | 设置后续命令的目标控件             |
+| `get_all_animations`      | ✅ 已实现 | 获取蓝图中的所有动画列表           |
+| `create_animation`        | ✅ 已实现 | 创建新动画                         |
+| `delete_animation`        | ✅ 已实现 | 删除动画                           |
+| `set_property_keys`       | ✅ 已实现 | 设置属性关键帧（目前仅支持浮点数） |
+| `remove_property_track`   | 🚧 计划中 | 移除属性轨道                       |
+| `remove_keys`             | 🚧 计划中 | 移除特定关键帧                     |
+| `get_animation_keyframes` | 🚧 计划中 | 获取动画的关键帧数据               |
+| `get_animated_widgets`    | 🚧 计划中 | 获取受动画影响的控件列表           |
 
-> [!WARNING]
-> **已知问题 (Known Issue):** UMG 动画功能 (`set_property_keys`, `set_animation_data`) 目前处于实验阶段，尚未通过全面验证。可能会遇到运行时错误或崩溃。请谨慎使用。
+## UMG 材质 (Material) API 实现状态 (New: 五大核心能力)
+
+| 分类             | API 名称                       |   状态   | 描述                                                                   |
+| ---------------- | ------------------------------ | :------: | ---------------------------------------------------------------------- |
+| **P0: 上下文**   | `material_set_target`          | ⏳ 计划中 | **锚点**：指定当前编辑的材质资产（支持自动创建/重定向）。              |
+| **P1: 输入定义** | `material_define_variable`     | ⏳ 计划中 | 定义外部接口参数（定义而非连线）。支持 Scalar, Vector, Texture。       |
+| **P2: 符号放置** | `material_add_node`            | ⏳ 计划中 | **拖拽符号**：将 UE5 库中的符号放置到图表并分配实例句柄（Handle）。    |
+|                  | `material_get_nodes`           | ⏳ 计划中 | 查询图表中的所有节点句柄及其状态。                                     |
+| **P3: 连接拓扑** | `material_connect_nodes`       | ⏳ 计划中 | **自然连接**：建立节点间的逻辑映射（A -> B），模拟功能性嵌套。         |
+|                  | `material_connect_pins`        | ⏳ 计划中 | **外科连线**：在复杂拓扑下手动连接特定的输入引脚。                     |
+| **P4: 符号检索** | `material_search_library`      | ⏳ 计划中 | 快速检索 UE5 材质表达式库中的符号（Symbol）。                          |
+| **P5: 细节注入** | `material_set_hlsl_node_io`    | ⏳ 计划中 | **战术细节**：编写 Custom 节点的 HLSL 代码并实时同步 IO 引脚。         |
+|                  | `material_set_node_properties` | ⏳ 计划中 | **属性编辑**：设置常规节点（如 Constant, TextureSample）的内部属性值。 |
+| **生命周期**     | `compile_asset`                | ⏳ 计划中 | 提交更改并分析 HLSL 报错。                                             |
+|                  | `material_delete`              | ⏳ 计划中 | 根据唯一句柄删除实例。                                                 |
+
+## UMG 样式与主题 (Style & Theming) API 实现状态 (New)
+
+| 类别     | API 名称             | status | 描述                                          |
+| -------- | -------------------- | :----: | --------------------------------------------- |
+| **样式** | `set_widget_style`   |   ⏳    | 设置特定控件的详细样式（例如 FButtonStyle）。 |
+| **主题** | `apply_global_theme` |   ⏳    | 根据主题配置批量应用样式、字体和配色。        |
+| **资源** | `style_create_asset` |   ⏳    | 创建独立的 Slate 控件样式资源。               |
 
 ## 故障排除与已知问题
 

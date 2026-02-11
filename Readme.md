@@ -1,4 +1,4 @@
-[中文版请点击此处](Readme_zh.md)
+[Chinese version please click here](Readme_zh.md)
 
 # UE5-UMG-MCP 🤖📄
 
@@ -130,7 +130,7 @@ Execute the following command in your Python environment:
 ```bash
 python Resources/Python/PromptManager/server.py
 ```
-The browser will automatically open `http://localhost:8085`.
+The browser will automatically open `http://localhost:8085`。
 
 ### Usage Tips
 
@@ -173,57 +173,82 @@ flowchart LR
 
 ## API Status
 
-| Category | API Name | Status |
-|---|---|:---:|
-| **Context & Attention** | `get_target_umg_asset` | ✅ |
-| | `set_target_umg_asset` | ✅ |
-| | `get_last_edited_umg_asset` | ✅ |
-| | `get_recently_edited_umg_assets` | ✅ |
-| **Sensing & Querying** | `get_widget_tree` | ✅ |
-| | `query_widget_properties` | ✅ |
-| | `get_creatable_widget_types` | ✅ |
-| | `get_widget_schema` | ✅ |
-| | `get_layout_data` | ✅ |
-| | `check_widget_overlap` | ✅ |
-| **Actions & Modifications** | `create_widget` | ✅ |
-| | `delete_widget` | ✅ |
-| | `set_widget_properties` | ✅ |
-| | `reparent_widget` | ✅ |
-| | `save_asset` | ✅ |
-| **File Transformation** | `export_umg_to_json` | ✅ |
-| | `apply_json_to_umg` | ✅ |
-| | `apply_layout` | ✅ |
+| Category                    | API Name                         | Status |
+| --------------------------- | -------------------------------- | :----: |
+| **Context & Attention**     | `get_target_umg_asset`           |   ✅    |
+|                             | `set_target_umg_asset`           |   ✅    |
+|                             | `get_last_edited_umg_asset`      |   ✅    |
+|                             | `get_recently_edited_umg_assets` |   ✅    |
+| **Sensing & Querying**      | `get_widget_tree`                |   ✅    |
+|                             | `query_widget_properties`        |   ✅    |
+|                             | `get_creatable_widget_types`     |   ✅    |
+|                             | `get_widget_schema`              |   ✅    |
+|                             | `get_layout_data`                |   ✅    |
+|                             | `check_widget_overlap`           |   ✅    |
+| **Actions & Modifications** | `create_widget`                  |   ✅    |
+|                             | `delete_widget`                  |   ✅    |
+|                             | `set_widget_properties`          |   ✅    |
+|                             | `reparent_widget`                |   ✅    |
+|                             | `save_asset`                     |   ✅    |
+| **File Transformation**     | `export_umg_to_json`             |   ✅    |
+|                             | `apply_json_to_umg`              |   ✅    |
+|                             | `apply_layout`                   |   ✅    |
  
  ## UMG Blueprint API Status (New)
  
- | Category | API Name | Status | Description |
- |---|---|:---:|---|
- | **Context & Attention** | `set_edit_function` | ✅ | Set the current edit context (Function/Event). Supports auto-creating Custom Events. |
- | | `set_cursor_node` | ✅ | Explicitly set the "Cursor" node (Program Counter). |
- | **Sensing & Querying** | `get_function_nodes` | ✅ | Get nodes in **Current Context Scope** (Filtered to connected graph to avoid global noise). |
- | | `get_variables` | ✅ | Get list of member variables. |
- | | `search_function_library` | ✅ | Search callable libraries (C++/BP). Supports Fuzzy Search. |
- | **Actions & Modifications** | `add_step(name)` | ✅ | **Core**: Add executable node by Name (e.g. "PrintString"). Auto-Wiring & Auto-Layout supported. |
- | | `prepare_value(name)` | ✅ | Add Data Node by Name (e.g. "MakeLiteralString", "GetVariable"). |
- | | `connect_data_to_pin` | ✅ | Connect pins precisely (Supports `NodeID:PinName` format). |
- | | `add_variable` | ✅ | Add new member variable. |
- | | `delete_variable` | ✅ | Delete member variable. |
- | | `delete_node` | ✅ | Delete specific node. |
- | | `compile_blueprint` | ✅ | Compile and apply changes. |
+ | Category                    | API Name                  | Status | Description                                                                                      |
+ | --------------------------- | ------------------------- | :----: | ------------------------------------------------------------------------------------------------ |
+ | **Context & Attention**     | `set_edit_function`       |   ✅    | Set the current edit context (Function/Event). Supports auto-creating Custom Events.             |
+ |                             | `set_cursor_node`         |   ✅    | Explicitly set the "Cursor" node (Program Counter).                                              |
+ | **Sensing & Querying**      | `get_function_nodes`      |   ✅    | Get nodes in **Current Context Scope** (Filtered to connected graph to avoid global noise).      |
+ |                             | `get_variables`           |   ✅    | Get list of member variables.                                                                    |
+ |                             | `search_function_library` |   ✅    | Search callable libraries (C++/BP). Supports Fuzzy Search.                                       |
+ | **Actions & Modifications** | `add_step(name)`          |   ✅    | **Core**: Add executable node by Name (e.g. "PrintString"). Auto-Wiring & Auto-Layout supported. |
+ |                             | `prepare_value(name)`     |   ✅    | Add Data Node by Name (e.g. "MakeLiteralString", "GetVariable").                                 |
+ |                             | `connect_data_to_pin`     |   ✅    | Connect pins precisely (Supports `NodeID:PinName` format).                                       |
+ |                             | `add_variable`            |   ✅    | Add new member variable.                                                                         |
+ |                             | `delete_variable`         |   ✅    | Delete member variable.                                                                          |
+ |                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
+ |                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
 
 ## UMG Sequencer API Status
 
-| Command | Status | Description |
-| :--- | :--- | :--- |
-| `set_animation_scope` | ✅ Implemented | Set the target animation for subsequent commands |
-| `set_widget_scope` | ✅ Implemented | Set the target widget for subsequent commands |
-| `get_all_animations` | ✅ Implemented | Get list of all animations in the blueprint |
-| `create_animation` | ✅ Implemented | Create a new animation |
-| `delete_animation` | ✅ Implemented | Delete an animation |
-| `set_property_keys` | ✅ Implemented | Set keyframes for a property (Float only currently) |
-| `remove_property_track` | 🚧 Planned | Remove a property track |
-| `remove_keys` | 🚧 Planned | Remove specific keys |
-| `get_animation_keyframes` | 🚧 Planned | Get keyframes for an animation |
+| Command                   | Status        | Description                                         |
+| :------------------------ | :------------ | :-------------------------------------------------- |
+| `set_animation_scope`     | ✅ Implemented | Set the target animation for subsequent commands    |
+| `set_widget_scope`        | ✅ Implemented | Set the target widget for subsequent commands       |
+| `get_all_animations`      | ✅ Implemented | Get list of all animations in the blueprint         |
+| `create_animation`        | ✅ Implemented | Create a new animation                              |
+| `delete_animation`        | ✅ Implemented | Delete an animation                                 |
+| `set_property_keys`       | ✅ Implemented | Set keyframes for a property (Float only currently) |
+| `remove_property_track`   | 🚧 Planned     | Remove a property track                             |
+| `remove_keys`             | 🚧 Planned     | Remove specific keys                                |
+| `get_animation_keyframes` | 🚧 Planned     | Get keyframes for an animation                      |
+| `get_animated_widgets`    | 🚧 Planned     | Get list of widgets affected by animation           |
+
+## UMG Material API Status (New: The 5 Core Pillars Strategy)
+
+| Category                | API Name                       |  Status   | Description                                                                                     |
+| ----------------------- | ------------------------------ | :-------: | ----------------------------------------------------------------------------------------------- |
+| **P0: Context**         | `material_set_target`          | 🚧 Planned | **Anchor**: Specify target asset (path or parent). Required for stateful editing.               |
+| **P1: Def & Query**     | `material_define_variable`     | 🚧 Planned | Define external interface parameters (Def, not wire). Supports Scalar, Vector, Texture.         |
+| **P2: Symbol Place**    | `material_add_node`            | 🚧 Planned | **Drag Symbol**: Place a symbol from lib into graph and assign a unique instance handle.        |
+|                         | `material_get_nodes`           | 🚧 Planned | Query existence and state of node instances in the graph.                                       |
+| **P3: Connectivity**    | `material_connect_nodes`       | 🚧 Planned | **Natural Connection**: Establish node-to-node functional flow (A -> B).                        |
+|                         | `material_connect_pins`        | 🚧 Planned | **Surgical Wiring**: Manually connect specific pins for complex topologies.                     |
+| **P4: Lib Search**      | `material_search_library`      | 🚧 Planned | Search for available Material Expressions (symbols) and Functions.                              |
+| **P5: Tactical Detail** | `material_set_hlsl_node_io`    | 🚧 Planned | **Tactical Code**: Inject HLSL into Custom nodes and sync IO pins via JSON mapping.             |
+|                         | `material_set_node_properties` | 🚧 Planned | **Property Editing**: Set internal properties for regular nodes (e.g. Constant Value, Texture). |
+| **Lifecycle**           | `compile_asset`                | 🚧 Planned | Submit changes and analyze HLSL compilation errors.                                             |
+| **Maintenance**         | `material_delete`              | 🚧 Planned | Delete node instances or clean up logic by unique handle.                                       |
+
+## UMG Style & Theming API Status (New)
+
+| Category    | API Name             |  Status   | Description                                                                   |
+| ----------- | -------------------- | :-------: | ----------------------------------------------------------------------------- |
+| **Styling** | `set_widget_style`   | 🚧 Planned | Set detailed style (e.g. FButtonStyle) for a specific widget.                 |
+| **Theming** | `apply_global_theme` | 🚧 Planned | Batch apply styles and fonts across multiple widgets based on a theme config. |
+| **Assets**  | `style_create_asset` | 🚧 Planned | Create a standalone Slate Widget Style asset.                                 |
 
 ## Troubleshooting & Known Issues
 
