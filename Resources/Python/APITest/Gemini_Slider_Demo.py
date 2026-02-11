@@ -48,10 +48,6 @@ class SimpleConnection:
             
             response_data = b"".join(chunks).decode('utf-8')
             response = json.loads(response_data)
-            
-            status = response.get("success", False) or response.get("status") == "success"
-            res_str = "SUCCESS" if status else "FAIL"
-            # print(f"[RECV] {res_str}: {response}")
             return response
             
         except Exception as e:
@@ -64,172 +60,140 @@ class SimpleConnection:
 
 def get_handle(response):
     if response and isinstance(response, dict):
-        # Unwrap 'result' if present (Bridge wrapper)
         result = response.get("result", response)
         return result.get("handle")
     return None
 
-async def run_slider_demo():
-    print("=== 启动 'Holographic Slider' 演示 ===")
+async def run_fancy_slider_demo():
+    print("=== 启动 'Cyberpunk Slider' 顶级演示 ===")
     
     conn = SimpleConnection()
     mat_api = UMGMaterial(conn)
     widget_set = UMGSet(conn)
     
-    # --- PHASE 1: Create Widget Layout ---
-    print("\n[1] 创建 UI 布局...")
-    
-    slider_name = "HoloSlider"
-    # Assuming "RootWidget" exists, or just skip parent
-    await widget_set.create_widget("CanvasPanel", slider_name, "Root") 
-    
-    # --- PHASE 2: Create Material ---
-    print("\n[2] 创建全息材质...")
-    material_path = "/Game/UMGMCP/Demos/M_HoloSlider_Fixed"
+    # --- PHASE 1: Design Material ---
+    print("\n[1] 设计顶级渲染材质 (Cyberpunk Style)...")
+    material_path = "/Game/UMGMCP/Demos/M_Cyberpunk_Slider"
     await mat_api.set_target_material(material_path)
-    print(f"\n[PAUSE] Material '{material_path}' targeted. You can check it in Editor.")
-    input("Press Enter to continue building nodes...")
     
-    # 2. Define Variables
-    color1 = get_handle(await mat_api.define_variable("CoreColor", "Vector"))
-    color2 = get_handle(await mat_api.define_variable("GlowColor", "Vector"))
+    # 配置材质域为 UI，混合模式为半透明 (MD_UI, BLEND_Translucent)
+    await mat_api.set_node_properties("Output", {
+        "MaterialDomain": "MD_UI",
+        "BlendMode": "BLEND_Translucent"
+    })
+    
+    # 定义交互变量
     progress = get_handle(await mat_api.define_variable("Progress", "Scalar"))
+    hover_pos = get_handle(await mat_api.define_variable("HoverPos", "Vector"))
     
-    # HLSL Logic - Transmit as Clean String (C++ will unescape \n)
+    # 核心 HLSL 逻辑
     hlsl_code = (
-        "// Inputs: UV, Time, ColorA, ColorB, Prog\n"
+        "// Inputs: UV, Time, Progress, HoverPos\n"
+        "float2 pos = UV;\n"
         "\n"
-        "// 1. Basic Shape\n"
-        "float2 centered = UV - 0.5;\n"
-        "float dist = length(max(abs(centered) - float2(0.45, 0.1), 0.0));\n"
-        "float alpha = 1.0 - smoothstep(0.0, 0.05, dist);\n"
+        "// 1. 赛博网格底纹\n"
+        "float2 gridUV = pos * 25.0;\n"
+        "float grid = step(0.96, frac(gridUV.x)) + step(0.96, frac(gridUV.y));\n"
+        "float3 bgColor = float3(0.0, 0.02, 0.08) + grid * float3(0.0, 0.4, 0.8) * 0.15;\n"
         "\n"
-        "// 2. Moving Glint\n"
-        "float glintPos = frac(Time * 0.5);\n"
-        "float glint = 1.0 - smoothstep(0.0, 0.2, abs(UV.x - glintPos));\n"
+        "// 2. 扫描线与动态干扰\n"
+        "float scanline = sin(pos.y * 150.0 + Time * 3.0) * 0.02;\n"
+        "float noise = frac(sin(dot(pos.xy ,float2(12.9898,78.233))) * 43758.5453) * 0.05;\n"
+        "bgColor += scanline + noise;\n"
         "\n"
-        "// 3. Mix\n"
-        "float3 finalColor = lerp(ColorA, ColorB, glint);\n"
+        "// 3. 进度感知色彩偏置 (Cold Blue -> Intense Red)\n"
+        "float3 cold = float3(0.0, 0.6, 1.0);\n"
+        "float3 hot = float3(1.0, 0.1, 0.1);\n"
+        "float3 accentColor = lerp(cold, hot, Progress);\n"
         "\n"
-        "return float4(finalColor * 2.0, alpha);"
+        "// 4. 背景板交互光晕 (根据 HoverPos 响应)\n"
+        "float dist = length(pos - HoverPos.xy);\n"
+        "float glow = 1.0 - smoothstep(0.0, 0.4, dist);\n"
+        "float3 interactionColor = accentColor * glow * 1.2;\n"
+        "\n"
+        "// 5. 进度条视觉化 (在背景板中心位置显示)\n"
+        "float barS = 0.48; float barE = 0.52;\n"
+        "float mask = step(barS, pos.y) * step(pos.y, barE);\n"
+        "float fill = step(pos.x, Progress) * mask;\n"
+        "float3 barColor = accentColor * fill * (0.8 + 0.2 * sin(Time * 5.0));\n"
+        "\n"
+        "// 6. 最终合成\n"
+        "float3 finalRGB = bgColor + barColor + interactionColor;\n"
+        "float finalAlpha = 0.85 + 0.1 * sin(Time * 2.0);\n"
+        "\n"
+        "return float4(finalRGB, finalAlpha);"
     )
     
-    custom_node = get_handle(await mat_api.add_node("Custom", "SliderEffect"))
-    await mat_api.set_hlsl_node_io(custom_node, hlsl_code, ["UV", "Time", "ColorA", "ColorB", "Prog"])
+    custom_node = get_handle(await mat_api.add_node("Custom", "VisualEngine"))
+    # 设置输出类型为 Float4，否则会导致 Mask 报错 (Not enough components)
+    await mat_api.set_node_properties(custom_node, {"OutputType": "CMOT_Float4"})
+    await mat_api.set_hlsl_node_io(custom_node, hlsl_code, ["UV", "Time", "Progress", "HoverPos"])
     
-    # Nodes
+    # 连接环境节点
     tex_coord = get_handle(await mat_api.add_node("TextureCoordinate", "UV"))
-    time_node = get_handle(await mat_api.add_node("Time", "GameTime"))
+    time_node = get_handle(await mat_api.add_node("Time", "Clock"))
     
-    # Wiring
-    await mat_api.connect_pins(tex_coord, custom_node, None, "UV")
-    await mat_api.connect_pins(time_node, custom_node, None, "Time")
-    await mat_api.connect_pins(color1, custom_node, None, "ColorA")
-    await mat_api.connect_pins(color2, custom_node, None, "ColorB")
-    await mat_api.connect_pins(progress, custom_node, None, "Prog")
+    await mat_api.connect_pins(tex_coord, "Output", custom_node, "UV")
+    await mat_api.connect_pins(time_node, "Output", custom_node, "Time")
+    await mat_api.connect_pins(progress, "Output", custom_node, "Progress")
+    await mat_api.connect_pins(hover_pos, "Output", custom_node, "HoverPos")
     
-    # Output to Master
-    mask_rgb = get_handle(await mat_api.add_node("ComponentMask", "RGB"))
+    # 核心组件：分离 RGB (颜色) 与 Alpha (透明度) 以达到最佳专业度
+    mask_rgb = get_handle(await mat_api.add_node("ComponentMask", "RGB_Mask"))
     await mat_api.set_node_properties(mask_rgb, {"R": True, "G": True, "B": True, "A": False})
     
-    mask_a = get_handle(await mat_api.add_node("ComponentMask", "Alpha"))
+    mask_a = get_handle(await mat_api.add_node("ComponentMask", "Alpha_Mask"))
     await mat_api.set_node_properties(mask_a, {"R": False, "G": False, "B": False, "A": True})
     
-    await mat_api.connect_nodes(custom_node, mask_rgb)
-    await mat_api.connect_nodes(custom_node, mask_a)
+    # 连接 Custom 到 Mask
+    await mat_api.connect_pins(custom_node, "Output", mask_rgb, "Input")
+    await mat_api.connect_pins(custom_node, "Output", mask_a, "Input")
     
-    print("\n[PAUSE] Material Created. Please manually connect pins in the Editor if you wish.")
-    input("Press Enter to continue to Introspection...")
+    # 战略节点连接：使用 "Output" 别名代表最终输出节点
+    print("[Wiring] 自动连接至材质导出节点 (FinalColor & Opacity)...")
+    await mat_api.connect_pins(mask_rgb, "Output", "Output", " FinalColor")  # 映射到 EmissiveColor
+    await mat_api.connect_pins(mask_a, "Output", "Output", "Opacity")        # 映射到 Opacity
+    
+    await mat_api.compile_asset()
+    print("--- 材质创建与编译完成 ---")
 
-    # Introspect Master Pins (Using explicit Asset Name)
-    target_mat_name = "M_HoloSlider_Fixed"
-    print(f"--- [Introspection] Querying Pins for '{target_mat_name}'... ---")
+    # --- PHASE 2: Create UI Layout ---
+    print("\n[2] 构建全屏 UI 布局...")
+    widget_path = "/Game/UMGMCP/Demos/W_CyberSlider"
+    await conn.send_command("create_blueprint", {"package_path": widget_path, "parent_class": "UserWidget"})
+    await conn.send_command("set_target_umg_asset", {"asset_path": widget_path})
     
-    # We can now use the Asset Name as the handle!
-    node_info = await mat_api.get_node_pins(target_mat_name)
-    master_pins = node_info.get("pins", [])
-    current_connections = node_info.get("connections", {})
+    root_id = "MainCanvas"
+    await widget_set.create_widget("CanvasPanel", root_id, "Root")
     
-    print(f"Material Pins: {master_pins}")
-    print(f"Current Connections: {current_connections}")
-
-    # Helper to find best match
-    def find_pin(pins, candidates):
-        for c in candidates:
-            if c in pins: return c
-        return None
-
-    final_color_pin = find_pin(master_pins, ["EmissiveColor", "FinalColor", "BaseColor"])
-    opacity_pin = find_pin(master_pins, ["Opacity", "OpacityMask"])
-
-    if final_color_pin:
-        print(f"Connecting to Color Pin: {final_color_pin}")
-        await mat_api.connect_pins(mask_rgb, target_mat_name, None, final_color_pin)
-    
-    if opacity_pin:
-        print(f"Connecting to Opacity Pin: {opacity_pin}")
-        await mat_api.connect_pins(mask_a, target_mat_name, None, opacity_pin)
-
-    # Compile
-    await mat_api.compile_asset() # This function wrapper needs update too in UMGMaterial.py, or override here? 
-    # Actually UMGMaterial.py likely sends "compile_asset". We should check and fix UMGMaterial.py OR just fix the call here if raw.
-    # The UMGMaterial helper handles the command string. Let's assume we update UMGMaterial.py next.
-    print("=== 材质创建完成: /Game/UMGMCP/Demos/M_HoloSlider_Fixed ===")
-
-    # --- PHASE 3: Apply to Widget ---
-    print("\n[3] 创建并应用到 Slider 组件...")
-    
-    # NEW: Context Logic. We need a target Widget Blueprint.
-    # We can use "create_blueprint" or simply set target if we assume one exists.
-    # Let's try to create a fresh one for the demo.
-    
-    widget_bp_path = "/Game/UMGMCP/Demos/W_HoloDemo"
-    # Create Blueprint command is in 'Blueprint' module usually, let's check UMGSet wrapper.
-    # If not wrapped, we use raw command.
-    
-    print(f"Creating/Loading Widget Asset: {widget_bp_path}")
-    await conn.send_command("create_blueprint", {"package_path": widget_bp_path, "parent_class": "UserWidget"})
-    # Only after creation, we set it as target for UMG commands
-    await conn.send_command("set_target_umg_asset", {"asset_path": widget_bp_path})
-    
-    # Now we can edit it
-    root_container = "HoloCanvas"
-    await widget_set.create_widget("CanvasPanel", root_container, "Root") # Try to make it root if empty
-    
-    slider_name = "HoloSlider"
-    await widget_set.create_widget("Slider", slider_name, root_container)
-    
-    # 2. Construct Style JSON
-    # We need to set 'WidgetStyle'. Inside it: 'NormalBarImage', 'HoveredBarImage', etc.
-    # FSlateBrush structure: { "ResourceObject": "Path", "ImageSize": {"X": 500, "Y": 20}, "DrawAs": "Image" }
-    
-    # Apply Material to Slider (This assumes a property 'Style' or similar exists, or we use the unified set_widget_property)
-    # Applying to 'WidgetStyle' or 'Style' depends on the widget. For simple test, let's try root SetBrush if generic?
-    # Actually Slider has complex styling. Let's just try to set it on a simple Image for verification if Slider fails.
-    # But user wants Slider.
-    # Let's try to set "Style.NormalBarImage.ResourceObject"
-    
-    # NOTE: Property paths are case sensitive and strict in reflection! 
-    # For now, let's try a simpler approach or just print success.
-    
-    slider_style_update = {
-        "Style": {
-            "NormalBarImage": {
-                "ResourceObject": material_path,
-                "ImageSize": {"X": 500, "Y": 50}
-            },
-            "HoveredBarImage": {
-                 "ResourceObject": material_path
-            },
-            "DisabledBarImage": {
-                 "ResourceObject": material_path
-            }
+    # 背景板：全屏填充 (Anchors: 0,0 to 1,1)
+    bg_id = "BackgroundBoard"
+    await widget_set.create_widget("Image", bg_id, root_id)
+    await widget_set.set_widget_properties(bg_id, {
+        "Brush": {
+            "ResourceObject": material_path,
+            "DrawAs": "Image"
+        },
+        "Slot": {
+            "Anchors": {"Minimum": {"X": 0, "Y": 0}, "Maximum": {"X": 1, "Y": 1}},
+            "Offsets": {"Left": 0, "Top": 0, "Right": 0, "Bottom": 0}
         }
-    }
+    })
     
-    # 3. Apply
-    await widget_set.set_widget_properties(slider_name, slider_style_update)
-    print(f"=== 已将材质应用到组件: {slider_name} ===")
+    # 滑条：底部居中
+    slider_id = "InteractiveSlider"
+    await widget_set.create_widget("Slider", slider_id, root_id)
+    await widget_set.set_widget_properties(slider_id, {
+        "Value": 0.5,
+        "Slot": {
+            "Anchors": {"Minimum": {"X": 0.5, "Y": 0.9}, "Maximum": {"X": 0.5, "Y": 0.9}},
+            "Alignment": {"X": 0.5, "Y": 0.5},
+            "Offsets": {"Left": 0, "Top": 0, "Right": 600, "Bottom": 60}
+        }
+    })
+    
+    print(f"\n[SUCCESS] 演示创建完毕: {widget_path}")
+    print("提示：在编辑器中调整 M_Cyberpunk_Slider 的 Progress 参数，即可看到全屏背景板的色彩切换、网格效果与交互光晕！")
 
 if __name__ == "__main__":
-    asyncio.run(run_slider_demo())
+    asyncio.run(run_fancy_slider_demo())

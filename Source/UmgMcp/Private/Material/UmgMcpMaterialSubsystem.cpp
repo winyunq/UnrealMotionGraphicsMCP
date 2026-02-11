@@ -5,6 +5,7 @@
 #include "Materials/MaterialExpression.h"
 #include "Materials/MaterialExpressionCustom.h"
 #include "MaterialEditingLibrary.h" // Added for proper refresh
+#include "MaterialShared.h"
 #include "Materials/MaterialExpressionComponentMask.h" 
 #include "Materials/MaterialExpressionScalarParameter.h"
 #include "Materials/MaterialExpressionVectorParameter.h"
@@ -14,12 +15,14 @@
 #include "MaterialGraph/MaterialGraph.h" 
 #include "MaterialGraph/MaterialGraphNode.h"
 #include "MaterialGraph/MaterialGraphNode_Root.h"
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "Editor.h" 
+#if WITH_EDITOR
+#endif
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphPin.h"
 // Material Editor
 #include "IMaterialEditor.h"
-#include "Subsystems/AssetEditorSubsystem.h"
-#include "Editor.h" 
 
 #include "UObject/UObjectGlobals.h"
 #include "Dom/JsonObject.h"
@@ -293,34 +296,72 @@ FExpressionInput* FindInputProperty(UObject* Owner, const FString& PinName)
 {
     if (!Owner) return nullptr;
 
-    for (TFieldIterator<FProperty> PropIt(Owner->GetClass()); PropIt; ++PropIt)
+    // List of objects to search for properties (Mat + EditorOnlyData)
+    TArray<UObject*> Targets;
+    
+#if WITH_EDITOR
+    if (UMaterial* Mat = Cast<UMaterial>(Owner))
     {
-        FProperty* Prop = *PropIt;
-        
-        // Handle precise match or common aliases
-        bool bMatch = Prop->GetName().Equals(PinName, ESearchCase::IgnoreCase);
-        
-        if (!bMatch)
+        if (Mat->GetEditorOnlyData())
         {
-            // Auto-Resolution Aliases
-            if (PinName.Equals(TEXT("UV"), ESearchCase::IgnoreCase) && Prop->GetName().Equals(TEXT("Coordinates"), ESearchCase::IgnoreCase)) bMatch = true;
-            if (PinName.Equals(TEXT("Alpha"), ESearchCase::IgnoreCase) && Prop->GetName().Equals(TEXT("A"), ESearchCase::IgnoreCase)) bMatch = true;
+            Targets.Add((UObject*)Mat->GetEditorOnlyData());
         }
-
-        if (bMatch)
+    }
+#endif
+    Targets.Add(Owner);
+    
+    // SMART MAPPING: Handle common aliases before searching
+    FString SearchName = PinName.TrimStartAndEnd().Replace(TEXT(" "), TEXT(""));
+    
+    // Explicit user-requested mapping for Root node
+    if (UMaterial* Mat = Cast<UMaterial>(Owner))
+    {
+        if (SearchName.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
         {
-            // Check if it is an FExpressionInput structured property
-            FStructProperty* StructProp = CastField<FStructProperty>(Prop);
-            if (StructProp)
+            SearchName = (Mat->MaterialDomain == MD_UI) ? TEXT("EmissiveColor") : TEXT("BaseColor");
+        }
+        else if (SearchName.Equals(TEXT("FinalColor"), ESearchCase::IgnoreCase) || SearchName.Equals(TEXT("最终颜色"), ESearchCase::IgnoreCase))
+        {
+            SearchName = TEXT("EmissiveColor");
+        }
+        else if (SearchName.Equals(TEXT("Opacity"), ESearchCase::IgnoreCase) || SearchName.Equals(TEXT("不透明度"), ESearchCase::IgnoreCase))
+        {
+            SearchName = TEXT("Opacity");
+        }
+        else if (SearchName.Equals(TEXT("OpacityMask"), ESearchCase::IgnoreCase) || SearchName.Equals(TEXT("不透明度蒙版"), ESearchCase::IgnoreCase))
+        {
+            SearchName = TEXT("OpacityMask");
+        }
+        else if (SearchName.Equals(TEXT("WorldPositionOffset"), ESearchCase::IgnoreCase))
+        {
+            SearchName = TEXT("WorldPositionOffset");
+        }
+    }
+
+    for (UObject* Target : Targets)
+    {
+        for (TFieldIterator<FProperty> PropIt(Target->GetClass()); PropIt; ++PropIt)
+        {
+            FProperty* Prop = *PropIt;
+            FString PropName = Prop->GetName();
+            
+            bool bMatch = PropName.Equals(SearchName, ESearchCase::IgnoreCase) ||
+                          Prop->GetDisplayNameText().ToString().Equals(SearchName, ESearchCase::IgnoreCase);
+            
+            // Heuristic fallbacks
+            if (!bMatch)
             {
-                // STRATEGY: "Sparse Matrix" / "Best Effort"
-                // In the context of a Material Graph, if we find a StructProperty with a matching name 
-                // (e.g. "BaseColor", "Opacity", "UV"), it is almost certainly a Material Input.
-                // We skip strict type validation (IsChildOf FExpressionInput) to avoid false negatives 
-                // due to reflection quirks or derived struct hierarchies.
-                // We implicitly trust that accessing the first members (Expression, OutputIndex) is safe 
-                // because all Material Inputs inherit from FExpressionInput.
-                return StructProp->ContainerPtrToValuePtr<FExpressionInput>(Owner);
+                if (SearchName.Equals(TEXT("UV"), ESearchCase::IgnoreCase) && PropName.Equals(TEXT("Coordinates"), ESearchCase::IgnoreCase)) bMatch = true;
+                if (SearchName.Equals(TEXT("Alpha"), ESearchCase::IgnoreCase) && PropName.Equals(TEXT("A"), ESearchCase::IgnoreCase)) bMatch = true;
+            }
+
+            if (bMatch)
+            {
+                FStructProperty* StructProp = CastField<FStructProperty>(Prop);
+                if (StructProp && StructProp->Struct->GetName().Contains(TEXT("Input")))
+                {
+                    return StructProp->ContainerPtrToValuePtr<FExpressionInput>(Target);
+                }
             }
         }
     }
@@ -338,11 +379,17 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
     if (!Mat) return false;
 
     // Check if Target is Root Node
-    bool bIsRootAlias = ToHandle.StartsWith(TEXT("Master")) || ToHandle.Equals(TEXT("MaterialRoot")) || ToHandle.Equals(Mat->GetName());
+    bool bIsRootAlias = ToHandle.StartsWith(TEXT("Master")) || 
+                        ToHandle.Equals(TEXT("Output"), ESearchCase::IgnoreCase) ||
+                        ToHandle.Equals(TEXT("MaterialRoot")) || 
+                        ToHandle.Equals(Mat->GetName());
+    UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: From=%s, To=%s, bIsRootAlias=%d"), *FromHandle, *ToHandle, bIsRootAlias);
 
-    if (bIsRootAlias && Mat->MaterialGraph)
+    if (bIsRootAlias)
     {
-        // === ROOT NODE: Use Graph-based connection ===
+        if (Mat->MaterialGraph)
+        {
+            // === ROOT NODE: Use Graph-based connection (Preferred) ===
         // 1. Find Source GraphNode
         UMaterialGraphNode* SourceGraphNode = nullptr;
         for (UEdGraphNode* Node : Mat->MaterialGraph->Nodes)
@@ -365,7 +412,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
             return false;
         }
 
-        // 2. Find Root Node
+        // 2. Find Root Node Object in Graph
         UEdGraphNode* RootNode = nullptr;
         for (UEdGraphNode* Node : Mat->MaterialGraph->Nodes)
         {
@@ -378,14 +425,27 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
 
         if (!RootNode)
         {
-            // UE_LOG(LogTemp, Error, TEXT("[ConnectPins] Root node not found"));
+            UE_LOG(LogTemp, Error, TEXT("[MaterialSubsystem] ConnectPins FATAL: Root node object NOT found in Graph! Material might be corrupted or not open in Editor."));
             return false;
+        }
+
+        UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: Successfully accessed Root Node Object: %s"), *RootNode->GetName());
+
+        UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: Found Root Node. Dumping all Input Pins:"));
+        for (UEdGraphPin* Pin : RootNode->Pins)
+        {
+            if (Pin->Direction == EGPD_Input)
+            {
+                UE_LOG(LogTemp, Log, TEXT("  - Pin: '%s', Category: '%s', SubCategory: '%s'"), 
+                    *Pin->PinName.ToString(), *Pin->PinType.PinCategory.ToString(), *Pin->PinType.PinSubCategory.ToString());
+            }
         }
 
         // 3. Find Output Pin on Source
         UEdGraphPin* SourcePin = nullptr;
-        if (FromPin.IsEmpty())
+        if (FromPin.IsEmpty() || FromPin.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
         {
+            // If empty or named "Output", take the first output pin found
             for (UEdGraphPin* Pin : SourceGraphNode->Pins)
             {
                 if (Pin->Direction == EGPD_Output)
@@ -413,76 +473,117 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
             return false;
         }
 
-        // 4. Find Root Input Pin (使用PinCategory，语言无关)
+        // 4. Resolve Target Pin on Root Node
         UEdGraphPin* TargetPin = nullptr;
         FString TargetPinName = ToPin;
 
-        // Define Pin matching by Category (language-independent)
-        auto FindPinByCategory = [&](const FString& Category, const FString& SubCategory = TEXT("")) -> UEdGraphPin*
+        // SMART MAPPING: Map aliases to internal property names for Root Node
+        FString CleanPinName = TargetPinName.TrimStartAndEnd().Replace(TEXT(" "), TEXT(""));
+        if (CleanPinName.IsEmpty() || CleanPinName.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
         {
-            for (UEdGraphPin* Pin : RootNode->Pins)
-            {
-                if (Pin->Direction == EGPD_Input)
-                {
-                    bool bCategoryMatch = Pin->PinType.PinCategory.ToString().Equals(Category, ESearchCase::IgnoreCase);
-                    bool bSubCategoryMatch = SubCategory.IsEmpty() || Pin->PinType.PinSubCategory.ToString().Equals(SubCategory, ESearchCase::IgnoreCase);
-                    
-                    if (bCategoryMatch && bSubCategoryMatch)
-                    {
-                        return Pin;
-                    }
-                }
-            }
-            return nullptr;
-        };
-
-        // Map user-friendly names to PinCategory searches
-        if (TargetPinName.IsEmpty() || 
-            TargetPinName.Equals(TEXT("FinalColor"), ESearchCase::IgnoreCase) ||
-            TargetPinName.Equals(TEXT("EmissiveColor"), ESearchCase::IgnoreCase) ||
-            TargetPinName.Equals(TEXT("最终颜色"), ESearchCase::IgnoreCase))
-        {
-            // For UI materials: Find EmissiveColor/FinalColor (materialinput + rgba)
-            // Try to find a pin with "Final" or "Emissive" in the name first
-            for (UEdGraphPin* Pin : RootNode->Pins)
-            {
-                if (Pin->Direction == EGPD_Input &&
-                    Pin->PinType.PinCategory.ToString().Equals(TEXT("materialinput")) &&
-                    (Pin->PinName.ToString().Contains(TEXT("最终")) || 
-                     Pin->PinName.ToString().Contains(TEXT("Final")) ||
-                     Pin->PinName.ToString().Contains(TEXT("Emissive"))))
-                {
-                    TargetPin = Pin;
-                    break;
-                }
-            }
-            
-            // Fallback: Find first rgba materialinput (usually BaseColor, but acceptable)
-            if (!TargetPin)
-            {
-                TargetPin = FindPinByCategory(TEXT("materialinput"), TEXT("rgba"));
-            }
+            TargetPinName = (Mat->MaterialDomain == MD_UI) ? TEXT("EmissiveColor") : TEXT("BaseColor");
         }
-        else if (TargetPinName.Equals(TEXT("Opacity"), ESearchCase::IgnoreCase) ||
-                 TargetPinName.Equals(TEXT("不透明度"), ESearchCase::IgnoreCase))
+        else if (CleanPinName.Equals(TEXT("FinalColor"), ESearchCase::IgnoreCase) || CleanPinName.Equals(TEXT("最终颜色"), ESearchCase::IgnoreCase))
         {
-            // Find Opacity (materialinput + red, contains "Opacity" or "不透明")
-            for (UEdGraphPin* Pin : RootNode->Pins)
-            {
-                if (Pin->Direction == EGPD_Input &&
-                    Pin->PinType.PinCategory.ToString().Equals(TEXT("materialinput")) &&
-                    Pin->PinType.PinSubCategory.ToString().Equals(TEXT("red")) &&
-                    (Pin->PinName.ToString().Contains(TEXT("不透明")) ||
-                     Pin->PinName.ToString().Contains(TEXT("Opacity"))))
-                {
-                    TargetPin = Pin;
-                    break;
-                }
-            }
+            TargetPinName = TEXT("EmissiveColor");
+        }
+        else if (CleanPinName.Equals(TEXT("Opacity"), ESearchCase::IgnoreCase) || CleanPinName.Equals(TEXT("不透明度"), ESearchCase::IgnoreCase))
+        {
+            TargetPinName = TEXT("Opacity");
+        }
+        else if (CleanPinName.Equals(TEXT("OpacityMask"), ESearchCase::IgnoreCase) || CleanPinName.Equals(TEXT("不透明度蒙版"), ESearchCase::IgnoreCase))
+        {
+            TargetPinName = TEXT("OpacityMask");
         }
         else
         {
-            // Direct name match fallback
+            TargetPinName = CleanPinName;
+        }
+
+        // --- STRATEGY 1: Use Stable Property Names from UMaterial (Language Independent) ---
+        FProperty* MatProp = nullptr;
+#if WITH_EDITOR
+        if (Mat->GetEditorOnlyData())
+        {
+            MatProp = Mat->GetEditorOnlyData()->GetClass()->FindPropertyByName(*TargetPinName);
+        }
+#endif
+        if (!MatProp)
+        {
+            MatProp = Mat->GetClass()->FindPropertyByName(*TargetPinName);
+        }
+
+        if (MatProp)
+        {
+            FString LocalizedDisplayName = MatProp->GetDisplayNameText().ToString();
+            UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: Resolved Stable ID '%s' to Localized Name '%s'"), *TargetPinName, *LocalizedDisplayName);
+            
+            for (UEdGraphPin* Pin : RootNode->Pins)
+            {
+                if (Pin->Direction == EGPD_Input && 
+                    (Pin->PinName.ToString().Equals(TargetPinName, ESearchCase::IgnoreCase) ||
+                     Pin->PinName.ToString().Equals(LocalizedDisplayName, ESearchCase::IgnoreCase) ||
+                     Pin->PinName.ToString().Replace(TEXT(" "), TEXT("")).Equals(TargetPinName, ESearchCase::IgnoreCase)))
+                {
+                    TargetPin = Pin;
+                    break;
+                }
+            }
+        }
+
+        // --- STRATEGY 2: Heuristic/Localized fallback ---
+        if (!TargetPin)
+        {
+            if (TargetPinName.Equals(TEXT("EmissiveColor"), ESearchCase::IgnoreCase) ||
+                TargetPinName.Equals(TEXT("自发光"), ESearchCase::IgnoreCase) ||
+                TargetPinName.Equals(TEXT("Final"), ESearchCase::IgnoreCase))
+            {
+                for (UEdGraphPin* Pin : RootNode->Pins)
+                {
+                    if (Pin->Direction == EGPD_Input && 
+                         (Pin->PinName.ToString().Contains(TEXT("Final")) || 
+                          Pin->PinName.ToString().Contains(TEXT("Emissive")) ||
+                          Pin->PinName.ToString().Contains(TEXT("最终")) ||
+                          Pin->PinName.ToString().Contains(TEXT("自发光"))))
+                    {
+                        TargetPin = Pin;
+                        break;
+                    }
+                }
+            }
+            else if (TargetPinName.Equals(TEXT("Opacity"), ESearchCase::IgnoreCase) ||
+                     TargetPinName.Equals(TEXT("不透明度"), ESearchCase::IgnoreCase))
+            {
+                for (UEdGraphPin* Pin : RootNode->Pins)
+                {
+                    if (Pin->Direction == EGPD_Input && 
+                        (Pin->PinName.ToString().Contains(TEXT("不透明")) ||
+                         Pin->PinName.ToString().Contains(TEXT("Opacity"))))
+                    {
+                        TargetPin = Pin;
+                        break;
+                    }
+                }
+            }
+            else if (TargetPinName.Equals(TEXT("BaseColor"), ESearchCase::IgnoreCase) ||
+                     TargetPinName.Equals(TEXT("基础颜色"), ESearchCase::IgnoreCase))
+            {
+                 for (UEdGraphPin* Pin : RootNode->Pins)
+                 {
+                     if (Pin->Direction == EGPD_Input && 
+                          (Pin->PinName.ToString().Contains(TEXT("Base")) || 
+                           Pin->PinName.ToString().Contains(TEXT("基础"))))
+                     {
+                         TargetPin = Pin;
+                         break;
+                     }
+                 }
+            }
+        }
+
+        // --- STRATEGY 3: Direct Name Match fallback ---
+        if (!TargetPin)
+        {
             for (UEdGraphPin* Pin : RootNode->Pins)
             {
                 if (Pin->Direction == EGPD_Input && Pin->PinName.ToString().Equals(TargetPinName, ESearchCase::IgnoreCase))
@@ -495,26 +596,52 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
 
         if (!TargetPin)
         {
-            // UE_LOG(LogTemp, Error, TEXT("[ConnectPins] Root input pin not found for: %s"), *TargetPinName);
+            UE_LOG(LogTemp, Error, TEXT("[MaterialSubsystem] ConnectPins ERROR: Could not match Root Input Pin for handle '%s' with name '%s'"), *ToHandle, *TargetPinName);
             return false;
         }
+
+        UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: SUCCESS! Linking '%s' to Root Pin '%s'"), *FromHandle, *TargetPin->PinName.ToString());
 
         // 5. Make Graph Connection
         SourcePin->MakeLinkTo(TargetPin);
 
-        // UE_LOG(LogTemp, Warning, TEXT("[ConnectPins] Graph: Connected %s.%s -> Root.%s"), 
-        //    *FromHandle, *SourcePin->PinName.ToString(), *TargetPin->PinName.ToString());
-
-        // 6. Force Graph Refresh
-        if (Mat->MaterialGraph)
+        // --- NEW: Sync Data Layer ---
+        FExpressionInput* DataInput = FindInputProperty(Mat, TargetPinName);
+        if (DataInput && SourceGraphNode->MaterialExpression)
         {
-            Mat->MaterialGraph->NotifyGraphChanged();
+            DataInput->Expression = SourceGraphNode->MaterialExpression;
+            DataInput->OutputIndex = 0;
+            UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: Data-layer synced for Root.%s"), *TargetPinName);
         }
+
+        // 6. Force Refresh
+        if (Mat->MaterialGraph) Mat->MaterialGraph->NotifyGraphChanged();
+        Mat->Modify();
         Mat->PostEditChange();
         Mat->MarkPackageDirty();
         ForceRefreshMaterialEditor();
-
         return true;
+        }
+
+        // === ROOT NODE FALLBACK: Use Reflection (When Graph is null) ===
+        UE_LOG(LogTemp, Warning, TEXT("[MaterialSubsystem] ConnectPins: Graph is null, using Reflection fallback for Master."));
+        
+        UMaterialExpression* FromExpr = FindExpressionByHandle(FromHandle);
+        if (!FromExpr) return false;
+
+        FExpressionInput* InputPtr = FindInputProperty(Mat, ToPin);
+        if (InputPtr)
+        {
+            InputPtr->Expression = FromExpr;
+            InputPtr->OutputIndex = 0;
+            
+            Mat->PostEditChange();
+            Mat->MarkPackageDirty();
+            ForceRefreshMaterialEditor();
+            return true;
+        }
+
+        return false;
     }
     else
     {
@@ -537,9 +664,9 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
 
         // Find Input Property
         FExpressionInput* InputPtr = nullptr;
-        FString TargetPinName = ToPin;
+        FString ReflTargetPinName = ToPin;
 
-        if (TargetPinName.IsEmpty())
+        if (ReflTargetPinName.IsEmpty())
         {
             const TArray<FString> TryPins = { TEXT("Input"), TEXT("Coordinates"), TEXT("UV"), TEXT("Alpha"), TEXT("A") };
             for (const FString& Try : TryPins)
@@ -550,7 +677,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
         }
         else
         {
-            InputPtr = FindInputProperty(TargetObject, TargetPinName);
+            InputPtr = FindInputProperty(TargetObject, ReflTargetPinName);
         }
 
         // Special Case: Custom Node Inputs
@@ -559,7 +686,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
         {
             for (int32 i = 0; i < CustomNode->Inputs.Num(); i++)
             {
-                if (CustomNode->Inputs[i].InputName.ToString().Equals(TargetPinName, ESearchCase::IgnoreCase))
+                if (CustomNode->Inputs[i].InputName.ToString().Equals(ReflTargetPinName, ESearchCase::IgnoreCase))
                 {
                     InputPtr = &(CustomNode->Inputs[i].Input);
                     break;
@@ -625,38 +752,106 @@ bool UUmgMcpMaterialSubsystem::SetCustomNodeHLSL(const FString& NodeHandle, cons
 
 bool UUmgMcpMaterialSubsystem::SetNodeProperties(const FString& NodeHandle, const TSharedPtr<FJsonObject>& Properties)
 {
-    UMaterialExpression* Expr = FindExpressionByHandle(NodeHandle);
-    if (!Expr || !Properties) return false;
+    UMaterial* Mat = GetTargetMaterial();
+    if (!Mat || !Properties) return false;
 
-    // Use FJsonObjectConverter to apply properties
-    // Note: FJsonObjectConverter handles basic types. Structs might be tricky.
+    UObject* TargetObject = nullptr;
     
+    // Check if targeting the Material Asset itself
+    bool bTargetRoot = NodeHandle.StartsWith(TEXT("Master")) || 
+                      NodeHandle.Equals(TEXT("Output"), ESearchCase::IgnoreCase) ||
+                      NodeHandle.Equals(TEXT("MaterialRoot")) || 
+                      NodeHandle.Equals(Mat->GetName());
+
+    if (bTargetRoot)
+    {
+        TargetObject = Mat;
+    }
+    else
+    {
+        TargetObject = FindExpressionByHandle(NodeHandle);
+    }
+
+    if (!TargetObject) return false;
+
+    // Use Reflection to apply properties
     for (const auto& Elem : Properties->Values)
     {
         FString PropName = Elem.Key;
         TSharedPtr<FJsonValue> JsonVal = Elem.Value;
         
-        FProperty* Prop = Expr->GetClass()->FindPropertyByName(*PropName);
+        FProperty* Prop = TargetObject->GetClass()->FindPropertyByName(*PropName);
         if (Prop)
         {
-             // Simple types
+             // 1. Numeric Types
              if (FFloatProperty* FloatProp = CastField<FFloatProperty>(Prop))
              {
-                 FloatProp->SetPropertyValue_InContainer(Expr, JsonVal->AsNumber());
+                 FloatProp->SetPropertyValue_InContainer(TargetObject, JsonVal->AsNumber());
              }
              else if (FDoubleProperty* DblProp = CastField<FDoubleProperty>(Prop))
              {
-                 DblProp->SetPropertyValue_InContainer(Expr, JsonVal->AsNumber());
+                 DblProp->SetPropertyValue_InContainer(TargetObject, JsonVal->AsNumber());
              }
              else if (FIntProperty* IntProp = CastField<FIntProperty>(Prop))
              {
-                 IntProp->SetPropertyValue_InContainer(Expr, (int)JsonVal->AsNumber());
+                 IntProp->SetPropertyValue_InContainer(TargetObject, (int32)JsonVal->AsNumber());
              }
-             // TODO: Vector, Texture, etc.
+             else if (FBoolProperty* BoolProp = CastField<FBoolProperty>(Prop))
+             {
+                 BoolProp->SetPropertyValue_InContainer(TargetObject, JsonVal->AsBool());
+             }
+             // 2. Enum Types (Important for MaterialDomain, BlendMode)
+             else if (FEnumProperty* EnumProp = CastField<FEnumProperty>(Prop))
+             {
+                 if (JsonVal->Type == EJson::String)
+                 {
+                     FString EnumString = JsonVal->AsString();
+                     int64 EnumValue = EnumProp->GetEnum()->GetValueByNameString(EnumString);
+                     if (EnumValue != INDEX_NONE)
+                     {
+                         EnumProp->GetUnderlyingProperty()->SetIntPropertyValue(EnumProp->ContainerPtrToValuePtr<void>(TargetObject), EnumValue);
+                     }
+                 }
+                 else if (JsonVal->Type == EJson::Number)
+                 {
+                     EnumProp->GetUnderlyingProperty()->SetIntPropertyValue(EnumProp->ContainerPtrToValuePtr<void>(TargetObject), (int64)JsonVal->AsNumber());
+                 }
+             }
+             else if (FByteProperty* ByteProp = CastField<FByteProperty>(Prop))
+             {
+                 if (ByteProp->Enum && JsonVal->Type == EJson::String)
+                 {
+                     int64 EnumValue = ByteProp->Enum->GetValueByNameString(*JsonVal->AsString(), EGetByNameFlags::None);
+                     if (EnumValue != INDEX_NONE)
+                     {
+                         ByteProp->SetPropertyValue_InContainer(TargetObject, (uint8)EnumValue);
+                     }
+                 }
+                 else if (JsonVal->Type == EJson::Number)
+                 {
+                     ByteProp->SetPropertyValue_InContainer(TargetObject, (uint8)JsonVal->AsNumber());
+                 }
+             }
+             // 3. String/Name Types
+             else if (FStrProperty* StrProp = CastField<FStrProperty>(Prop))
+             {
+                 StrProp->SetPropertyValue_InContainer(TargetObject, JsonVal->AsString());
+             }
+             else if (FNameProperty* NameProp = CastField<FNameProperty>(Prop))
+             {
+                 NameProp->SetPropertyValue_InContainer(TargetObject, FName(*JsonVal->AsString()));
+             }
         }
     }
     
-    Expr->PostEditChange();
+    TargetObject->PostEditChange();
+    
+    // If we changed Material properties, we might need a compile and a full refresh
+    if (bTargetRoot)
+    {
+        Mat->MarkPackageDirty();
+    }
+
     ForceRefreshMaterialEditor();
     return true;
 }
@@ -807,11 +1002,7 @@ FString UUmgMcpMaterialSubsystem::GetNodeInfo(const FString& NodeHandle)
     UMaterial* Mat = GetTargetMaterial();
     if (!Mat) return TEXT("{}");
 
-    // Ensure we have a valid Graph to look at
-    if (!Mat->MaterialGraph)
-    {
-        return TEXT("{\"error\": \"Material Graph is null. Is Editor loaded?\"}");
-    }
+    // We no longer strictly require MaterialGraph here for bIsRootAlias fallback
 
     UEdGraphNode* TargetNode = nullptr;
 
@@ -819,33 +1010,39 @@ FString UUmgMcpMaterialSubsystem::GetNodeInfo(const FString& NodeHandle)
     // Check for Root Alias
     bool bIsRootAlias = NodeHandle.StartsWith(TEXT("Master")) || NodeHandle.Equals(TEXT("MaterialRoot")) || NodeHandle.Equals(Mat->GetName());
     
-    if (bIsRootAlias)
+    if (Mat->MaterialGraph)
     {
-        // Find Root Node
-        for (UEdGraphNode* Node : Mat->MaterialGraph->Nodes)
+        if (bIsRootAlias)
         {
-            if (Node->IsA(UMaterialGraphNode_Root::StaticClass()))
+            // STRATEGY: Directly iterate the Graph Nodes to find the Root instance
+            for (UEdGraphNode* Node : Mat->MaterialGraph->Nodes)
             {
-                TargetNode = Node;
-                break;
-            }
-        }
-    }
-    else
-    {
-        // Find Expression Node
-        // Note: NodeHandle might be the Expression Name, but GraphNodes contain Expressions.
-        // We need to match GraphNode -> MaterialExpression -> Name
-        for (UEdGraphNode* Node : Mat->MaterialGraph->Nodes)
-        {
-            UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
-            if (MatNode && MatNode->MaterialExpression)
-            {
-                if (MatNode->MaterialExpression->GetName().Equals(NodeHandle, ESearchCase::IgnoreCase) || 
-                    MatNode->MaterialExpression->Desc.Equals(NodeHandle, ESearchCase::IgnoreCase))
+                if (Node->IsA(UMaterialGraphNode_Root::StaticClass()))
                 {
                     TargetNode = Node;
                     break;
+                }
+            }
+            
+            if (TargetNode)
+            {
+                UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] GetNodeInfo: Successfully located Root Node Object in Graph: %s"), *TargetNode->GetName());
+            }
+        }
+        else
+        {
+            // Find Expression Node
+            for (UEdGraphNode* Node : Mat->MaterialGraph->Nodes)
+            {
+                UMaterialGraphNode* MatNode = Cast<UMaterialGraphNode>(Node);
+                if (MatNode && MatNode->MaterialExpression)
+                {
+                    if (MatNode->MaterialExpression->GetName().Equals(NodeHandle, ESearchCase::IgnoreCase) || 
+                        MatNode->MaterialExpression->Desc.Equals(NodeHandle, ESearchCase::IgnoreCase))
+                    {
+                        TargetNode = Node;
+                        break;
+                    }
                 }
             }
         }
@@ -853,49 +1050,118 @@ FString UUmgMcpMaterialSubsystem::GetNodeInfo(const FString& NodeHandle)
 
     if (!TargetNode)
     {
-        return FString::Printf(TEXT("{\"error\": \"Node not found in Graph: %s\"}"), *NodeHandle);
+        if (bIsRootAlias)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[MaterialSubsystem] GetNodeInfo: GraphNode not found for Root, using Property Reflection fallback."));
+        }
+        else
+        {
+            return FString::Printf(TEXT("{\"error\": \"Node not found in Graph: %s\"}"), *NodeHandle);
+        }
     }
 
-    // 2. Dump Pins and Connections from Graph Node
+    // 2. Dump Pins and Connections
     TSharedPtr<FJsonObject> RootObject = MakeShareable(new FJsonObject());
     TArray<TSharedPtr<FJsonValue>> PinsArray;
     TSharedPtr<FJsonObject> ConnectionsObject = MakeShareable(new FJsonObject());
+    TSet<FString> UniquePins;
 
-    for (UEdGraphPin* Pin : TargetNode->Pins)
+    if (TargetNode)
     {
-        // Only interested in Inputs for "Pins" list usually, but let's dump all?
-        // User wants to know what they can connect TO. So Inputs.
-        if (Pin->Direction == EGPD_Input)
+        // === GRAPH-BASED INTROSPECTION ===
+        for (UEdGraphPin* Pin : TargetNode->Pins)
         {
-             PinsArray.Add(MakeShareable(new FJsonValueString(Pin->PinName.ToString())));
-             
-             // Check Connections
-             if (Pin->LinkedTo.Num() > 0)
-             {
-                 // It connects TO something.
-                 // In Material Graph, Input Pin connects to an Output Pin of another Node.
-                 UEdGraphPin* ConnectedPin = Pin->LinkedTo[0];
-                 if (ConnectedPin && ConnectedPin->GetOwningNode())
-                 {
-                     UEdGraphNode* SourceNode = ConnectedPin->GetOwningNode();
-                     FString SourceName = SourceNode->GetNodeTitle(ENodeTitleType::ListView).ToString();
-                     
-                     // Try to get the actual Expression Name for code usage
-                     if (UMaterialGraphNode* SourceMatNode = Cast<UMaterialGraphNode>(SourceNode))
-                     {
-                         if (SourceMatNode->MaterialExpression)
-                         {
-                             SourceName = SourceMatNode->MaterialExpression->GetName();
-                             if (!SourceMatNode->MaterialExpression->Desc.IsEmpty())
-                             {
-                                 SourceName = SourceMatNode->MaterialExpression->Desc;
-                             }
-                         }
-                     }
-                     
-                     ConnectionsObject->SetStringField(Pin->PinName.ToString(), SourceName);
-                 }
-             }
+            if (Pin->Direction == EGPD_Input)
+            {
+                FString PinName = Pin->PinName.ToString();
+                
+                // Deduplicate pins (UE5 often lists properties twice in Graph nodes)
+                if (UniquePins.Contains(PinName)) continue;
+                UniquePins.Add(PinName);
+
+                FString StableId = PinName;
+                if (bIsRootAlias)
+                {
+                    // Map localized UI name back to Stable Property ID for Root Node
+#if WITH_EDITOR
+                    if (Mat->GetEditorOnlyData())
+                    {
+                        for (TFieldIterator<FProperty> PropIt(Mat->GetEditorOnlyData()->GetClass()); PropIt; ++PropIt)
+                        {
+                            if (PropIt->GetDisplayNameText().ToString().Equals(PinName, ESearchCase::IgnoreCase))
+                            {
+                                StableId = PropIt->GetName();
+                                break;
+                            }
+                        }
+                    }
+#endif
+                }
+
+                TSharedPtr<FJsonObject> PinObj = MakeShareable(new FJsonObject());
+                PinObj->SetStringField(TEXT("name"), PinName);
+                PinObj->SetStringField(TEXT("id"), StableId);
+                PinsArray.Add(MakeShareable(new FJsonValueObject(PinObj)));
+
+                if (Pin->LinkedTo.Num() > 0)
+                {
+                    UEdGraphPin* ConnectedPin = Pin->LinkedTo[0];
+                    if (ConnectedPin && ConnectedPin->GetOwningNode())
+                    {
+                        FString SourceHandle = ConnectedPin->GetOwningNode()->GetName();
+                        if (UMaterialGraphNode* SourceMatNode = Cast<UMaterialGraphNode>(ConnectedPin->GetOwningNode()))
+                        {
+                            if (SourceMatNode->MaterialExpression)
+                            {
+                                SourceHandle = SourceMatNode->MaterialExpression->GetName();
+                                if (!SourceMatNode->MaterialExpression->Desc.IsEmpty())
+                                    SourceHandle = SourceMatNode->MaterialExpression->Desc;
+                            }
+                        }
+                        ConnectionsObject->SetStringField(StableId, SourceHandle);
+                    }
+                }
+            }
+        }
+    }
+    else if (bIsRootAlias)
+    {
+        // === REFLECTION FALLBACK (When Graph is null or hidden) ===
+        TArray<UObject*> SearchTargets;
+#if WITH_EDITOR
+        if (Mat->GetEditorOnlyData()) SearchTargets.Add((UObject*)Mat->GetEditorOnlyData());
+#endif
+        SearchTargets.Add(Mat);
+
+        for (UObject* Target : SearchTargets)
+        {
+            for (TFieldIterator<FProperty> PropIt(Target->GetClass()); PropIt; ++PropIt)
+            {
+                FProperty* Prop = *PropIt;
+                FString PropName = Prop->GetName();
+                if (UniquePins.Contains(PropName)) continue;
+
+                // Check if it's a Material Input (usually FExpressionInput subclasses)
+                FStructProperty* StructProp = CastField<FStructProperty>(Prop);
+                if (StructProp && StructProp->Struct->GetName().Contains(TEXT("Input")))
+                {
+                    UniquePins.Add(PropName);
+                    
+                    TSharedPtr<FJsonObject> PinObj = MakeShareable(new FJsonObject());
+                    PinObj->SetStringField(TEXT("name"), Prop->GetDisplayNameText().ToString());
+                    PinObj->SetStringField(TEXT("id"), PropName);
+                    PinsArray.Add(MakeShareable(new FJsonValueObject(PinObj)));
+
+                    FExpressionInput* InputPtr = StructProp->ContainerPtrToValuePtr<FExpressionInput>(Target);
+                    if (InputPtr && InputPtr->Expression)
+                    {
+                        FString SourceHandle = InputPtr->Expression->GetName();
+                        if (!InputPtr->Expression->Desc.IsEmpty())
+                            SourceHandle = InputPtr->Expression->Desc;
+                        ConnectionsObject->SetStringField(PropName, SourceHandle);
+                    }
+                }
+            }
         }
     }
 
@@ -905,11 +1171,9 @@ FString UUmgMcpMaterialSubsystem::GetNodeInfo(const FString& NodeHandle)
     FString OutputString;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
     FJsonSerializer::Serialize(RootObject.ToSharedRef(), Writer);
-
     return OutputString;
 }
     
-
 
 
 UMaterialExpression* UUmgMcpMaterialSubsystem::FindExpressionByHandle(const FString& Handle)

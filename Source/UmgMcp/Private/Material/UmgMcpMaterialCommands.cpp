@@ -74,17 +74,26 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(InfoJsonStr);
             if (FJsonSerializer::Deserialize(Reader, InfoObj))
             {
-                 // Flatten: Add "pins" and "connections" to the top level result
-                 if (InfoObj->HasField(TEXT("pins"))) 
-                     ResultJson->SetArrayField(TEXT("pins"), InfoObj->GetArrayField(TEXT("pins")));
+                 // Relay Error if present
+                 if (InfoObj->HasField(TEXT("error")))
+                 {
+                     ResultJson->SetStringField(TEXT("error"), InfoObj->GetStringField(TEXT("error")));
+                     ResultJson->SetBoolField(TEXT("success"), false);
+                 }
+                 else
+                 {
+                     // Flatten: Add "pins", "connections" and "name" to the top level result
+                     if (InfoObj->HasField(TEXT("pins"))) 
+                         ResultJson->SetArrayField(TEXT("pins"), InfoObj->GetArrayField(TEXT("pins")));
+                         
+                     if (InfoObj->HasField(TEXT("connections")))
+                         ResultJson->SetObjectField(TEXT("connections"), InfoObj->GetObjectField(TEXT("connections")));
+                         
+                     if (InfoObj->HasField(TEXT("name")))
+                         ResultJson->SetStringField(TEXT("name"), InfoObj->GetStringField(TEXT("name")));
                      
-                 if (InfoObj->HasField(TEXT("connections")))
-                     ResultJson->SetObjectField(TEXT("connections"), InfoObj->GetObjectField(TEXT("connections")));
-                     
-                 if (InfoObj->HasField(TEXT("name")))
-                     ResultJson->SetStringField(TEXT("name"), InfoObj->GetStringField(TEXT("name")));
-                 
-                 ResultJson->SetBoolField(TEXT("success"), true);
+                     ResultJson->SetBoolField(TEXT("success"), true);
+                 }
             }
             else
             {

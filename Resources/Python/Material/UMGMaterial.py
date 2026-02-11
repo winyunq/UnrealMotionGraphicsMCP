@@ -31,13 +31,13 @@ class UMGMaterial:
     async def connect_nodes(self, from_handle: str, to_handle: str) -> dict:
         return await self.connection.send_command("material_connect_nodes", {"from": from_handle, "to": to_handle})
 
-    async def connect_pins(self, source: str, target: str, source_pin: str = None, target_pin: str = None) -> dict:
+    async def connect_pins(self, source: str, source_pin: str, target: str, target_pin: str) -> dict:
         params = {
             "source": source,
-            "target": target
+            "source_pin": source_pin,
+            "target": target,
+            "target_pin": target_pin
         }
-        if source_pin: params["source_pin"] = source_pin
-        if target_pin: params["target_pin"] = target_pin
         return await self.connection.send_command("material_connect_pins", params)
 
     async def set_hlsl_node_io(self, handle: str, code: str, inputs: list) -> dict:
