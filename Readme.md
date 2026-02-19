@@ -230,17 +230,18 @@ flowchart LR
 
 | Category                | API Name                       |  Status   | Description                                                                                     |
 | ----------------------- | ------------------------------ | :-------: | ----------------------------------------------------------------------------------------------- |
-| **P0: Context**         | `material_set_target`          | 🚧 Planned | **Anchor**: Specify target asset (path or parent). Required for stateful editing.               |
-| **P1: Def & Query**     | `material_define_variable`     | 🚧 Planned | Define external interface parameters (Def, not wire). Supports Scalar, Vector, Texture.         |
-| **P2: Symbol Place**    | `material_add_node`            | 🚧 Planned | **Drag Symbol**: Place a symbol from lib into graph and assign a unique instance handle.        |
-|                         | `material_get_nodes`           | 🚧 Planned | Query existence and state of node instances in the graph.                                       |
-| **P3: Connectivity**    | `material_connect_nodes`       | 🚧 Planned | **Natural Connection**: Establish node-to-node functional flow (A -> B).                        |
-|                         | `material_connect_pins`        | 🚧 Planned | **Surgical Wiring**: Manually connect specific pins for complex topologies.                     |
+| **P0: Context**         | `material_set_target`          |     ✅     | **Anchor**: Specify target asset (path or parent). Required for stateful editing.               |
+| **P1: Def & Query**     | `material_define_variable`     |     ✅     | Define external interface parameters (Def, not wire). Supports Scalar, Vector, Texture.         |
+| **P2: Symbol Place**    | `material_add_node`            |     ✅     | **Drag Symbol**: Place a symbol from lib into graph and assign a unique instance handle.        |
+|                         | `material_get_graph`           |     ✅     | Query existence and state of node instances in the graph.                                       |
+| **P3: Connectivity**    | `material_connect_nodes`       |     ✅     | **Natural Connection**: Establish node-to-node functional flow (A -> B).                        |
+|                         | `material_connect_pins`        |     ✅     | **Surgical Wiring**: Manually connect specific pins for complex topologies.                     |
 | **P4: Lib Search**      | `material_search_library`      | 🚧 Planned | Search for available Material Expressions (symbols) and Functions.                              |
-| **P5: Tactical Detail** | `material_set_hlsl_node_io`    | 🚧 Planned | **Tactical Code**: Inject HLSL into Custom nodes and sync IO pins via JSON mapping.             |
-|                         | `material_set_node_properties` | 🚧 Planned | **Property Editing**: Set internal properties for regular nodes (e.g. Constant Value, Texture). |
-| **Lifecycle**           | `compile_asset`                | 🚧 Planned | Submit changes and analyze HLSL compilation errors.                                             |
-| **Maintenance**         | `material_delete`              | 🚧 Planned | Delete node instances or clean up logic by unique handle.                                       |
+| **P5: Tactical Detail** | `material_set_hlsl_node_io`    |     ✅     | **Tactical Code**: Inject HLSL into Custom nodes and sync IO pins via JSON mapping.             |
+|                         | `material_set_node_properties` |     ✅     | **Property Editing**: Set internal properties for regular nodes (e.g. Constant Value, Texture). |
+| **Lifecycle**           | `material_compile_asset`       |     ✅     | Submit changes and analyze HLSL compilation errors.                                             |
+| **Maintenance**         | `material_delete`              |     ✅     | Delete node instances or clean up logic by unique handle.                                       |
+|                         | `material_get_pins`            |     ✅     | Introspect pins for a specific node handle.                                                     |
 
 ## UMG Style & Theming API Status (New)
 

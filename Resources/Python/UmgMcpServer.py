@@ -887,8 +887,107 @@ async def remove_keys(property_name: str, times: List[float]) -> Dict[str, Any]:
 
 
 # =============================================================================
-
+#  Category: Material (New - 5 Pillars API)
 # =============================================================================
+
+@register_tool("material_set_target", "Specify target asset (path or parent). Required for stateful editing.")
+async def material_set_target(path: str, create_if_not_found: bool = True) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.set_target_material(path, create_if_not_found)
+
+@register_tool("material_define_variable", "Define external interface parameters (Scalar, Vector, Texture).")
+async def material_define_variable(name: str, type: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.define_variable(name, type)
+
+@register_tool("material_add_node", "Place a symbol from lib into graph and assign a unique instance handle.")
+async def material_add_node(symbol: str, handle: str = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.add_node(symbol, handle)
+
+@register_tool("material_delete", "Delete node instances or clean up logic by unique handle.")
+async def material_delete(handle: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.delete_node(handle)
+
+@register_tool("material_connect_nodes", "Establish node-to-node functional flow (Natural Connection).")
+async def material_connect_nodes(from_handle: str, to_handle: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.connect_nodes(from_handle, to_handle)
+
+@register_tool("material_connect_pins", "Manually connect specific pins for complex topologies.")
+async def material_connect_pins(source: str, source_pin: str, target: str, target_pin: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.connect_pins(source, source_pin, target, target_pin)
+
+@register_tool("material_set_hlsl_node_io", "Inject HLSL into Custom nodes and sync IO pins.")
+async def material_set_hlsl_node_io(handle: str, code: str, inputs: List[str]) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.set_hlsl_node_io(handle, code, inputs)
+
+@register_tool("material_set_node_properties", "Set internal properties for regular nodes.")
+async def material_set_node_properties(handle: str, properties: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.set_node_properties(handle, properties)
+
+@register_tool("material_compile_asset", "Submit changes and analyze HLSL compilation errors.")
+async def material_compile_asset() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.compile_asset()
+
+@register_tool("material_get_pins", "Introspects the available pins for a given node or 'Master'.")
+async def material_get_pins(handle: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.get_node_pins(handle)
+
+@register_tool("material_get_graph", "Retrieves the full graph topology.")
+async def material_get_graph() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.get_graph()
 
 # =============================================================================
 #  Category: Dynamic Prompts (Loaded from JSON)
@@ -909,8 +1008,8 @@ def load_prompts():
             data = json.load(f)
 
         # 1. Register Action Prompts (from specific categories)
-        # Added "Animation Sequencer" to the list
-        target_categories = ["UMG Editor", "Blueprint Logic", "Animation Sequencer"]
+        # Added "Animation Sequencer" and "Material Logic" to the list
+        target_categories = ["UMG Editor", "Blueprint Logic", "Animation Sequencer", "Material Logic"]
         
         for category in target_categories:
             if category in data:
