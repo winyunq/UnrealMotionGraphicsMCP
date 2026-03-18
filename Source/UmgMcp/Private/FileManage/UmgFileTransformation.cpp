@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 // UmgFileTransformation.cpp (v1.3 - Added comments and thread safety)
 
+#include "UmgMcp.h"
 #include "FileManage/UmgFileTransformation.h"
 #include "Blueprint/UserWidget.h"
 #include "WidgetBlueprint.h"
@@ -19,9 +20,6 @@
 #include "WidgetBlueprintFactory.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Kismet2/BlueprintEditorUtils.h"
-
-// Log category for this module
-DEFINE_LOG_CATEGORY_STATIC(LogUmgMcp, Log, All);
 
 // Forward declarations
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget);
