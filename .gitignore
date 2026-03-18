@@ -32,6 +32,16 @@ DerivedDataCache/
 
 # Python generated files
 __pycache__/
+*.pyc
+*.pyo
 
-# Configuration files (if not meant to be tracked)
-Config/
+# Gemini Temporary Files
+Gemini_*
+
+# Doxygen / Documentation generated files
+Document/html/
+Document/latex/
+
+# Plugin internal configs
+UmgMcpConfig.json
+Gemini_FabExportConfig.json
