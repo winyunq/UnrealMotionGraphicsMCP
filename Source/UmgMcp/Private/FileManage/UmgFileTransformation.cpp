@@ -1,8 +1,6 @@
-// Copyright (c) 2025-2026 Winyunq. All rights reserved.
-// UmgFileTransformation.cpp (v1.3 - Added comments and thread safety)
-
-#include "UmgMcp.h"
 #include "FileManage/UmgFileTransformation.h"
+#include "UmgMcp.h"
+
 #include "Blueprint/UserWidget.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
@@ -610,7 +608,7 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
     {
         // Normalize JSON keys from camelCase to PascalCase to match C++ UPROPERTY names
         UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Processing Slot properties for widget '%s'"), *WidgetName);
-        TSharedPtr<FJsonObject> NormalizedSlotProps = NormalizeJsonKeysToPascalCase(SlotProps);
+        TSharedPtr<FJsonObject> NormalizedSlotProps = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(SlotProps);
         
         // Log the normalized Slot JSON for debugging
         FString SlotPropsString;
