@@ -11,6 +11,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "FileHelpers.h"
+#include "FileManage/UmgFileTransformation.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
 
@@ -26,67 +27,7 @@ void UUmgSetSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
-// Forward declaration
-static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson);
-
-/**
- * Normalizes JSON keys from camelCase to PascalCase to match C++ UPROPERTY names.
- * (Same implementation as in UmgFileTransformation.cpp)
- */
-static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson)
-{
-    if (!SourceJson.IsValid())
-    {
-        return nullptr;
-    }
-    
-    TSharedPtr<FJsonObject> NormalizedJson = MakeShared<FJsonObject>();
-    
-    for (const auto& Pair : SourceJson->Values)
-    {
-        FString OriginalKey = Pair.Key;
-        FString NormalizedKey = OriginalKey;
-        
-        // Convert first character to uppercase (camelCase → PascalCase)
-        if (NormalizedKey.Len() > 0 && FChar::IsLower(NormalizedKey[0]))
-        {
-            NormalizedKey[0] = FChar::ToUpper(NormalizedKey[0]);
-        }
-        
-        // Recursively process nested objects
-        TSharedPtr<FJsonValue> Value = Pair.Value;
-        if (Value->Type == EJson::Object)
-        {
-            TSharedPtr<FJsonObject> NormalizedNestedObj = NormalizeJsonKeysToPascalCase(Value->AsObject());
-            NormalizedJson->SetObjectField(NormalizedKey, NormalizedNestedObj);
-        }
-        else if (Value->Type == EJson::Array)
-        {
-            TArray<TSharedPtr<FJsonValue>> SourceArray = Value->AsArray();
-            TArray<TSharedPtr<FJsonValue>> NormalizedArray;
-            
-            for (const TSharedPtr<FJsonValue>& ArrayValue : SourceArray)
-            {
-                if (ArrayValue->Type == EJson::Object)
-                {
-                    TSharedPtr<FJsonObject> NormalizedArrayObj = NormalizeJsonKeysToPascalCase(ArrayValue->AsObject());
-                    NormalizedArray.Add(MakeShared<FJsonValueObject>(NormalizedArrayObj));
-                }
-                else
-                {
-                    NormalizedArray.Add(ArrayValue);
-                }
-            }
-            NormalizedJson->SetArrayField(NormalizedKey, NormalizedArray);
-        }
-        else
-        {
-            NormalizedJson->SetField(NormalizedKey, Value);
-        }
-    }
-    
-    return NormalizedJson;
-}
+// Removed redundant NormalizeJsonKeysToPascalCase implementation, now using UUmgFileTransformation::NormalizeJsonKeysToPascalCase
 
 bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& PropertiesJson)
 {
@@ -119,7 +60,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
 
     // Normalize JSON keys from camelCase to PascalCase (especially important for Slot properties)
     UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Normalizing property keys for widget '%s'"), *WidgetName);
-    TSharedPtr<FJsonObject> NormalizedProperties = NormalizeJsonKeysToPascalCase(PropertiesJsonObject);
+    TSharedPtr<FJsonObject> NormalizedProperties = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(PropertiesJsonObject);
     
     // Separate Slot properties from widget properties (Slot must be applied to the Slot object, not the Widget)
     TSharedPtr<FJsonObject> SlotProperties;

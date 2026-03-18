@@ -50,4 +50,14 @@ public:
      * @return True if the operation was successful, false otherwise.
      */
     static bool ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName = TEXT(""));
+
+    /**
+     * Normalizes JSON keys from camelCase to PascalCase to match C++ UPROPERTY names.
+     * This solves the case-sensitivity issue where UE exports JSON with camelCase keys
+     * but JsonObjectToUStruct requires PascalCase to match UPROPERTY names.
+     * 
+     * @param SourceJson The source JSON object with potentially camelCase keys
+     * @return A new JSON object with all keys converted to PascalCase
+     */
+    static TSharedPtr<FJsonObject> NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson);
 };
