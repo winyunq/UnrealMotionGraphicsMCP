@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 /**
  * @file UmgMcpConfig.h
  * @brief Defines default configuration values for the MCP server.

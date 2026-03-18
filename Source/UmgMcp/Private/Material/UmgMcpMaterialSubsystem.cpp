@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Material/UmgMcpMaterialSubsystem.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Factories/MaterialFactoryNew.h"

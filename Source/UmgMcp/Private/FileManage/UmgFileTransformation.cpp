@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 // UmgFileTransformation.cpp (v1.3 - Added comments and thread safety)
 
 #include "FileManage/UmgFileTransformation.h"

@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 // PropertyNameMappings.h
 // 已知的大小写映射表，用于处理UE导出JSON与C++ UPROPERTY之间的命名差异
 //

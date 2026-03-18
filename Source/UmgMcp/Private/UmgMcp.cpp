@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "UmgMcp.h"
 #include "Bridge/UmgMcpConfig.h" // Include our config header
 

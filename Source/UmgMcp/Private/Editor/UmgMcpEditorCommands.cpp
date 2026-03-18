@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Editor/UmgMcpEditorCommands.h"
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "Editor.h"

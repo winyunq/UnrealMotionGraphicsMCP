@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Blueprint/UmgBlueprintFunctionSubsystem.h"
 #include "WidgetBlueprint.h"
 #include "Kismet/KismetSystemLibrary.h"

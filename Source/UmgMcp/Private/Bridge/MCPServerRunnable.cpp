@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Bridge/MCPServerRunnable.h"
 #include "Bridge/UmgMcpBridge.h"
 #include "UmgMcp.h" // Include specifically for LogUmgMcp

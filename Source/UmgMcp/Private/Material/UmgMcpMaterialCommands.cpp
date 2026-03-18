@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Material/UmgMcpMaterialCommands.h"
 #include "Material/UmgMcpMaterialSubsystem.h" // Required for Subsystem usage
 #include "Editor.h"

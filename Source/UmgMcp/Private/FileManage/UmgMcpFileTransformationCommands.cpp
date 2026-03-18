@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 // UmgMcpFileTransformationCommands.cpp
 #include "FileManage/UmgMcpFileTransformationCommands.h"
 #include "FileManage/UmgFileTransformation.h" // Our utility class

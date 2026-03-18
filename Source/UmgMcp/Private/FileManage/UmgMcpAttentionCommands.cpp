@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "FileManage/UmgMcpAttentionCommands.h"
 #include "Editor.h"
 #include "FileManage/UmgAttentionSubsystem.h"

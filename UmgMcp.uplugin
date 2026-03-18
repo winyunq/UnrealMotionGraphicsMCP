@@ -3,13 +3,14 @@
 	"Version": 1,
 	"VersionName": "1.0",
 	"FriendlyName": "UmgMcp",
-	"Description": "A plugin for AI-assisted UMG workflow with version control.",
+	"Description": "UmgMcp Focus: Core UMG protocol is Open-Source; Fab Edition provides 'Context Compression' and high-performance reliability.",
 	"Category": "Editor",
 	"CreatedBy": "Winyunq",
 	"CreatedByURL": "",
-	"DocsURL": "",
+	"DocsURL": "https://github.com/winyunq/UnrealMotionGraphicsMCP",
 	"MarketplaceURL": "",
 	"SupportURL": "",
+	"EngineVersion": "5.6.0",
 	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
@@ -18,13 +19,11 @@
 		{
 			"Name": "UmgMcp",
 			"Type": "Editor",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64"
+			]
 		}
 	],
-	"Plugins": [
-		{
-			"Name": "EditorScriptingUtilities",
-			"Enabled": true
-		}
-	]
+	"Plugins": []
 }

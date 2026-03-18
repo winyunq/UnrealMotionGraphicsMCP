@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Animation/UmgMcpSequencerCommands.h"
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "UmgMcp.h"
