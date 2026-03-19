@@ -16,6 +16,19 @@
 
 ---
 
+### 🛍️ Looking for an easier Setup? Try the Fab Version!
+
+If you find manual plugin configuration and MCP environment setup too cumbersome, check out our commercial version on **Fab**:
+[**UMG MCP on Fab Marketplace**](https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71)
+
+**Differences between Fab and Open Source versions:**
+- **Out-of-the-Box**: The Fab version installs directly via the Unreal Engine launcher, eliminating the need for manual cloning and Python environment setup.
+- **Context Compression**: The Fab version includes advanced context management, automatically filtering redundant MCP history to maximize available tokens for the AI.
+- **Commercial Focus**: While the Open Source version is our protocol testbed, the Fab version is optimized for production business logic. Commercial users receive prioritized support for their specific integration challenges.
+- **Maintained Parity**: We remain committed to open source; all core logic improvements will continue to be synced to this GitHub repository.
+
+---
+
 ### 🚀 Quick Start
 
 This guide covers the two-step process to install the `UmgMcp` plugin and connect it to your Gemini CLI.
