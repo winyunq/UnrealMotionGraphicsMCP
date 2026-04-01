@@ -1,4 +1,4 @@
-[Chinese version please click here](Readme_zh.md)
+[中文版点击这里](Readme_zh.md)
 
 # UE5-UMG-MCP 🤖📄
 
@@ -264,10 +264,6 @@ flowchart LR
 | **Theming** | `apply_global_theme` | 🚧 Planned | Batch apply styles and fonts across multiple widgets based on a theme config. |
 | **Assets**  | `style_create_asset` | 🚧 Planned | Create a standalone Slate Widget Style asset.                                 |
 
-## Troubleshooting & Known Issues
+## Project Status Update
 
-> [!WARNING]
-> **Startup Order is Critical**
-> We have observed that the TCP connection handshake can be confusing. **You MUST launch the Unreal Engine 5 project FIRST**, wait for it to initialize, and **THEN launch the Gemini CLI**.
->
-> If you launch the CLI first, the Python server may fail to connect correctly or enter a retry loop that results in connection failures or "success-on-kill" behavior. The UE5 Server acts as the Listener; it must be ready before the Client connects.
+I'm sorry, due to Google's cancellation of my student discount, my free time to advance this project is limited. But don't worry, as this has forced me to use AIs from other platforms, which might actually accelerate the support for other platforms in this plugin. Specifically, our upcoming development plan is to add various API key access in the Fab version because I believe you are all tech-savvy, but those who truly need UMG are artists who may not have a technical background. In any case, if you could purchase a paid version of UMG MCP on Fab, that would be wonderful—maybe I could then directly subscribe to Gemini AI for development?
