@@ -47,7 +47,11 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
             bool bSuccess = UUmgFileTransformation::ApplyJsonStringToUmgAsset(AssetPath, JsonData, TargetWidgetName);
             if (bSuccess)
             {
-                ResultJson->SetStringField(TEXT("message"), TEXT("JSON data applied to UMG asset successfully."));
+                ResultJson->SetStringField(TEXT("asset_path"), AssetPath);
+                if (!TargetWidgetName.IsEmpty())
+                {
+                    ResultJson->SetStringField(TEXT("target_widget"), TargetWidgetName);
+                }
                 ResultJson->SetBoolField(TEXT("success"), true);
             }
             else

@@ -86,7 +86,9 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetWidgetScope(const TSharedPt
         if (AttentionSubsystem)
         {
             AttentionSubsystem->SetTargetWidget(WidgetName);
-            return FUmgMcpCommonUtils::CreateSuccessResponse();
+            TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+            Data->SetStringField(TEXT("widget_name"), WidgetName);
+            return FUmgMcpCommonUtils::CreateSuccessResponse(Data);
         }
     }
 
@@ -323,7 +325,10 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
                 if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
                     Sub->SetTargetAnimation(AnimationName);
             }
-            return FUmgMcpCommonUtils::CreateSuccessResponse();
+            TSharedPtr<FJsonObject> ExistResult = MakeShared<FJsonObject>();
+            ExistResult->SetStringField(TEXT("name"), AnimationName);
+            ExistResult->SetStringField(TEXT("action"), TEXT("found"));
+            return FUmgMcpCommonUtils::CreateSuccessResponse(ExistResult);
         }
     }
 
@@ -371,8 +376,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
     // ... Result construction ...
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("name"), NewAnimation->GetName());
-    Result->SetStringField(TEXT("context_path"), Blueprint->GetPathName());
-    Result->SetStringField(TEXT("context_ptr"), FString::Printf(TEXT("%p"), Blueprint));
+    Result->SetStringField(TEXT("action"), TEXT("created"));
+    Result->SetStringField(TEXT("blueprint_path"), Blueprint->GetPathName());
     
     return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
 }
@@ -396,7 +401,9 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteAnimation(const TSharedP
     if (RemovedCount > 0)
     {
         Blueprint->Modify();
-        return FUmgMcpCommonUtils::CreateSuccessResponse();
+        TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+        Result->SetStringField(TEXT("deleted_animation"), AnimationName);
+        return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
     }
     return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Animation not found"));
 }
@@ -651,7 +658,12 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
         }
     }
     
-    return FUmgMcpCommonUtils::CreateSuccessResponse();
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("animation"), AnimationName);
+    Result->SetStringField(TEXT("widget"), WidgetName);
+    Result->SetStringField(TEXT("property"), PropertyName);
+    Result->SetNumberField(TEXT("keys_count"), KeysPtr->Num());
+    return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
 }
 
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSharedPtr<FJsonObject>& Params)
@@ -730,7 +742,11 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
             }
         }
 
-        return FUmgMcpCommonUtils::CreateSuccessResponse();
+        TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+        Result->SetStringField(TEXT("animation"), AnimationName);
+        Result->SetStringField(TEXT("widget"), WidgetName);
+        Result->SetStringField(TEXT("property"), PropertyName);
+        return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
     }
     
     return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Track not found"));

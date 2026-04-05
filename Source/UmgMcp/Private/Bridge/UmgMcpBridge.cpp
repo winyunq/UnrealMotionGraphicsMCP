@@ -640,6 +640,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         bool bSuccess = true;
         FString ErrorMessage;
         
+        // Determine success by checking for "success" bool, or "status" string, or absence of "error"
         if (ResultJson->HasField(TEXT("success")))
         {
             bSuccess = ResultJson->GetBoolField(TEXT("success"));
@@ -648,12 +649,33 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                 ErrorMessage = ResultJson->GetStringField(TEXT("error"));
             }
         }
+        else if (ResultJson->HasField(TEXT("status")))
+        {
+            FString InnerStatus;
+            ResultJson->TryGetStringField(TEXT("status"), InnerStatus);
+            bSuccess = (InnerStatus != TEXT("error"));
+            if (!bSuccess && ResultJson->HasField(TEXT("error")))
+            {
+                ErrorMessage = ResultJson->GetStringField(TEXT("error"));
+            }
+            else if (!bSuccess && ResultJson->HasField(TEXT("message")))
+            {
+                ErrorMessage = ResultJson->GetStringField(TEXT("message"));
+            }
+        }
         
         if (bSuccess)
         {
-            // Set success status and include the result
+            // Flatten: copy all fields from ResultJson directly into ResponseJson (skip internal keys)
             ResponseJson->SetStringField(TEXT("status"), TEXT("success"));
-            ResponseJson->SetObjectField(TEXT("result"), ResultJson);
+            for (const auto& Field : ResultJson->Values)
+            {
+                const FString& Key = Field.Key;
+                if (Key != TEXT("success") && Key != TEXT("status"))
+                {
+                    ResponseJson->SetField(Key, Field.Value);
+                }
+            }
         }
         else
         {

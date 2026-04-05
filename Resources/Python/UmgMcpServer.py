@@ -526,11 +526,9 @@ async def apply_layout(layout_content: str, widget_name: str = "Root") -> Dict[s
         # Try to get currently open asset from Unreal
         resp = await conn.send_command("get_target_umg_asset")
         if resp.get("status") == "success":
-            data = resp.get("result", {}).get("data", {})
-            if data:
-                final_path = data.get("asset_path")
-                if final_path:
-                    context_manager.set_target(final_path)
+            final_path = resp.get("asset_path")
+            if final_path:
+                context_manager.set_target(final_path)
     
     if not final_path:
         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}

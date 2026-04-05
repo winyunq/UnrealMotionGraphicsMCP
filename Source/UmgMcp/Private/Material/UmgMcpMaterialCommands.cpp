@@ -48,7 +48,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             }
             else
             {
-                 ResultJson->SetStringField(TEXT("message"), Status);
+                 ResultJson->SetStringField(TEXT("target"), Path);
+                 // "创建" appears only in the creation message "创建并设置目标材质: ..."
+                 FString Action = Status.Contains(TEXT("创建")) ? TEXT("created") : TEXT("loaded");
+                 ResultJson->SetStringField(TEXT("action"), Action);
                  ResultJson->SetBoolField(TEXT("success"), true);
             }
         }
@@ -167,6 +170,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         {
             bool bSuccess = Subsystem->DeleteNode(Handle);
             ResultJson->SetBoolField(TEXT("success"), bSuccess);
+            if (bSuccess)
+            {
+                ResultJson->SetStringField(TEXT("deleted_handle"), Handle);
+            }
         }
         else
         {
@@ -182,7 +189,15 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         {
             bool bSuccess = Subsystem->ConnectNodes(From, To);
             ResultJson->SetBoolField(TEXT("success"), bSuccess);
-            if (!bSuccess) ResultJson->SetStringField(TEXT("error"), TEXT("Failed to connect nodes. Check Handles."));
+            if (bSuccess)
+            {
+                ResultJson->SetStringField(TEXT("from"), From);
+                ResultJson->SetStringField(TEXT("to"), To);
+            }
+            else
+            {
+                ResultJson->SetStringField(TEXT("error"), TEXT("Failed to connect nodes. Check Handles."));
+            }
         }
         else
         {
@@ -200,7 +215,17 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         
         bool bSuccess = Subsystem->ConnectPins(Source, SourcePin, Target, TargetPin);
         ResultJson->SetBoolField(TEXT("success"), bSuccess);
-        if (!bSuccess) ResultJson->SetStringField(TEXT("error"), TEXT("Failed to connect pins. Check Pin Names."));
+        if (bSuccess)
+        {
+            ResultJson->SetStringField(TEXT("source"), Source);
+            if (!SourcePin.IsEmpty()) ResultJson->SetStringField(TEXT("source_pin"), SourcePin);
+            ResultJson->SetStringField(TEXT("target"), Target);
+            ResultJson->SetStringField(TEXT("target_pin"), TargetPin);
+        }
+        else
+        {
+            ResultJson->SetStringField(TEXT("error"), TEXT("Failed to connect pins. Check Pin Names."));
+        }
     }
     // --- P5: Detail Injection ---
     else if (CommandType == TEXT("material_set_hlsl_node_io"))
@@ -220,6 +245,14 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             
             bool bSuccess = Subsystem->SetCustomNodeHLSL(Handle, Code, Inputs);
             ResultJson->SetBoolField(TEXT("success"), bSuccess);
+            if (bSuccess)
+            {
+                ResultJson->SetStringField(TEXT("handle"), Handle);
+                ResultJson->SetNumberField(TEXT("code_length"), Code.Len());
+                TArray<TSharedPtr<FJsonValue>> InputsJson;
+                for (const FString& Input : Inputs) InputsJson.Add(MakeShareable(new FJsonValueString(Input)));
+                ResultJson->SetArrayField(TEXT("inputs"), InputsJson);
+            }
         }
         else
         {
@@ -237,11 +270,15 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         {
              bool bSuccess = Subsystem->SetNodeProperties(Handle, *Props);
              ResultJson->SetBoolField(TEXT("success"), bSuccess);
+             if (bSuccess)
+             {
+                 ResultJson->SetStringField(TEXT("handle"), Handle);
+                 ResultJson->SetObjectField(TEXT("properties_set"), *Props);
+             }
         }
         else
         {
              ResultJson->SetStringField(TEXT("error"), TEXT("Missing handle or properties"));
-             ResultJson->SetBoolField(TEXT("success"), false);
              ResultJson->SetBoolField(TEXT("success"), false);
         }
     }
@@ -265,8 +302,13 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
     else if (CommandType == TEXT("material_compile_asset"))
     {
         FString Status = Subsystem->CompileAsset();
-        ResultJson->SetStringField(TEXT("message"), Status);
-        ResultJson->SetBoolField(TEXT("success"), true);
+        bool bCompileSuccess = !Status.StartsWith(TEXT("Error"));
+        ResultJson->SetStringField(TEXT("compile_status"), Status);
+        ResultJson->SetBoolField(TEXT("success"), bCompileSuccess);
+        if (!bCompileSuccess)
+        {
+            ResultJson->SetStringField(TEXT("error"), Status);
+        }
     }
     else
     {
