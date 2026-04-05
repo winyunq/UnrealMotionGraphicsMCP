@@ -49,8 +49,8 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             else
             {
                  ResultJson->SetStringField(TEXT("target"), Path);
-                 // Determine action from status message
-                 FString Action = Status.Contains(TEXT("Created")) || Status.Contains(TEXT("创建")) ? TEXT("created") : TEXT("loaded");
+                 // "创建" appears only in the creation message "创建并设置目标材质: ..."
+                 FString Action = Status.Contains(TEXT("创建")) ? TEXT("created") : TEXT("loaded");
                  ResultJson->SetStringField(TEXT("action"), Action);
                  ResultJson->SetBoolField(TEXT("success"), true);
             }

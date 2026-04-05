@@ -5,6 +5,7 @@
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 #include "WidgetBlueprint.h" // Added based on UmgAttentionSubsystem.cpp
+#include "AssetRegistry/AssetRegistryModule.h"
 
 TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& Command, const TSharedPtr<FJsonObject>& Params)
 {
@@ -60,8 +61,9 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         if (Params && Params->HasField(TEXT("asset_path")))
         {
             FString AssetPath = Params->GetStringField(TEXT("asset_path"));
-            // Check existence before setting to determine action type
-            bool bAlreadyExists = (LoadObject<UWidgetBlueprint>(nullptr, *AssetPath, nullptr, LOAD_NoWarn) != nullptr);
+            // Use AssetRegistry to check existence without loading the asset
+            IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+            bool bAlreadyExists = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(AssetPath)).IsValid();
             bool bSuccess = AttentionSubsystem->SetTargetUmgAsset(AssetPath);
             if (bSuccess)
             {
