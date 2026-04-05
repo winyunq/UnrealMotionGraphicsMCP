@@ -377,7 +377,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("name"), NewAnimation->GetName());
     Result->SetStringField(TEXT("action"), TEXT("created"));
-    Result->SetStringField(TEXT("context_path"), Blueprint->GetPathName());
+    Result->SetStringField(TEXT("blueprint_path"), Blueprint->GetPathName());
     
     return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
 }
