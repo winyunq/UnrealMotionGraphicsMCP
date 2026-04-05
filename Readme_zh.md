@@ -256,6 +256,23 @@ flowchart LR
 |                  | `material_delete`              |    ✅     | 根据唯一句柄删除实例。                                                 |
 | **维护**         | `material_get_pins`            |    ✅     | 内省特定节点句柄的引脚。                                               |
 
+## UMG HLSL MCP API 实现状态（新增：面向 UMG 的文本编辑闭环）
+
+| 命令                | 状态 | 描述                                                                                         |
+| ------------------- | :--: | -------------------------------------------------------------------------------------------- |
+| `hlsl_set_target`   |  ✅   | 锁定/创建 HLSL 目标材质。校验 UI 材质域 + 单 Custom 节点拓扑；不匹配时可先返回覆写确认。     |
+| `hlsl_get`          |  ✅   | 读取当前 HLSL 代码和结构化输入参数信息。                                                      |
+| `hlsl_set`          |  ✅   | 对 HLSL 与/或参数做增量更新。删除必须显式标记（`delete: true`），避免误删。                   |
+| `hlsl_compile`      |  ✅   | 编译当前 HLSL 目标并返回精简诊断信息，便于 AI 后处理。                                        |
+
+### HLSL 协议约定（UMG 垂直优化）
+
+- 材质被视作单一 HLSL 程序。
+- 后端约定 HLSL 返回 `float4`。
+- 输出自动连线固定为：`.rgb -> FinalColor`，`.a -> Opacity`。
+- 输入参数以结构化描述返回（如 `name`、`kind`、`source_handle`），便于 AI 学习与复用。
+- `hlsl_set` 采用“易写难删”策略：写入简单，删除必须显式声明。
+
 ## UMG 样式与主题 (Style & Theming) API 实现状态 (New)
 
 | 类别     | API 名称             | status | 描述                                          |

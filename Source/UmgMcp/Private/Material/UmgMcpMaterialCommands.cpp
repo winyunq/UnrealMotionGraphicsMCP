@@ -2,6 +2,303 @@
 #include "Material/UmgMcpMaterialCommands.h"
 #include "Material/UmgMcpMaterialSubsystem.h" // Required for Subsystem usage
 #include "Editor.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialExpression.h"
+#include "Materials/MaterialExpressionCustom.h"
+#include "Materials/MaterialExpressionComponentMask.h"
+#include "Materials/MaterialExpressionParameter.h"
+#include "Materials/MaterialExpressionTextureSampleParameter.h"
+#include "Materials/MaterialExpressionScalarParameter.h"
+#include "Materials/MaterialExpressionVectorParameter.h"
+#include "MaterialEditingLibrary.h"
+#include "UObject/UnrealType.h"
+
+namespace
+{
+    constexpr const TCHAR* DefaultBootstrapHlsl = TEXT("return float4(1,1,1,1);");
+    constexpr const TCHAR* UnknownParamKind = TEXT("Unknown");
+    constexpr const TCHAR* DefaultParamKind = TEXT("Scalar");
+    constexpr const TCHAR* MasterHandleName = TEXT("Master");
+    constexpr const TCHAR* FinalColorPinName = TEXT("FinalColor");
+    constexpr const TCHAR* OpacityPinName = TEXT("Opacity");
+
+    static bool IsErrorStatus(const FString& Status)
+    {
+        return Status.StartsWith(TEXT("Error")) || Status.StartsWith(TEXT("错误"));
+    }
+
+    static FString ResolveHandleFromExpression(const UMaterialExpression* Expr)
+    {
+        if (!Expr)
+        {
+            return TEXT("");
+        }
+        return Expr->Desc.IsEmpty() ? Expr->GetName() : Expr->Desc;
+    }
+
+    static FExpressionInput* FindMaterialInputByName(UMaterial* Mat, const FString& InputName)
+    {
+        if (!Mat)
+        {
+            return nullptr;
+        }
+
+        auto FindInObject = [&](UObject* Owner) -> FExpressionInput*
+        {
+            if (!Owner)
+            {
+                return nullptr;
+            }
+
+            for (TFieldIterator<FProperty> It(Owner->GetClass()); It; ++It)
+            {
+                FProperty* Prop = *It;
+                const bool bNameMatch =
+                    Prop->GetName().Equals(InputName, ESearchCase::IgnoreCase) ||
+                    Prop->GetDisplayNameText().ToString().Equals(InputName, ESearchCase::IgnoreCase);
+
+                if (!bNameMatch)
+                {
+                    continue;
+                }
+
+                if (FStructProperty* StructProp = CastField<FStructProperty>(Prop))
+                {
+                    if (StructProp->Struct &&
+                        (StructProp->Struct->GetName().Equals(TEXT("ExpressionInput")) ||
+                         StructProp->Struct->GetName().Contains(TEXT("MaterialInput"))))
+                    {
+                        return StructProp->ContainerPtrToValuePtr<FExpressionInput>(Owner);
+                    }
+                }
+            }
+            return nullptr;
+        };
+
+#if WITH_EDITOR
+        if (Mat->GetEditorOnlyData())
+        {
+            if (FExpressionInput* Input = FindInObject((UObject*)Mat->GetEditorOnlyData()))
+            {
+                return Input;
+            }
+        }
+#endif
+        return FindInObject(Mat);
+    }
+
+    static FString DetectParamKind(const UMaterialExpression* Expr)
+    {
+        if (Cast<UMaterialExpressionScalarParameter>(Expr))
+        {
+            return DefaultParamKind;
+        }
+        if (Cast<UMaterialExpressionVectorParameter>(Expr))
+        {
+            return TEXT("Vector");
+        }
+        if (Cast<UMaterialExpressionTextureSampleParameter>(Expr))
+        {
+            return TEXT("Texture");
+        }
+        return UnknownParamKind;
+    }
+
+    static UMaterialExpressionCustom* FindSingleCustomNode(UMaterial* Mat)
+    {
+        if (!Mat)
+        {
+            return nullptr;
+        }
+
+        UMaterialExpressionCustom* Found = nullptr;
+        for (UMaterialExpression* Expr : Mat->GetExpressions())
+        {
+            if (UMaterialExpressionCustom* Custom = Cast<UMaterialExpressionCustom>(Expr))
+            {
+                if (Found)
+                {
+                    return nullptr;
+                }
+                Found = Custom;
+            }
+        }
+        return Found;
+    }
+
+    static bool IsValidHlslTarget(UMaterial* Mat, UMaterialExpressionCustom*& OutCustomNode, FString& OutReason)
+    {
+        OutCustomNode = nullptr;
+        if (!Mat)
+        {
+            OutReason = TEXT("No target material");
+            return false;
+        }
+
+        if (Mat->MaterialDomain != MD_UI)
+        {
+            OutReason = TEXT("Target material is not a UI material (MaterialDomain != MD_UI)");
+            return false;
+        }
+
+        UMaterialExpressionCustom* CustomNode = FindSingleCustomNode(Mat);
+        if (!CustomNode)
+        {
+            OutReason = TEXT("Material must contain exactly one Custom HLSL node");
+            return false;
+        }
+
+        FExpressionInput* FinalColorInput = FindMaterialInputByName(Mat, TEXT("EmissiveColor"));
+        FExpressionInput* OpacityInput = FindMaterialInputByName(Mat, OpacityPinName);
+        const bool bHasFinalColor = FinalColorInput && FinalColorInput->Expression != nullptr;
+        const bool bHasOpacity = OpacityInput && OpacityInput->Expression != nullptr;
+
+        if (!bHasFinalColor && !bHasOpacity)
+        {
+            OutReason = TEXT("UI output is not connected");
+            return false;
+        }
+
+        OutCustomNode = CustomNode;
+        OutReason = TEXT("ok");
+        return true;
+    }
+
+    static bool ResetToSingleHlslTopology(UUmgMcpMaterialSubsystem* Subsystem, UMaterial* Mat, UMaterialExpressionCustom*& OutCustomNode, FString& OutError)
+    {
+        OutCustomNode = nullptr;
+        if (!Subsystem || !Mat)
+        {
+            OutError = TEXT("No material target");
+            return false;
+        }
+
+#if WITH_EDITOR
+        if (Mat->GetEditorOnlyData())
+        {
+            Mat->GetEditorOnlyData()->ExpressionCollection.Expressions.Empty();
+        }
+#endif
+
+        UMaterialExpressionCustom* CustomNode = Cast<UMaterialExpressionCustom>(
+            UMaterialEditingLibrary::CreateMaterialExpression(Mat, UMaterialExpressionCustom::StaticClass()));
+        UMaterialExpressionComponentMask* RgbMask = Cast<UMaterialExpressionComponentMask>(
+            UMaterialEditingLibrary::CreateMaterialExpression(Mat, UMaterialExpressionComponentMask::StaticClass()));
+        UMaterialExpressionComponentMask* AlphaMask = Cast<UMaterialExpressionComponentMask>(
+            UMaterialEditingLibrary::CreateMaterialExpression(Mat, UMaterialExpressionComponentMask::StaticClass()));
+
+        if (!CustomNode || !RgbMask || !AlphaMask)
+        {
+            OutError = TEXT("Failed to create required topology nodes");
+            return false;
+        }
+
+        CustomNode->Desc = TEXT("HLSL_Core");
+        if (CustomNode->Code.IsEmpty())
+        {
+            CustomNode->Code = DefaultBootstrapHlsl;
+        }
+
+        RgbMask->Desc = TEXT("HLSL_RGB");
+        RgbMask->R = true;
+        RgbMask->G = true;
+        RgbMask->B = true;
+        RgbMask->A = false;
+
+        AlphaMask->Desc = TEXT("HLSL_A");
+        AlphaMask->R = false;
+        AlphaMask->G = false;
+        AlphaMask->B = false;
+        AlphaMask->A = true;
+
+        const FString CustomHandle = CustomNode->GetName();
+        const FString RgbHandle = RgbMask->GetName();
+        const FString AlphaHandle = AlphaMask->GetName();
+
+        const bool bLinkOk =
+            Subsystem->ConnectPins(CustomHandle, TEXT(""), RgbHandle, TEXT("Input")) &&
+            Subsystem->ConnectPins(CustomHandle, TEXT(""), AlphaHandle, TEXT("Input")) &&
+            Subsystem->ConnectPins(RgbHandle, TEXT(""), MasterHandleName, FinalColorPinName) &&
+            Subsystem->ConnectPins(AlphaHandle, TEXT(""), MasterHandleName, OpacityPinName);
+
+        if (!bLinkOk)
+        {
+            OutError = TEXT("Failed to auto-wire HLSL output topology");
+            return false;
+        }
+
+        OutCustomNode = CustomNode;
+        OutError = TEXT("");
+        return true;
+    }
+
+    static void BuildParameterSnapshot(UMaterialExpressionCustom* CustomNode, TArray<TSharedPtr<FJsonValue>>& OutParameters)
+    {
+        OutParameters.Empty();
+        if (!CustomNode)
+        {
+            return;
+        }
+
+        for (const FCustomInput& Input : CustomNode->Inputs)
+        {
+            TSharedPtr<FJsonObject> ParamObj = MakeShareable(new FJsonObject);
+            const FString Name = Input.InputName.ToString();
+            ParamObj->SetStringField(TEXT("name"), Name);
+
+            UMaterialExpression* SourceExpr = Input.Input.Expression;
+            ParamObj->SetStringField(TEXT("kind"), DetectParamKind(SourceExpr));
+            ParamObj->SetBoolField(TEXT("connected"), SourceExpr != nullptr);
+            ParamObj->SetStringField(TEXT("source_handle"), ResolveHandleFromExpression(SourceExpr));
+            ParamObj->SetStringField(TEXT("custom_input"), Name);
+            OutParameters.Add(MakeShareable(new FJsonValueObject(ParamObj)));
+        }
+    }
+
+    struct FHlslParamDraft
+    {
+        FString Name;
+        FString Kind;
+        bool bDelete = false;
+    };
+
+    static void ParseParameterDrafts(const TArray<TSharedPtr<FJsonValue>>& JsonParams, TArray<FHlslParamDraft>& OutDrafts)
+    {
+        OutDrafts.Empty();
+        for (const TSharedPtr<FJsonValue>& JsonVal : JsonParams)
+        {
+            FHlslParamDraft Draft;
+            Draft.Kind = DefaultParamKind;
+
+            if (JsonVal->Type == EJson::String)
+            {
+                Draft.Name = JsonVal->AsString();
+            }
+            else if (JsonVal->Type == EJson::Object)
+            {
+                const TSharedPtr<FJsonObject> Obj = JsonVal->AsObject();
+                if (!Obj.IsValid())
+                {
+                    continue;
+                }
+                Obj->TryGetStringField(TEXT("name"), Draft.Name);
+                Obj->TryGetStringField(TEXT("kind"), Draft.Kind);
+                bool bDeleteFlag = false;
+                Obj->TryGetBoolField(TEXT("delete"), bDeleteFlag);
+                FString Action;
+                Obj->TryGetStringField(TEXT("action"), Action);
+                Draft.bDelete = bDeleteFlag || Action.Equals(TEXT("delete"), ESearchCase::IgnoreCase);
+            }
+
+            if (!Draft.Name.IsEmpty())
+            {
+                OutDrafts.Add(Draft);
+            }
+        }
+    }
+}
 
 FUmgMcpMaterialCommands::FUmgMcpMaterialCommands()
 {
@@ -41,7 +338,7 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             // Default to always trying to create/load (Context Anchor)
             FString Status = Subsystem->SetTargetMaterial(Path, true);
             
-            if (Status.StartsWith(TEXT("错误")) || Status.StartsWith(TEXT("Error")))
+            if (IsErrorStatus(Status))
             {
                  ResultJson->SetStringField(TEXT("error"), Status);
                  ResultJson->SetBoolField(TEXT("success"), false);
@@ -59,6 +356,252 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         {
             ResultJson->SetStringField(TEXT("error"), TEXT("Missing 'path' parameter"));
             ResultJson->SetBoolField(TEXT("success"), false);
+        }
+    }
+    else if (CommandType == TEXT("hlsl_set_target"))
+    {
+        FString Path;
+        bool bConfirmOverwrite = false;
+        Params->TryGetBoolField(TEXT("confirm_overwrite"), bConfirmOverwrite);
+        bool bCreateIfNotFoundValue = true;
+        if (Params->HasField(TEXT("create_if_not_found")))
+        {
+            Params->TryGetBoolField(TEXT("create_if_not_found"), bCreateIfNotFoundValue);
+        }
+        const bool bCreateIfNotFound = bCreateIfNotFoundValue;
+
+        if (!Params->TryGetStringField(TEXT("path"), Path))
+        {
+            ResultJson->SetStringField(TEXT("error"), TEXT("Missing 'path' parameter"));
+            ResultJson->SetBoolField(TEXT("success"), false);
+            return ResultJson;
+        }
+
+        FString LoadStatus = Subsystem->SetTargetMaterial(Path, false);
+        UMaterial* Mat = nullptr;
+        UMaterialExpressionCustom* CustomNode = nullptr;
+        FString ValidationReason;
+
+        if (!IsErrorStatus(LoadStatus))
+        {
+            Mat = Subsystem->GetTargetMaterial();
+            if (IsValidHlslTarget(Mat, CustomNode, ValidationReason))
+            {
+                ResultJson->SetBoolField(TEXT("success"), true);
+                ResultJson->SetStringField(TEXT("target"), Path);
+                ResultJson->SetStringField(TEXT("action"), TEXT("loaded"));
+                ResultJson->SetStringField(TEXT("custom_node_handle"), ResolveHandleFromExpression(CustomNode));
+                ResultJson->SetStringField(TEXT("message"), TEXT("HLSL target ready"));
+            }
+            else if (!bConfirmOverwrite)
+            {
+                ResultJson->SetBoolField(TEXT("success"), false);
+                ResultJson->SetBoolField(TEXT("requires_confirmation"), true);
+                ResultJson->SetStringField(TEXT("target"), Path);
+                ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Target does not match HLSL protocol (%s). Overwrite target file and continue?"), *ValidationReason));
+            }
+            else
+            {
+                FString BootstrapError;
+                if (ResetToSingleHlslTopology(Subsystem, Mat, CustomNode, BootstrapError))
+                {
+                    ResultJson->SetBoolField(TEXT("success"), true);
+                    ResultJson->SetStringField(TEXT("target"), Path);
+                    ResultJson->SetStringField(TEXT("action"), TEXT("overwritten"));
+                    ResultJson->SetStringField(TEXT("custom_node_handle"), ResolveHandleFromExpression(CustomNode));
+                    ResultJson->SetStringField(TEXT("message"), TEXT("HLSL topology overwritten successfully"));
+                }
+                else
+                {
+                    ResultJson->SetBoolField(TEXT("success"), false);
+                    ResultJson->SetStringField(TEXT("error"), BootstrapError);
+                }
+            }
+        }
+        else if (bCreateIfNotFound)
+        {
+            FString CreateStatus = Subsystem->SetTargetMaterial(Path, true);
+            if (IsErrorStatus(CreateStatus))
+            {
+                ResultJson->SetBoolField(TEXT("success"), false);
+                ResultJson->SetStringField(TEXT("error"), CreateStatus);
+            }
+            else
+            {
+                Mat = Subsystem->GetTargetMaterial();
+                FString BootstrapError;
+                if (ResetToSingleHlslTopology(Subsystem, Mat, CustomNode, BootstrapError))
+                {
+                    ResultJson->SetBoolField(TEXT("success"), true);
+                    ResultJson->SetStringField(TEXT("target"), Path);
+                    ResultJson->SetStringField(TEXT("action"), TEXT("created"));
+                    ResultJson->SetStringField(TEXT("custom_node_handle"), ResolveHandleFromExpression(CustomNode));
+                    ResultJson->SetStringField(TEXT("message"), TEXT("Created and initialized HLSL target"));
+                }
+                else
+                {
+                    ResultJson->SetBoolField(TEXT("success"), false);
+                    ResultJson->SetStringField(TEXT("error"), BootstrapError);
+                }
+            }
+        }
+        else
+        {
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(TEXT("error"), LoadStatus);
+        }
+    }
+    else if (CommandType == TEXT("hlsl_get"))
+    {
+        UMaterial* Mat = Subsystem->GetTargetMaterial();
+        UMaterialExpressionCustom* CustomNode = nullptr;
+        FString ValidationReason;
+        if (!IsValidHlslTarget(Mat, CustomNode, ValidationReason))
+        {
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Target is not HLSL-protocol ready: %s"), *ValidationReason));
+            return ResultJson;
+        }
+
+        TArray<TSharedPtr<FJsonValue>> ParamsArray;
+        BuildParameterSnapshot(CustomNode, ParamsArray);
+
+        TSharedPtr<FJsonObject> OutputContract = MakeShareable(new FJsonObject);
+        OutputContract->SetStringField(TEXT("return"), TEXT("float4"));
+        OutputContract->SetStringField(TEXT("rgb_to"), FinalColorPinName);
+        OutputContract->SetStringField(TEXT("a_to"), OpacityPinName);
+
+        ResultJson->SetBoolField(TEXT("success"), true);
+        ResultJson->SetStringField(TEXT("target"), Mat ? Mat->GetPathName() : TEXT(""));
+        ResultJson->SetStringField(TEXT("custom_node_handle"), ResolveHandleFromExpression(CustomNode));
+        ResultJson->SetStringField(TEXT("hlsl"), CustomNode ? CustomNode->Code : TEXT(""));
+        ResultJson->SetArrayField(TEXT("parameters"), ParamsArray);
+        ResultJson->SetObjectField(TEXT("output_contract"), OutputContract);
+    }
+    else if (CommandType == TEXT("hlsl_set"))
+    {
+        UMaterial* Mat = Subsystem->GetTargetMaterial();
+        UMaterialExpressionCustom* CustomNode = nullptr;
+        FString ValidationReason;
+        if (!IsValidHlslTarget(Mat, CustomNode, ValidationReason))
+        {
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Target is not HLSL-protocol ready: %s. Call hlsl_set_target first."), *ValidationReason));
+            return ResultJson;
+        }
+
+        FString NewHlsl;
+        const bool bHasHlsl = Params->TryGetStringField(TEXT("hlsl"), NewHlsl);
+        const TArray<TSharedPtr<FJsonValue>>* NewParametersJson = nullptr;
+        const bool bHasParameters = Params->TryGetArrayField(TEXT("parameters"), NewParametersJson);
+
+        if (!bHasHlsl && !bHasParameters)
+        {
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(TEXT("error"), TEXT("Provide at least one of 'hlsl' or 'parameters'"));
+            return ResultJson;
+        }
+
+        // Collect existing parameters from current custom input list
+        TArray<FHlslParamDraft> WorkingParams;
+        for (const FCustomInput& Input : CustomNode->Inputs)
+        {
+            FHlslParamDraft Draft;
+            Draft.Name = Input.InputName.ToString();
+            Draft.Kind = DetectParamKind(Input.Input.Expression);
+            WorkingParams.Add(Draft);
+        }
+
+        if (bHasParameters)
+        {
+            TArray<FHlslParamDraft> Incoming;
+            ParseParameterDrafts(*NewParametersJson, Incoming);
+
+            for (const FHlslParamDraft& Item : Incoming)
+            {
+                int32 ExistingIndex = INDEX_NONE;
+                for (int32 i = 0; i < WorkingParams.Num(); ++i)
+                {
+                    if (WorkingParams[i].Name.Equals(Item.Name, ESearchCase::IgnoreCase))
+                    {
+                        ExistingIndex = i;
+                        break;
+                    }
+                }
+
+                if (Item.bDelete)
+                {
+                    if (ExistingIndex != INDEX_NONE)
+                    {
+                        WorkingParams.RemoveAt(ExistingIndex);
+                    }
+                    continue;
+                }
+
+                if (ExistingIndex != INDEX_NONE)
+                {
+                    if (!Item.Kind.IsEmpty())
+                    {
+                        WorkingParams[ExistingIndex].Kind = Item.Kind;
+                    }
+                }
+                else
+                {
+                    WorkingParams.Add(Item);
+                }
+            }
+        }
+
+        TArray<FString> FinalInputNames;
+        FinalInputNames.Reserve(WorkingParams.Num());
+        for (const FHlslParamDraft& Param : WorkingParams)
+        {
+            FinalInputNames.Add(Param.Name);
+        }
+
+        const FString EffectiveCode = bHasHlsl ? NewHlsl : CustomNode->Code;
+        if (!Subsystem->SetCustomNodeHLSL(CustomNode->GetName(), EffectiveCode, FinalInputNames))
+        {
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(TEXT("error"), TEXT("Failed to set HLSL code/inputs"));
+            return ResultJson;
+        }
+
+        // Re-wire parameters to Custom inputs
+        for (const FHlslParamDraft& Param : WorkingParams)
+        {
+            FString Kind = Param.Kind.IsEmpty() || Param.Kind.Equals(UnknownParamKind, ESearchCase::IgnoreCase) ? DefaultParamKind : Param.Kind;
+            FString ParamHandle = Subsystem->DefineVariable(Param.Name, Kind);
+            if (IsErrorStatus(ParamHandle))
+            {
+                ResultJson->SetBoolField(TEXT("success"), false);
+                ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Failed to define parameter '%s': %s"), *Param.Name, *ParamHandle));
+                return ResultJson;
+            }
+            Subsystem->ConnectPins(ParamHandle, TEXT(""), CustomNode->GetName(), Param.Name);
+        }
+
+        // Re-validate and expose resulting parameter list
+        UMaterialExpressionCustom* NewCustomNode = FindSingleCustomNode(Subsystem->GetTargetMaterial());
+        TArray<TSharedPtr<FJsonValue>> ParametersOut;
+        BuildParameterSnapshot(NewCustomNode, ParametersOut);
+
+        ResultJson->SetBoolField(TEXT("success"), true);
+        ResultJson->SetBoolField(TEXT("hlsl_updated"), bHasHlsl);
+        ResultJson->SetBoolField(TEXT("parameters_updated"), bHasParameters);
+        ResultJson->SetStringField(TEXT("custom_node_handle"), ResolveHandleFromExpression(NewCustomNode));
+        ResultJson->SetArrayField(TEXT("parameters"), ParametersOut);
+    }
+    else if (CommandType == TEXT("hlsl_compile"))
+    {
+        const FString Status = Subsystem->CompileAsset();
+        const bool bOk = !IsErrorStatus(Status);
+        ResultJson->SetBoolField(TEXT("success"), bOk);
+        ResultJson->SetStringField(TEXT("status"), bOk ? TEXT("ok") : TEXT("error"));
+        ResultJson->SetStringField(TEXT("compile_message"), Status);
+        if (!bOk)
+        {
+            ResultJson->SetStringField(TEXT("error"), Status);
         }
     }
     // --- P0: Context & Search ---

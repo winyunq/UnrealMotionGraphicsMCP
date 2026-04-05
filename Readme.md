@@ -256,6 +256,23 @@ flowchart LR
 | **Maintenance**         | `material_delete`              |     ✅     | Delete node instances or clean up logic by unique handle.                                       |
 |                         | `material_get_pins`            |     ✅     | Introspect pins for a specific node handle.                                                     |
 
+## UMG HLSL MCP API Status (New: Text-Edit Loop for UMG)
+
+| Command             | Status | Description                                                                                                                           |
+| ------------------- | :----: | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `hlsl_set_target`   |   ✅    | Lock/create HLSL target material. Validates UI-domain + single Custom node topology; can request confirmation before overwrite.     |
+| `hlsl_get`          |   ✅    | Read current HLSL code and structured input parameters from the single Custom node.                                                  |
+| `hlsl_set`          |   ✅    | Incremental update of HLSL and/or parameters. Deletion is explicit (`delete: true`) to avoid accidental destructive edits.           |
+| `hlsl_compile`      |   ✅    | Compile current HLSL target and return concise diagnostics for AI post-processing.                                                   |
+
+### HLSL Protocol Contract (UMG-Optimized)
+
+- Material is treated as a single HLSL program.
+- Backend assumes HLSL returns `float4`.
+- Output auto-wiring is fixed: `.rgb -> FinalColor`, `.a -> Opacity`.
+- Input parameters are returned as structured descriptors (`name`, `kind`, `source_handle`) for learning/replay by AI agents.
+- `hlsl_set` is safety-biased: writing is easy, deletion must be explicit.
+
 ## UMG Style & Theming API Status (New)
 
 | Category    | API Name             |  Status   | Description                                                                   |

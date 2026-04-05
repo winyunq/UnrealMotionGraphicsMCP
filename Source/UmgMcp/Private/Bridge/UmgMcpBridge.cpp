@@ -480,7 +480,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
             ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
         }
         // Material Commands (New 5 Pillars)
-        else if (CommandType.StartsWith(TEXT("material_")))
+        else if (CommandType.StartsWith(TEXT("material_")) || CommandType.StartsWith(TEXT("hlsl_")))
         {
              ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
         }
@@ -621,7 +621,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
              }
         }
         // --- Material Commands ---
-        else if (CommandType.StartsWith(TEXT("material_")))
+        else if (CommandType.StartsWith(TEXT("material_")) || CommandType.StartsWith(TEXT("hlsl_")))
         {
             ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
         }
