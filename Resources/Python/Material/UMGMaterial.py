@@ -1,4 +1,5 @@
 import logging
+from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger("UmgMcpServer")
 
@@ -84,8 +85,8 @@ class UMGMaterial:
     async def hlsl_get(self) -> dict:
         return await self.connection.send_command("hlsl_get", {})
 
-    async def hlsl_set(self, hlsl: str = None, parameters: list = None) -> dict:
-        params = {}
+    async def hlsl_set(self, hlsl: Optional[str] = None, parameters: Optional[List[Dict[str, Any]]] = None) -> dict:
+        params: Dict[str, Any] = {}
         if hlsl is not None:
             params["hlsl"] = hlsl
         if parameters is not None:

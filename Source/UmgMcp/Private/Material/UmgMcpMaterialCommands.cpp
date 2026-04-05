@@ -17,6 +17,13 @@
 
 namespace
 {
+    constexpr const TCHAR* DefaultBootstrapHlsl = TEXT("return float4(1,1,1,1);");
+    constexpr const TCHAR* UnknownParamKind = TEXT("Unknown");
+    constexpr const TCHAR* DefaultParamKind = TEXT("Scalar");
+    constexpr const TCHAR* MasterHandleName = TEXT("Master");
+    constexpr const TCHAR* FinalColorPinName = TEXT("FinalColor");
+    constexpr const TCHAR* OpacityPinName = TEXT("Opacity");
+
     static bool IsErrorStatus(const FString& Status)
     {
         return Status.StartsWith(TEXT("Error")) || Status.StartsWith(TEXT("错误"));
@@ -86,7 +93,7 @@ namespace
     {
         if (Cast<UMaterialExpressionScalarParameter>(Expr))
         {
-            return TEXT("Scalar");
+            return DefaultParamKind;
         }
         if (Cast<UMaterialExpressionVectorParameter>(Expr))
         {
@@ -96,7 +103,7 @@ namespace
         {
             return TEXT("Texture");
         }
-        return TEXT("Unknown");
+        return UnknownParamKind;
     }
 
     static UMaterialExpressionCustom* FindSingleCustomNode(UMaterial* Mat)
@@ -144,7 +151,7 @@ namespace
         }
 
         FExpressionInput* FinalColorInput = FindMaterialInputByName(Mat, TEXT("EmissiveColor"));
-        FExpressionInput* OpacityInput = FindMaterialInputByName(Mat, TEXT("Opacity"));
+        FExpressionInput* OpacityInput = FindMaterialInputByName(Mat, OpacityPinName);
         const bool bHasFinalColor = FinalColorInput && FinalColorInput->Expression != nullptr;
         const bool bHasOpacity = OpacityInput && OpacityInput->Expression != nullptr;
 
@@ -191,7 +198,7 @@ namespace
         CustomNode->Desc = TEXT("HLSL_Core");
         if (CustomNode->Code.IsEmpty())
         {
-            CustomNode->Code = TEXT("return float4(1,1,1,1);");
+            CustomNode->Code = DefaultBootstrapHlsl;
         }
 
         RgbMask->Desc = TEXT("HLSL_RGB");
@@ -213,8 +220,8 @@ namespace
         const bool bLinkOk =
             Subsystem->ConnectPins(CustomHandle, TEXT(""), RgbHandle, TEXT("Input")) &&
             Subsystem->ConnectPins(CustomHandle, TEXT(""), AlphaHandle, TEXT("Input")) &&
-            Subsystem->ConnectPins(RgbHandle, TEXT(""), TEXT("Master"), TEXT("FinalColor")) &&
-            Subsystem->ConnectPins(AlphaHandle, TEXT(""), TEXT("Master"), TEXT("Opacity"));
+            Subsystem->ConnectPins(RgbHandle, TEXT(""), MasterHandleName, FinalColorPinName) &&
+            Subsystem->ConnectPins(AlphaHandle, TEXT(""), MasterHandleName, OpacityPinName);
 
         if (!bLinkOk)
         {
@@ -263,7 +270,7 @@ namespace
         for (const TSharedPtr<FJsonValue>& JsonVal : JsonParams)
         {
             FHlslParamDraft Draft;
-            Draft.Kind = TEXT("Scalar");
+            Draft.Kind = DefaultParamKind;
 
             if (JsonVal->Type == EJson::String)
             {
@@ -331,7 +338,7 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             // Default to always trying to create/load (Context Anchor)
             FString Status = Subsystem->SetTargetMaterial(Path, true);
             
-            if (Status.StartsWith(TEXT("错误")) || Status.StartsWith(TEXT("Error")))
+            if (IsErrorStatus(Status))
             {
                  ResultJson->SetStringField(TEXT("error"), Status);
                  ResultJson->SetBoolField(TEXT("success"), false);
@@ -461,8 +468,8 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
 
         TSharedPtr<FJsonObject> OutputContract = MakeShareable(new FJsonObject);
         OutputContract->SetStringField(TEXT("return"), TEXT("float4"));
-        OutputContract->SetStringField(TEXT("rgb_to"), TEXT("FinalColor"));
-        OutputContract->SetStringField(TEXT("a_to"), TEXT("Opacity"));
+        OutputContract->SetStringField(TEXT("rgb_to"), FinalColorPinName);
+        OutputContract->SetStringField(TEXT("a_to"), OpacityPinName);
 
         ResultJson->SetBoolField(TEXT("success"), true);
         ResultJson->SetStringField(TEXT("target"), Mat ? Mat->GetPathName() : TEXT(""));
@@ -563,11 +570,13 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         // Re-wire parameters to Custom inputs
         for (const FHlslParamDraft& Param : WorkingParams)
         {
-            FString Kind = Param.Kind.IsEmpty() || Param.Kind.Equals(TEXT("Unknown"), ESearchCase::IgnoreCase) ? TEXT("Scalar") : Param.Kind;
+            FString Kind = Param.Kind.IsEmpty() || Param.Kind.Equals(UnknownParamKind, ESearchCase::IgnoreCase) ? DefaultParamKind : Param.Kind;
             FString ParamHandle = Subsystem->DefineVariable(Param.Name, Kind);
-            if (ParamHandle.StartsWith(TEXT("Error")))
+            if (IsErrorStatus(ParamHandle))
             {
-                continue;
+                ResultJson->SetBoolField(TEXT("success"), false);
+                ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Failed to define parameter '%s': %s"), *Param.Name, *ParamHandle));
+                return ResultJson;
             }
             Subsystem->ConnectPins(ParamHandle, TEXT(""), CustomNode->GetName(), Param.Name);
         }
