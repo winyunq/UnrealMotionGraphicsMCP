@@ -343,13 +343,27 @@ async def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
 
 def normalize_project_path(path: str) -> str:
     """
-    Normalizes a project path to the Unreal /Game/ format.
+    Normalizes a project path to the Unreal /Game/ format, actively
+    combating directory traversal (../) and enforcing valid roots.
     Example: 'Content/MyWidget' -> '/Game/MyWidget'
     """
+    import posixpath
     path = path.replace('\\', '/')
     if path.startswith('Content/'):
-        return '/Game/' + path[8:]
-    return path
+        path = '/Game/' + path[8:]
+        
+    if not path.startswith('/'):
+        path = '/Game/' + path
+
+    resolved = posixpath.normpath(path)
+    if not resolved.startswith('/'):
+        resolved = '/' + resolved
+        
+    valid_roots = ('/Game/', '/Engine/', '/Script/', '/Plugin/')
+    if not any(resolved.startswith(root) for root in valid_roots):
+        resolved = '/Game/' + resolved.lstrip('/')
+        
+    return resolved
 
 @register_tool("set_target_umg_asset", "Sets the target UMG asset.")
 async def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
@@ -475,6 +489,7 @@ async def export_umg_to_json(asset_path: str, widget_name: str = "Root") -> Dict
     """
     (Description loaded from prompts.json)
     """
+    asset_path = normalize_project_path(asset_path)
     conn = get_unreal_connection()
     umg_file_client = UMGFileTransformation.UMGFileTransformation(conn)
     return await umg_file_client.export_umg_to_json(asset_path, widget_name)
@@ -525,16 +540,20 @@ async def apply_layout(layout_content: str, widget_name: str = "Root") -> Dict[s
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
     return await umg_trans_client.apply_json_to_umg(final_path, json_data, widget_name)
 
-# Deprecated: Kept for backward compatibility
 @mcp.tool()
-def apply_json_to_umg(asset_path: str, json_data: Dict[str, Any]) -> Dict[str, Any]:
-    """[Deprecated] Use apply_layout instead."""
-    return apply_layout(json.dumps(json_data))
+async def apply_json_to_umg(asset_path: str, json_data: dict) -> Dict[str, Any]:
+    """Applies a JSON definition to a UMG asset. (Maintained for backward compatibility and specialized agent workflows)"""
+    asset_path = normalize_project_path(asset_path)
+    conn = get_unreal_connection()
+    umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
+    return await umg_trans_client.apply_json_to_umg(asset_path, json_data, "Root")
 
-# @mcp.tool()
-def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
-    """[Deprecated] Use apply_layout instead."""
-    return apply_layout(html_content)
+@mcp.tool()
+async def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
+    """Applies an HTML definition to a UMG asset. (Maintained for backward compatibility)"""
+    asset_path = normalize_project_path(asset_path)
+    context_manager.set_target(asset_path)
+    return await apply_layout(html_content)
 
 
 
