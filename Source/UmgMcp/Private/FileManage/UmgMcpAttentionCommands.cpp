@@ -10,33 +10,26 @@
 TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& Command, const TSharedPtr<FJsonObject>& Params)
 {
 	TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-    Response->SetStringField(TEXT("status"), TEXT("error")); // Default to error
 
     UUmgAttentionSubsystem* AttentionSubsystem = GEditor ? GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>() : nullptr;
     if (!AttentionSubsystem)
     {
-        Response->SetStringField(TEXT("message"), TEXT("UmgAttentionSubsystem not available."));
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("UmgAttentionSubsystem not available."));
         return Response;
     }
 
-	// Create a data object for successful responses
-	TSharedPtr<FJsonObject> Data = MakeShareable(new FJsonObject);
-
 	if (Command == TEXT("get_target_umg_asset"))
 	{
-		// Per user's direction, this is now a simple, stable query.
-		// The subsystem itself handles the logic of returning a locked target OR falling back to the last-opened asset.
         FString AssetPath = AttentionSubsystem->GetTargetUmgAsset();
-        Data->SetStringField(TEXT("asset_path"), AssetPath);
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-		Response->SetObjectField(TEXT("data"), Data);
+        Response->SetBoolField(TEXT("success"), true);
+        Response->SetStringField(TEXT("asset_path"), AssetPath);
 	}
 	else if (Command == TEXT("get_last_edited_umg_asset"))
 	{
         FString AssetPath = AttentionSubsystem->GetLastEditedUMGAsset();
-        Data->SetStringField(TEXT("asset_path"), AssetPath);
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-		Response->SetObjectField(TEXT("data"), Data);
+        Response->SetBoolField(TEXT("success"), true);
+        Response->SetStringField(TEXT("asset_path"), AssetPath);
 	}
 	else if (Command == TEXT("get_recently_edited_umg_assets"))
 	{
@@ -52,9 +45,8 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         {
             JsonAssets.Add(MakeShareable(new FJsonValueString(Asset)));
         }
-        Data->SetArrayField(TEXT("assets"), JsonAssets);
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-		Response->SetObjectField(TEXT("data"), Data);
+        Response->SetBoolField(TEXT("success"), true);
+        Response->SetArrayField(TEXT("assets"), JsonAssets);
 	}
     else if (Command == TEXT("set_target_umg_asset"))
     {
@@ -67,25 +59,26 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
             bool bSuccess = AttentionSubsystem->SetTargetUmgAsset(AssetPath);
             if (bSuccess)
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
-                Data->SetStringField(TEXT("asset_path"), AssetPath);
-                Data->SetStringField(TEXT("action"), bAlreadyExists ? TEXT("loaded") : TEXT("created"));
-                Response->SetObjectField(TEXT("data"), Data);
+                Response->SetBoolField(TEXT("success"), true);
+                Response->SetStringField(TEXT("asset_path"), AssetPath);
+                Response->SetStringField(TEXT("action"), bAlreadyExists ? TEXT("loaded") : TEXT("created"));
             }
             else
             {
-                Response->SetStringField(TEXT("status"), TEXT("error"));
-                Response->SetStringField(TEXT("message"), FString::Printf(TEXT("Failed to set target. Asset '%s' not found or invalid."), *AssetPath));
+                Response->SetBoolField(TEXT("success"), false);
+                Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Failed to set target. Asset '%s' not found or invalid."), *AssetPath));
             }
         }
         else
         {
-            Response->SetStringField(TEXT("message"), TEXT("Missing 'asset_path' parameter for set_target_umg_asset."));
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Missing 'asset_path' parameter for set_target_umg_asset."));
         }
     }
 	else
 	{
-		Response->SetStringField(TEXT("message"), TEXT("Unknown attention command"));
+        Response->SetBoolField(TEXT("success"), false);
+		Response->SetStringField(TEXT("error"), TEXT("Unknown attention command"));
 	}
 
 	return Response;

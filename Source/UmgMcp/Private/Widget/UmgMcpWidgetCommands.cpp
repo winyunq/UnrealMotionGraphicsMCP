@@ -15,10 +15,10 @@
 TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Command, const TSharedPtr<FJsonObject>& Params)
 {
     TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-    Response->SetStringField(TEXT("status"), TEXT("error")); // Default to error
 
     if (!GEditor)
     {
+        Response->SetBoolField(TEXT("success"), false);
         Response->SetStringField(TEXT("error"), TEXT("GEditor not available."));
         return Response;
     }
@@ -33,6 +33,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
 
         if (!TargetBlueprint)
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), ErrorMessage);
             return Response;
         }
@@ -49,16 +50,21 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(WidgetTreeJsonString);
             if (FJsonSerializer::Deserialize(Reader, WidgetTreeJson) && WidgetTreeJson.IsValid())
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
-                Response->SetObjectField(TEXT("data"), WidgetTreeJson);
+                Response->SetBoolField(TEXT("success"), true);
+                for (const auto& Field : WidgetTreeJson->Values)
+                {
+                    Response->SetField(Field.Key, Field.Value);
+                }
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to parse widget tree JSON from subsystem."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("GetWidgetTree from subsystem returned empty or invalid data. Check logs for details."));
         }
     }
@@ -79,16 +85,21 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(QueriedPropertiesString);
             if (FJsonSerializer::Deserialize(Reader, QueriedProperties) && QueriedProperties.IsValid())
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
-                Response->SetObjectField(TEXT("data"), QueriedProperties);
+                Response->SetBoolField(TEXT("success"), true);
+                for (const auto& Field : QueriedProperties->Values)
+                {
+                    Response->SetField(Field.Key, Field.Value);
+                }
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to query widget properties or parse response."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'properties' parameter."));
         }
     }
@@ -103,16 +114,21 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(SchemaJsonString);
             if (FJsonSerializer::Deserialize(Reader, SchemaJson) && SchemaJson.IsValid())
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
-                Response->SetObjectField(TEXT("data"), SchemaJson);
+                Response->SetBoolField(TEXT("success"), true);
+                for (const auto& Field : SchemaJson->Values)
+                {
+                    Response->SetField(Field.Key, Field.Value);
+                }
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to get widget schema or parse response."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_type' parameter."));
         }
     }
@@ -131,41 +147,41 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             FString NewWidgetId = SetSubsystem->CreateWidget(TargetBlueprint, ParentName, WidgetType, NewWidgetName);
             if (!NewWidgetId.IsEmpty())
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetBoolField(TEXT("success"), true);
                 Response->SetStringField(TEXT("new_widget_id"), NewWidgetId);
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to create widget. Check logs for details."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing parameters for create_widget (widget_type, new_widget_name)."));
         }
     }
-    // NEW: set_active_widget
     else if (Command == TEXT("set_active_widget"))
     {
          FString WidgetName;
          if (Params->TryGetStringField(TEXT("widget_name"), WidgetName))
          {
-             if (GEditor)
+             if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
              {
-                 if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
-                 {
-                     AttentionSubsystem->SetTargetWidget(WidgetName);
-                     Response->SetStringField(TEXT("status"), TEXT("success"));
-                     Response->SetStringField(TEXT("widget_name"), WidgetName);
-                 }
-                 else
-                 {
-                      Response->SetStringField(TEXT("error"), TEXT("Failed to get UmgAttentionSubsystem."));
-                 }
+                 AttentionSubsystem->SetTargetWidget(WidgetName);
+                 Response->SetBoolField(TEXT("success"), true);
+                 Response->SetStringField(TEXT("widget_name"), WidgetName);
+             }
+             else
+             {
+                 Response->SetBoolField(TEXT("success"), false);
+                 Response->SetStringField(TEXT("error"), TEXT("Failed to get UmgAttentionSubsystem."));
              }
          }
          else
          {
+             Response->SetBoolField(TEXT("success"), false);
              Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' parameter."));
          }
     }
@@ -186,17 +202,19 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
 
             if (SetSubsystem->SetWidgetProperties(TargetBlueprint, WidgetName, PropertiesJsonString))
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetBoolField(TEXT("success"), true);
                 Response->SetStringField(TEXT("widget"), WidgetName);
                 Response->SetObjectField(TEXT("properties_applied"), PropertiesJsonObject);
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to set widget properties. Check logs for details."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'properties' (as a JSON object) parameter."));
         }
     }
@@ -208,16 +226,18 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         {
             if (SetSubsystem->DeleteWidget(TargetBlueprint, WidgetName))
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetBoolField(TEXT("success"), true);
                 Response->SetStringField(TEXT("deleted_widget"), WidgetName);
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to delete widget. Check logs for details."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' parameter."));
         }
     }
@@ -229,17 +249,19 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         {
             if (SetSubsystem->ReparentWidget(TargetBlueprint, WidgetName, NewParentName))
             {
-                Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetBoolField(TEXT("success"), true);
                 Response->SetStringField(TEXT("widget"), WidgetName);
                 Response->SetStringField(TEXT("new_parent"), NewParentName);
             }
             else
             {
+                Response->SetBoolField(TEXT("success"), false);
                 Response->SetStringField(TEXT("error"), TEXT("Failed to reparent widget. Check logs for details."));
             }
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'new_parent_name' parameter."));
         }
     }
@@ -248,17 +270,19 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
         if (SetSubsystem->SaveAsset(TargetBlueprint))
         {
-            Response->SetStringField(TEXT("status"), TEXT("success"));
+            Response->SetBoolField(TEXT("success"), true);
             Response->SetStringField(TEXT("saved_asset"), TargetBlueprint->GetPathName());
         }
         else
         {
+            Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Failed to save asset. Check logs for details."));
         }
     }
 
     else
     {
+        Response->SetBoolField(TEXT("success"), false);
         Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Unknown or not implemented widget command: %s"), *Command));
     }
 

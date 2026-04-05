@@ -614,23 +614,31 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::CreateNodeInstance(UEdGr
              Result->SetStringField(TEXT("warning"), TEXT("Created Executable Node via prepare_value. It is NOT connected to execution flow. Did you mean add_step? Use connect_pins to fix."));
         }
         
-        // Return detailed pin info
-        TArray<TSharedPtr<FJsonValue>> PinInfo;
-        for (UEdGraphPin* Pin : NewNode->Pins)
+        // Only include unconnected input pins on non-exec (pure/data) nodes,
+        // where the caller may need to know what data inputs to wire up.
+        // For exec nodes the AI should focus on whether wiring succeeded, not listing all pins.
+        if (!bIsExec)
         {
-            if (Pin->Direction == EGPD_Input && Pin->LinkedTo.Num() == 0 && !Pin->bHidden)
+            TArray<TSharedPtr<FJsonValue>> PinInfo;
+            for (UEdGraphPin* Pin : NewNode->Pins)
             {
-                TSharedPtr<FJsonObject> PinObj = MakeShared<FJsonObject>();
-                PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
-                PinObj->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
-                 if (Pin->PinType.PinSubCategoryObject.IsValid())
+                if (Pin->Direction == EGPD_Input && Pin->LinkedTo.Num() == 0 && !Pin->bHidden)
                 {
-                     PinObj->SetStringField(TEXT("subType"), Pin->PinType.PinSubCategoryObject->GetName());
+                    TSharedPtr<FJsonObject> PinObj = MakeShared<FJsonObject>();
+                    PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
+                    PinObj->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
+                    if (Pin->PinType.PinSubCategoryObject.IsValid())
+                    {
+                        PinObj->SetStringField(TEXT("subType"), Pin->PinType.PinSubCategoryObject->GetName());
+                    }
+                    PinInfo.Add(MakeShared<FJsonValueObject>(PinObj));
                 }
-                PinInfo.Add(MakeShared<FJsonValueObject>(PinObj));
+            }
+            if (PinInfo.Num() > 0)
+            {
+                Result->SetArrayField(TEXT("unconnectedInputs"), PinInfo);
             }
         }
-        Result->SetArrayField(TEXT("unconnectedInputs"), PinInfo);
 
         return Result;
 	}
