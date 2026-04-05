@@ -1006,6 +1006,46 @@ async def material_get_graph() -> Dict[str, Any]:
     material_client = UMGMaterial.UMGMaterial(conn)
     return await material_client.get_graph()
 
+
+@register_tool("hlsl_set_target", "Set HLSL editing target material; supports create/overwrite flow.")
+async def hlsl_set_target(path: str, confirm_overwrite: bool = False, create_if_not_found: bool = True) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_set_target(path, confirm_overwrite, create_if_not_found)
+
+
+@register_tool("hlsl_get", "Read current HLSL code and parameter definitions.")
+async def hlsl_get() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_get()
+
+
+@register_tool("hlsl_set", "Incrementally update HLSL code and/or parameter list with explicit delete semantics.")
+async def hlsl_set(hlsl: Optional[str] = None, parameters: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_set(hlsl, parameters)
+
+
+@register_tool("hlsl_compile", "Compile current HLSL material target and return concise diagnostics.")
+async def hlsl_compile() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_compile()
+
 # =============================================================================
 #  Category: Dynamic Prompts (Loaded from JSON)
 # =============================================================================

@@ -71,6 +71,30 @@ class UMGMaterial:
         """
         return await self.connection.send_command("material_get_graph", {})
 
+    # ------------------------------
+    # HLSL streamlined protocol
+    # ------------------------------
+    async def hlsl_set_target(self, path: str, confirm_overwrite: bool = False, create_if_not_found: bool = True) -> dict:
+        return await self.connection.send_command("hlsl_set_target", {
+            "path": path,
+            "confirm_overwrite": confirm_overwrite,
+            "create_if_not_found": create_if_not_found
+        })
+
+    async def hlsl_get(self) -> dict:
+        return await self.connection.send_command("hlsl_get", {})
+
+    async def hlsl_set(self, hlsl: str = None, parameters: list = None) -> dict:
+        params = {}
+        if hlsl is not None:
+            params["hlsl"] = hlsl
+        if parameters is not None:
+            params["parameters"] = parameters
+        return await self.connection.send_command("hlsl_set", params)
+
+    async def hlsl_compile(self) -> dict:
+        return await self.connection.send_command("hlsl_compile", {})
+
     async def send_command(self, command: str, params: dict) -> dict:
         """
         Generic command sender exposed for advanced usage.
