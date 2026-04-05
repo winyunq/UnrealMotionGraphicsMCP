@@ -156,7 +156,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                  {
                      AttentionSubsystem->SetTargetWidget(WidgetName);
                      Response->SetStringField(TEXT("status"), TEXT("success"));
-                     Response->SetStringField(TEXT("message"), FString::Printf(TEXT("Active Widget Scope set to '%s'. Future create_widget calls will default to this parent."), *WidgetName));
+                     Response->SetStringField(TEXT("widget_name"), WidgetName);
                  }
                  else
                  {
@@ -187,6 +187,8 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             if (SetSubsystem->SetWidgetProperties(TargetBlueprint, WidgetName, PropertiesJsonString))
             {
                 Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetStringField(TEXT("widget"), WidgetName);
+                Response->SetObjectField(TEXT("properties_applied"), PropertiesJsonObject);
             }
             else
             {
@@ -207,6 +209,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             if (SetSubsystem->DeleteWidget(TargetBlueprint, WidgetName))
             {
                 Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetStringField(TEXT("deleted_widget"), WidgetName);
             }
             else
             {
@@ -227,6 +230,8 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             if (SetSubsystem->ReparentWidget(TargetBlueprint, WidgetName, NewParentName))
             {
                 Response->SetStringField(TEXT("status"), TEXT("success"));
+                Response->SetStringField(TEXT("widget"), WidgetName);
+                Response->SetStringField(TEXT("new_parent"), NewParentName);
             }
             else
             {
@@ -244,6 +249,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         if (SetSubsystem->SaveAsset(TargetBlueprint))
         {
             Response->SetStringField(TEXT("status"), TEXT("success"));
+            Response->SetStringField(TEXT("saved_asset"), TargetBlueprint->GetPathName());
         }
         else
         {

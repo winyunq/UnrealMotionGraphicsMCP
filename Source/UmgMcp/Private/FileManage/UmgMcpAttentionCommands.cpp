@@ -60,10 +60,15 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         if (Params && Params->HasField(TEXT("asset_path")))
         {
             FString AssetPath = Params->GetStringField(TEXT("asset_path"));
+            // Check existence before setting to determine action type
+            bool bAlreadyExists = (LoadObject<UWidgetBlueprint>(nullptr, *AssetPath, nullptr, LOAD_NoWarn) != nullptr);
             bool bSuccess = AttentionSubsystem->SetTargetUmgAsset(AssetPath);
             if (bSuccess)
             {
                 Response->SetStringField(TEXT("status"), TEXT("success"));
+                Data->SetStringField(TEXT("asset_path"), AssetPath);
+                Data->SetStringField(TEXT("action"), bAlreadyExists ? TEXT("loaded") : TEXT("created"));
+                Response->SetObjectField(TEXT("data"), Data);
             }
             else
             {
