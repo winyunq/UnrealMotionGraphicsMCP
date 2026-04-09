@@ -35,7 +35,12 @@ const I18n = (() => {
       if (s.src.includes('assets/js/main.js')) {
         const url = new URL(s.src, location.href);
         if (url.origin === location.origin) {
-          return url.pathname.replace(/[^a-zA-Z0-9/._-]/g, '');
+          // Derive base path by removing the known script suffix, then normalize.
+          const base = url.pathname.replace(/assets\/js\/main\.js$/, '');
+          // Reject if it doesn't look like a clean directory path.
+          if (/^[a-zA-Z0-9/_.-]*$/.test(base) && !base.includes('..')) {
+            return base;
+          }
         }
       }
     }
@@ -93,12 +98,14 @@ function getBase() {
   const scripts = document.querySelectorAll('script[src]');
   for (const s of scripts) {
     if (s.src.includes('assets/js/main.js')) {
-      // Extract only the path prefix; sanitize to allow only safe path characters.
-      const raw = s.src.replace('assets/js/main.js', '');
-      const url = new URL(raw, location.href);
-      // Allow only same-origin paths to prevent open-redirect injection.
+      // Extract only the path prefix; validate same-origin and safe characters.
+      const url = new URL(s.src, location.href);
       if (url.origin === location.origin) {
-        return url.pathname.replace(/[^a-zA-Z0-9/._-]/g, '');
+        const base = url.pathname.replace(/assets\/js\/main\.js$/, '');
+        // Reject paths containing traversal sequences; allow only safe chars.
+        if (/^[a-zA-Z0-9/_.-]*$/.test(base) && !base.includes('..')) {
+          return base;
+        }
       }
     }
   }
