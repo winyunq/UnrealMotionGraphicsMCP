@@ -384,28 +384,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
 
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteAnimation(const TSharedPtr<FJsonObject>& Params)
 {
-    FString ErrorMessage;
-    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
-    if (!Blueprint) return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
-
-    FString AnimationName;
-    if (!Params->TryGetStringField(TEXT("animation_name"), AnimationName) || AnimationName.IsEmpty())
-    {
-        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'animation_name'"));
-    }
-
-    int32 RemovedCount = Blueprint->Animations.RemoveAll([&](UWidgetAnimation* Anim) {
-        return Anim && Anim->GetName() == AnimationName;
-    });
-
-    if (RemovedCount > 0)
-    {
-        Blueprint->Modify();
-        TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
-        Result->SetStringField(TEXT("deleted_animation"), AnimationName);
-        return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
-    }
-    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Animation not found"));
+    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Append-only mode: delete_animation is disabled. Add or overwrite animations instead."));
 }
 
 // Helper to determine value type from JSON Key object
@@ -711,52 +690,12 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
     if (!WidgetGuid.IsValid()) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Widget binding not found in animation"));
 
     // Remove Track
-    bool bFound = false;
-    
-    TArray<TSubclassOf<UMovieSceneTrack>> TrackTypes = { 
-        UMovieSceneFloatTrack::StaticClass(), 
-        UMovieSceneColorTrack::StaticClass(), 
-        UMovieSceneDoubleVectorTrack::StaticClass() 
-    };
-
-    for (auto Class : TrackTypes)
-    {
-        UMovieSceneTrack* Track = MovieScene->FindTrack(Class, WidgetGuid, FName(*PropertyName));
-        if (Track)
-        {
-            MovieScene->RemoveTrack(*Track);
-            bFound = true;
-        }
-    }
-
-    if (bFound)
-    {
-        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
-        
-        // Refresh Editor
-        if (GEditor)
-        {
-            if (auto* AssetSub = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
-            {
-                AssetSub->OpenEditorForAsset(Blueprint);
-            }
-        }
-
-        TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
-        Result->SetStringField(TEXT("animation"), AnimationName);
-        Result->SetStringField(TEXT("widget"), WidgetName);
-        Result->SetStringField(TEXT("property"), PropertyName);
-        return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
-    }
-    
-    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Track not found"));
+    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Append-only mode: remove_property_track is disabled. Overwrite the keys you need instead."));
 }
 
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemoveKeys(const TSharedPtr<FJsonObject>& Params)
 {
-    // For now, just alias to RemovePropertyTrack as granular key removal is complex
-    // User can just overwrite keys by setting them again
-    return RemovePropertyTrack(Params);
+    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Append-only mode: remove_keys is disabled. Send updated keyframes to overwrite instead."));
 }
 
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetAnimationData(const TSharedPtr<FJsonObject>& Params)

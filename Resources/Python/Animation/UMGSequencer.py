@@ -53,10 +53,10 @@ class UMGSequencer:
         return self.conn.send_command("create_animation", params)
 
     def delete_animation(self, asset_path: Optional[str] = None, animation_name: str = "") -> Dict[str, Any]:
-        params = {"animation_name": animation_name}
-        if asset_path:
-            params["asset_path"] = asset_path
-        return self.conn.send_command("delete_animation", params)
+        return {
+            "status": "error",
+            "error": "Append-only mode: delete_animation is disabled. Overwrite or add animations instead."
+        }
 
     def set_property_keys(self, property_name: str, keys: List[Dict[str, Any]]) -> Dict[str, Any]:
         return self.conn.send_command("set_property_keys", {
@@ -65,10 +65,13 @@ class UMGSequencer:
         })
 
     def remove_property_track(self, property_name: str) -> Dict[str, Any]:
-        return self.conn.send_command("remove_property_track", {"property_name": property_name})
+        return {
+            "status": "error",
+            "error": "Append-only mode: remove_property_track is disabled. Overwrite key data instead."
+        }
 
     def remove_keys(self, property_name: str, times: List[float]) -> Dict[str, Any]:
-        return self.conn.send_command("remove_keys", {
-            "property_name": property_name,
-            "times": times
-        })
+        return {
+            "status": "error",
+            "error": "Append-only mode: remove_keys is disabled. Send updated keyframes to overwrite values."
+        }

@@ -23,8 +23,10 @@ class UMGSet:
 
     def delete_widget(self, widget_name: str) -> Dict[str, Any]:
         """Deletes a widget from the UMG asset."""
-        params = {"widget_name": widget_name}
-        return self.client.send_command("delete_widget", params)
+        return {
+            "status": "error",
+            "error": "Append-only mode: delete_widget is disabled. Use additive updates instead."
+        }
 
     def reparent_widget(self, widget_name: str, new_parent_name: str) -> Dict[str, Any]:
         """Moves a widget to be a child of a different parent."""

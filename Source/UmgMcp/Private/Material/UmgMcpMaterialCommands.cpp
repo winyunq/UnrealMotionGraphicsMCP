@@ -517,6 +517,23 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             TArray<FHlslParamDraft> Incoming;
             ParseParameterDrafts(*NewParametersJson, Incoming);
 
+            bool bRequestedDeletion = false;
+            for (const FHlslParamDraft& Item : Incoming)
+            {
+                if (Item.bDelete)
+                {
+                    bRequestedDeletion = true;
+                    break;
+                }
+            }
+
+            if (bRequestedDeletion)
+            {
+                ResultJson->SetBoolField(TEXT("success"), false);
+                ResultJson->SetStringField(TEXT("error"), TEXT("Append-only mode: HLSL parameter deletion is disabled. Send additive or overwrite updates only."));
+                return ResultJson;
+            }
+
             for (const FHlslParamDraft& Item : Incoming)
             {
                 int32 ExistingIndex = INDEX_NONE;
@@ -708,21 +725,8 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
     }
     else if (CommandType == TEXT("material_delete"))
     {
-        FString Handle;
-        if (Params->TryGetStringField(TEXT("handle"), Handle))
-        {
-            bool bSuccess = Subsystem->DeleteNode(Handle);
-            ResultJson->SetBoolField(TEXT("success"), bSuccess);
-            if (bSuccess)
-            {
-                ResultJson->SetStringField(TEXT("deleted_handle"), Handle);
-            }
-        }
-        else
-        {
-             ResultJson->SetStringField(TEXT("error"), TEXT("Missing 'handle'"));
-             ResultJson->SetBoolField(TEXT("success"), false);
-        }
+        ResultJson->SetBoolField(TEXT("success"), false);
+        ResultJson->SetStringField(TEXT("error"), TEXT("Append-only mode: material_delete is disabled. Use additive node updates instead."));
     }
     // --- P3: Connections ---
     else if (CommandType == TEXT("material_connect_nodes"))

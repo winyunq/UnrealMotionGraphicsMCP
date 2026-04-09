@@ -31,7 +31,10 @@ class UMGEditor:
 
     def delete_actor(self, name: str) -> Dict[str, Any]:
         """Deletes an actor by name."""
-        return self.client.send_command("delete_actor", {"name": name})
+        return {
+            "status": "error",
+            "error": "Append-only mode: delete_actor is disabled. Move or overwrite actors instead."
+        }
 
     def set_actor_transform(self, name: str, location: List[float] = None, 
                            rotation: List[float] = None, scale: List[float] = None) -> Dict[str, Any]:

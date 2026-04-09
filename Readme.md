@@ -186,6 +186,8 @@ flowchart LR
 
 ## API Status
 
+**Append-only writes**: All MCP write-capable tools now add or overwrite data only. Deletions are blocked by policy—replace content instead of removing it.
+
 | Category                    | API Name                         | Status |
 | --------------------------- | -------------------------------- | :----: |
 | **Context & Attention**     | `get_target_umg_asset`           |   ✅    |

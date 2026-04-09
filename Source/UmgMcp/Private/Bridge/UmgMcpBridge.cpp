@@ -290,8 +290,29 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
     try
     {
         TSharedPtr<FJsonObject> ResultJson;
-        
-        if (CommandType == TEXT("ping"))
+
+        // Append-only safety: block deletion-style commands at the protocol boundary.
+        static const TArray<FString> AppendOnlyDeletionCommands = {
+            TEXT("delete_widget"),
+            TEXT("delete_animation"),
+            TEXT("remove_property_track"),
+            TEXT("remove_keys"),
+            TEXT("delete_variable"),
+            TEXT("delete_node"),
+            TEXT("material_delete"),
+            TEXT("delete_actor")
+        };
+        const FString NormalizedCommand = CommandType.ToLower();
+        if (AppendOnlyDeletionCommands.Contains(NormalizedCommand))
+        {
+            ResultJson = MakeShareable(new FJsonObject);
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(
+                TEXT("error"),
+                FString::Printf(TEXT("Append-only mode: '%s' is disabled because deletions are not allowed."), *CommandType)
+            );
+        }
+        else if (CommandType == TEXT("ping"))
         {
             ResultJson = MakeShareable(new FJsonObject);
             ResultJson->SetStringField(TEXT("message"), TEXT("pong"));

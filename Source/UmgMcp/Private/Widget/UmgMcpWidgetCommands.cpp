@@ -220,26 +220,8 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     }
     else if (Command == TEXT("delete_widget"))
     {
-        UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-        FString WidgetName;
-        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName))
-        {
-            if (SetSubsystem->DeleteWidget(TargetBlueprint, WidgetName))
-            {
-                Response->SetBoolField(TEXT("success"), true);
-                Response->SetStringField(TEXT("deleted_widget"), WidgetName);
-            }
-            else
-            {
-                Response->SetBoolField(TEXT("success"), false);
-                Response->SetStringField(TEXT("error"), TEXT("Failed to delete widget. Check logs for details."));
-            }
-        }
-        else
-        {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' parameter."));
-        }
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Append-only mode: delete_widget is disabled. Use additive updates instead."));
     }
     else if (Command == TEXT("reparent_widget"))
     {
@@ -288,6 +270,5 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
 
     return Response;
 }
-
 
 

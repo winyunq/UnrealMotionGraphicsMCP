@@ -59,6 +59,36 @@ class UnrealConnection:
         """Send a command to Unreal Engine and get the response (Async Short-Lived)."""
         reader = None
         writer = None
+        payload = params or {}
+        normalized_command = command.lower()
+
+        append_only_blocked = {
+            "delete_widget",
+            "delete_animation",
+            "remove_property_track",
+            "remove_keys",
+            "delete_variable",
+            "delete_node",
+            "material_delete",
+            "delete_actor"
+        }
+
+        if normalized_command in append_only_blocked:
+            return {
+                "status": "error",
+                "error": f"Append-only mode: '{command}' is disabled. Use additive updates instead."
+            }
+
+        if normalized_command == "hlsl_set":
+            parameters = payload.get("parameters", [])
+            for param in parameters:
+                if isinstance(param, dict) and (
+                    param.get("delete") or str(param.get("action", "")).lower() == "delete"
+                ):
+                    return {
+                        "status": "error",
+                        "error": "Append-only mode: HLSL parameter deletion is disabled. Remove delete flags and resend."
+                    }
         
         try:
             logger.info(f"Connecting to Unreal at {UNREAL_HOST}:{UNREAL_PORT}...")
@@ -68,7 +98,7 @@ class UnrealConnection:
             # Match Unity's command format exactly
             command_obj = {
                 "command": command,
-                "params": params or {}
+                "params": payload
             }
             
             # Send with null delimiter

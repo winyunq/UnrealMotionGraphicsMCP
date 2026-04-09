@@ -27,7 +27,10 @@ class UMGMaterial:
         return await self.connection.send_command("material_add_node", params)
     
     async def delete_node(self, handle: str) -> dict:
-        return await self.connection.send_command("material_delete", {"handle": handle})
+        return {
+            "status": "error",
+            "error": "Append-only mode: material_delete is disabled. Remove references by overwriting connections instead."
+        }
 
     async def connect_nodes(self, from_handle: str, to_handle: str) -> dict:
         return await self.connection.send_command("material_connect_nodes", {"from": from_handle, "to": to_handle})

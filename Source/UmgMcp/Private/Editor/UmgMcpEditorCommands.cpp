@@ -238,26 +238,7 @@ TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleDeleteActor(const TSharedPt
         return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
-    TArray<AActor*> AllActors;
-    UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
-    
-    for (AActor* Actor : AllActors)
-    {
-        if (Actor && Actor->GetName() == ActorName)
-        {
-            // Store actor info before deletion for the response
-            TSharedPtr<FJsonObject> ActorInfo = FUmgMcpCommonUtils::ActorToJsonObject(Actor);
-            
-            // Delete the actor
-            Actor->Destroy();
-            
-            TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-            ResultObj->SetObjectField(TEXT("deleted_actor"), ActorInfo);
-            return ResultObj;
-        }
-    }
-    
-    return FUmgMcpCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Append-only mode: delete_actor is disabled. Move or overwrite actors instead of deleting them."));
 }
 
 TSharedPtr<FJsonObject> FUmgMcpEditorCommands::HandleSetActorTransform(const TSharedPtr<FJsonObject>& Params)
