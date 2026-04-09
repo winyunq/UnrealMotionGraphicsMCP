@@ -951,6 +951,24 @@ async def get_widget_animation_data(animation_name: str, widget_name: str) -> Di
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return await sequencer_client.get_widget_animation_data(animation_name, widget_name)
 
+@register_tool("animation_widget_properties", "Gets animated properties for a widget (timeline view).")
+async def animation_widget_properties(animation_name: str = "", widget_name: str = "", property_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_widget_properties(animation_name, widget_name, property_name)
+
+@register_tool("animation_time_properties", "Gets property values at specific times.")
+async def animation_time_properties(times: List[float], animation_name: str = "", widget_name: str = "", property_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_time_properties(times, animation_name, widget_name, property_name)
+
+@register_tool("animation_overview", "Summarizes keyframes and tracks for the animation.")
+async def animation_overview(animation_name: str = "", widget_name: str = "", property_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_animation_overview(animation_name, widget_name, property_name)
+
 # --- Write (Action) ---
 
 @register_tool("create_animation", "Creates a new animation.")
@@ -962,14 +980,14 @@ async def create_animation(animation_name: str) -> Dict[str, Any]:
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return await sequencer_client.create_animation(asset_path=None, animation_name=animation_name)
 
-@register_tool("delete_animation", "Deletes an animation.")
-async def delete_animation(animation_name: str) -> Dict[str, Any]:
+@register_tool("delete_animation", "Deletes an animation (requires confirm_delete=true).")
+async def delete_animation(animation_name: str, confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return await sequencer_client.delete_animation(asset_path=None, animation_name=animation_name)
+    return await sequencer_client.delete_animation(asset_path=None, animation_name=animation_name, confirm_delete=confirm_delete)
 
 @register_tool("set_property_keys", "Sets keyframes for a property.")
 async def set_property_keys(property_name: str, keys: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -980,23 +998,41 @@ async def set_property_keys(property_name: str, keys: List[Dict[str, Any]]) -> D
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return await sequencer_client.set_property_keys(property_name, keys)
 
-@register_tool("remove_property_track", "Removes a property track.")
-async def remove_property_track(property_name: str) -> Dict[str, Any]:
+@register_tool("remove_property_track", "Removes a property track (confirm_delete required).")
+async def remove_property_track(property_name: str, confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return await sequencer_client.remove_property_track(property_name)
+    return await sequencer_client.remove_property_track(property_name, confirm_delete)
 
-@register_tool("remove_keys", "Removes specific keys.")
-async def remove_keys(property_name: str, times: List[float]) -> Dict[str, Any]:
+@register_tool("remove_keys", "Removes specific keys (confirm_delete required).")
+async def remove_keys(property_name: str, times: List[float], confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return await sequencer_client.remove_keys(property_name, times)
+    return await sequencer_client.remove_keys(property_name, times, confirm_delete)
+
+@register_tool("animation_append_widget_tracks", "Append/overwrite property keys from the widget perspective.")
+async def animation_append_widget_tracks(widget_name: str, tracks: List[Dict[str, Any]], animation_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.append_widget_tracks(widget_name, tracks, animation_name)
+
+@register_tool("animation_append_time_slice", "Append a time-slice of widget properties (diff recommended).")
+async def animation_append_time_slice(time: float, widgets: List[Dict[str, Any]], animation_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.append_time_slice(time, widgets, animation_name)
+
+@register_tool("animation_delete_widget_keys", "Delete keys for a widget/property at specific times (confirm_delete required).")
+async def animation_delete_widget_keys(property_name: str, times: List[float], widget_name: str = "", animation_name: str = "", confirm_delete: bool = False) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.delete_widget_keys(property_name, times, widget_name, animation_name, confirm_delete)
 
 
 # =============================================================================
