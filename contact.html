@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact &amp; Support — UMG MCP</title>
+  <meta name="description" content="UMG MCP contact and support — GitHub issues, Fab marketplace support, community discussions.">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .contact-card {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px;
+      text-align: center;
+      transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .contact-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border);
+      box-shadow: var(--glow);
+    }
+    .contact-icon {
+      width: 72px; height: 72px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+    }
+    .contact-card h3 { font-size: 1.2rem; }
+    .contact-card p  { font-size: .9rem; max-width: 260px; }
+  </style>
+</head>
+<body>
+  <nav id="main-nav"></nav>
+
+  <div class="page-hero">
+    <div class="container">
+      <span class="section-label" data-i18n="contact.badge">Get Help</span>
+      <h1 class="mt-16" data-i18n="contact.title">Contact &amp; Support</h1>
+      <p class="hero-subtitle" data-i18n="contact.subtitle">We're here to help. Choose the right channel for your needs.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="contact-grid">
+        <div class="contact-card reveal reveal-delay-1">
+          <div class="contact-icon" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25)">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="white" opacity="0.9"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          </div>
+          <h3 data-i18n="contact.github.title">GitHub Issues</h3>
+          <p data-i18n="contact.github.desc">Report bugs, request features, or ask technical questions for the open source version.</p>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/issues" target="_blank" rel="noopener" class="btn btn-primary">
+            Open an Issue →
+          </a>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
+            View Repository
+          </a>
+        </div>
+
+        <div class="contact-card reveal reveal-delay-2">
+          <div class="contact-icon" style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.25)">
+            🛒
+          </div>
+          <h3 data-i18n="contact.fab.title">Fab Marketplace Support</h3>
+          <p data-i18n="contact.fab.desc">Purchase questions, license issues, or commercial version support.</p>
+          <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-accent">
+            Visit Fab Listing →
+          </a>
+          <span class="badge badge-green" style="margin-top:4px">Commercial Version</span>
+        </div>
+
+        <div class="contact-card reveal reveal-delay-3">
+          <div class="contact-icon" style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.25)">
+            💬
+          </div>
+          <h3 data-i18n="contact.community.title">Community Discussions</h3>
+          <p data-i18n="contact.community.desc">Share your work, ask questions, and connect with other UMG MCP users.</p>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/discussions" target="_blank" rel="noopener" class="btn btn-secondary">
+            Join Discussions →
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICK LINKS -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container container-sm">
+      <div class="section-header reveal">
+        <h2>Quick Links</h2>
+      </div>
+      <div class="card-grid reveal">
+        <div class="card">
+          <div class="card-icon">📖</div>
+          <h3>Getting Started Guide</h3>
+          <p style="margin-top:8px;font-size:.87rem">Step-by-step setup for both open source and commercial versions.</p>
+          <a href="getting-started.html" class="btn btn-ghost btn-sm mt-16">Read Guide →</a>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.25)">🗺️</div>
+          <h3>Roadmap</h3>
+          <p style="margin-top:8px;font-size:.87rem">See what's released, in progress, and planned for UMG MCP.</p>
+          <a href="roadmap.html" class="btn btn-ghost btn-sm mt-16">View Roadmap →</a>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:rgba(37,99,235,0.15);border-color:rgba(37,99,235,0.25)">🔧</div>
+          <h3>Architecture</h3>
+          <p style="margin-top:8px;font-size:.87rem">Technical deep dive into how UMG MCP works under the hood.</p>
+          <a href="architecture.html" class="btn btn-ghost btn-sm mt-16">Learn More →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>

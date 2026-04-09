@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roadmap — UMG MCP</title>
+  <meta name="description" content="UMG MCP development roadmap — from experimental plugin to full AI UI pipeline.">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .roadmap-legend {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 60px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .legend-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+      .timeline-item, .timeline-item:nth-child(even) {
+        padding-left: 60px !important;
+        padding-right: 0 !important;
+        justify-content: flex-start !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav id="main-nav"></nav>
+
+  <div class="page-hero">
+    <div class="container">
+      <span class="section-label" data-i18n="roadmap.badge">What's Coming</span>
+      <h1 class="mt-16" data-i18n="roadmap.title">Development Roadmap</h1>
+      <p class="hero-subtitle" data-i18n="roadmap.subtitle">The journey from experimental MCP plugin to full AI UI pipeline.</p>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <section class="section-sm">
+    <div class="container">
+      <div class="roadmap-legend reveal">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#10b981;box-shadow:0 0 8px rgba(16,185,129,0.6)"></div>
+          Released
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#06b6d4;box-shadow:0 0 8px rgba(6,182,212,0.6);animation:pulse 2s infinite"></div>
+          In Progress
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#7c3aed"></div>
+          Planned
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#94a3b8"></div>
+          Vision
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section class="section">
+    <div class="container">
+      <div class="timeline">
+
+        <!-- Phase 1 -->
+        <div class="timeline-item reveal">
+          <div class="timeline-dot released"></div>
+          <div class="timeline-card">
+            <div class="timeline-phase phase-released" data-i18n="roadmap.phase1">Phase 1 — Released</div>
+            <h3 data-i18n="roadmap.phase1.title">Core Foundation</h3>
+            <ul>
+              <li>40+ MCP tool APIs for UMG</li>
+              <li>Widget creation, deletion, property editing</li>
+              <li>Layout control (position, size, anchoring)</li>
+              <li>Blueprint variable &amp; event binding</li>
+              <li>Blueprint compilation</li>
+              <li>Animation/Sequencer API</li>
+              <li>Material creation &amp; editing</li>
+              <li>HLSL custom expression support</li>
+              <li>TCP socket bridge (C++ ↔ Python)</li>
+              <li>Open source on GitHub (MIT)</li>
+              <li>Compatible with Gemini, GPT, Claude</li>
+            </ul>
+            <div class="mt-16">
+              <span class="badge badge-green">✓ Live Now</span>
+              <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="badge badge-cyan" style="margin-left:8px;text-decoration:none">GitHub →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="timeline-item reveal">
+          <div class="timeline-dot in-progress"></div>
+          <div class="timeline-card">
+            <div class="timeline-phase phase-in-progress" data-i18n="roadmap.phase2">Phase 2 — In Progress</div>
+            <h3 data-i18n="roadmap.phase2.title">Commercial &amp; Multi-Agent</h3>
+            <ul>
+              <li>Commercial version on Fab Marketplace</li>
+              <li>Zero Python dependency (pure C++)</li>
+              <li>Multi-agent orchestration system</li>
+              <li>Specialized agents (Layout, Blueprint, Material, Anim)</li>
+              <li>Style &amp; Theming API</li>
+              <li>API key configuration UI</li>
+              <li>Improved error recovery</li>
+              <li>UE5 Launcher distribution</li>
+            </ul>
+            <div class="mt-16">
+              <span class="badge badge-cyan">🔄 In Progress</span>
+              <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="badge badge-purple" style="margin-left:8px;text-decoration:none">Fab →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="timeline-item reveal">
+          <div class="timeline-dot planned"></div>
+          <div class="timeline-card">
+            <div class="timeline-phase phase-planned" data-i18n="roadmap.phase3">Phase 3 — Planned</div>
+            <h3 data-i18n="roadmap.phase3.title">Developer Experience</h3>
+            <ul>
+              <li>Visual drag-and-drop widget preview</li>
+              <li>Real-time preview pane in AI chat</li>
+              <li>Widget template library</li>
+              <li>Design system / style tokens</li>
+              <li>More AI platform integrations</li>
+              <li>Batch operations API</li>
+              <li>Undo history integration</li>
+              <li>Plugin settings &amp; preferences UI</li>
+            </ul>
+            <div class="mt-16">
+              <span class="badge badge-purple">📅 Planned</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 4 -->
+        <div class="timeline-item reveal">
+          <div class="timeline-dot vision"></div>
+          <div class="timeline-card">
+            <div class="timeline-phase phase-vision" data-i18n="roadmap.phase4">Phase 4 — Vision</div>
+            <h3 data-i18n="roadmap.phase4.title">Full AI UI Pipeline</h3>
+            <ul>
+              <li>Full UI generation from image/mockup input</li>
+              <li>Design-to-UMG conversion pipeline</li>
+              <li>AI-powered responsive layout engine</li>
+              <li>Cross-project widget sharing</li>
+              <li>Team collaboration features</li>
+              <li>UMG-to-design export</li>
+              <li>AI accessibility checker</li>
+              <li>Performance profiling integration</li>
+            </ul>
+            <div class="mt-16">
+              <span class="badge" style="background:rgba(148,163,184,0.1);color:var(--muted);border:1px solid rgba(148,163,184,0.2)">🔭 Vision</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTRIBUTE -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container container-sm">
+      <div class="cta-section reveal">
+        <h2>Shape the Roadmap</h2>
+        <p>Have a feature request? The open source community drives the roadmap. Open an issue or start a discussion on GitHub.</p>
+        <div class="cta-buttons mt-24">
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/issues/new" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+            💡 Request a Feature
+          </a>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/discussions" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
+            💬 Join Discussions
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>

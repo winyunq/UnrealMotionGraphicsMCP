@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UMG MCP — AI-Powered UE5 UMG Editor</title>
+  <meta name="description" content="The first MCP plugin fully focused on UE5 UMG. AI-powered UI creation — describe it, watch it build.">
+  <meta property="og:title" content="UMG MCP — AI-Powered UE5 UMG Editor">
+  <meta property="og:description" content="Native UE5 UMG AI editor. Just describe what you want, watch it build.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <nav id="main-nav" aria-label="Main navigation"></nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-bg">
+      <div class="hero-gradient"></div>
+      <div class="hero-grid"></div>
+      <div class="hero-particles" id="hero-particles"></div>
+    </div>
+    <div class="container hero-content">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        <span data-i18n="hero.badge">Now Available on Fab Marketplace</span>
+      </div>
+      <h1>
+        <span data-i18n="hero.headline1">The AI That</span><br>
+        <span class="gradient-text" id="typing-target"></span>
+      </h1>
+      <p class="hero-subtitle" data-i18n="hero.subtitle">
+        Native UE5 UMG AI editor — just describe what you want, watch it build your interface in real time.
+      </p>
+      <div class="hero-cta">
+        <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span data-i18n="hero.cta.github">Get Started Free</span>
+        </a>
+        <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+          <span data-i18n="hero.cta.fab">Buy on Fab →</span>
+        </a>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="stats-bar">
+        <div class="stat-item">
+          <span class="stat-number" data-counter="40" data-suffix="+">40+</span>
+          <span class="stat-label" data-i18n="hero.stat.apis.label">MCP Tools</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" data-counter="5">5</span>
+          <span class="stat-label" data-i18n="hero.stat.categories.label">Widget / BP / Anim / Material / HLSL</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" data-counter="0">0</span>
+          <span class="stat-label" data-i18n="hero.stat.python.label">Python Required (Fab)</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number gradient-text" style="-webkit-text-fill-color:unset">AI</span>
+          <span class="stat-label" data-i18n="hero.stat.agents.label">Multi-Agent Architecture</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label" data-i18n="index.features.label">Core Capabilities</span>
+        <h2 data-i18n="index.features.title">AI That Understands UMG</h2>
+        <p data-i18n="index.features.subtitle">From simple button placement to complex blueprint logic — describe it, and the AI builds it.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card glow-card reveal reveal-delay-1">
+          <div class="card-icon">🎨</div>
+          <h3 data-i18n="index.feat1.title">Conversational UI Creation</h3>
+          <p data-i18n="index.feat1.desc">Talk to your AI in natural language. It reads your intent and directly creates, modifies, or arranges UMG widgets without you touching a single property panel.</p>
+          <div class="mt-16">
+            <span class="badge badge-cyan">Widget API</span>
+            <span class="badge badge-purple" style="margin-left:6px">40+ Tools</span>
+          </div>
+        </div>
+        <div class="card glow-card reveal reveal-delay-2">
+          <div class="card-icon" style="background:rgba(37,99,235,0.15);border-color:rgba(37,99,235,0.25)">⚡</div>
+          <h3 data-i18n="index.feat2.title">Blueprint Logic Generation</h3>
+          <p data-i18n="index.feat2.desc">Describe interactions and behaviors. The AI generates Blueprint nodes, sets variable bindings, creates animation triggers, and wires up your UI logic.</p>
+          <div class="mt-16">
+            <span class="badge badge-blue">Blueprint API</span>
+          </div>
+        </div>
+        <div class="card glow-card reveal reveal-delay-3">
+          <div class="card-icon" style="background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.25)">🌊</div>
+          <h3 data-i18n="index.feat3.title">Material &amp; HLSL Editing</h3>
+          <p data-i18n="index.feat3.desc">Ask for visual effects, shaders, or dynamic materials. The AI creates or modifies UE5 materials and even writes HLSL code for custom shader nodes.</p>
+          <div class="mt-16">
+            <span class="badge badge-cyan">Material API</span>
+            <span class="badge badge-yellow" style="margin-left:6px">HLSL</span>
+          </div>
+        </div>
+        <div class="card glow-card reveal reveal-delay-4">
+          <div class="card-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.25)">🎬</div>
+          <h3 data-i18n="index.feat4.title">Animation &amp; Sequencer</h3>
+          <p data-i18n="index.feat4.desc">Bring your UI to life. Describe entrance animations, idle loops, or state transitions — the AI sets keyframes and configures UMG animation sequences.</p>
+          <div class="mt-16">
+            <span class="badge badge-green">Animation API</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARISON TABLE -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label" data-i18n="index.compare.label">Two Versions</span>
+        <h2 data-i18n="index.compare.title">Open Source vs. Commercial</h2>
+        <p data-i18n="index.compare.subtitle">Start free on GitHub, or unlock the zero-friction commercial experience on Fab.</p>
+      </div>
+      <div class="compare-wrap reveal">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th data-i18n="index.compare.feature">Feature</th>
+              <th class="col-oss" data-i18n="index.compare.oss">Open Source (GitHub)</th>
+              <th class="col-fab" data-i18n="index.compare.fab">Commercial (Fab)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td data-i18n="index.compare.core_api">Core Widget API (40+ tools)</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.blueprint">Blueprint Editing</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.anim">Animation/Sequencer API</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.material">Material &amp; HLSL API</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.python">Requires Python</td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
+            <tr><td data-i18n="index.compare.install">One-click UE5 install</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.multiagent">Multi-Agent AI</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.support">Priority Support</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td data-i18n="index.compare.license">License</td><td data-i18n="index.compare.license.oss">MIT</td><td data-i18n="index.compare.license.fab">Commercial</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="flex-center gap-16 mt-32 reveal">
+        <a href="open-source.html" class="btn btn-secondary">Learn about OSS →</a>
+        <a href="commercial.html" class="btn btn-primary">Explore Commercial →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMO VIDEOS -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label" data-i18n="index.videos.label">See It in Action</span>
+        <h2 data-i18n="index.videos.title">Demo Videos</h2>
+        <p data-i18n="index.videos.subtitle">Watch the AI build real UE5 interfaces from scratch.</p>
+      </div>
+      <div class="video-grid">
+        <div class="video-card reveal reveal-delay-1">
+          <iframe src="https://www.youtube.com/embed/O86VCzxyF5o" title="RTS UI Design Demo" allowfullscreen loading="lazy"></iframe>
+          <div class="video-card-info">
+            <h4 data-i18n="index.video1.title">RTS UI Design</h4>
+            <p data-i18n="index.video1.desc">Building a complete RTS game HUD with AI assistance</p>
+          </div>
+        </div>
+        <div class="video-card reveal reveal-delay-2">
+          <iframe src="https://www.youtube.com/embed/h_J70I0m4Ls" title="UE5 Editor Recreation" allowfullscreen loading="lazy"></iframe>
+          <div class="video-card-info">
+            <h4 data-i18n="index.video2.title">UE5 Editor Recreation</h4>
+            <p data-i18n="index.video2.desc">Recreating the UE5 editor UI using only AI commands</p>
+          </div>
+        </div>
+        <div class="video-card reveal reveal-delay-3">
+          <iframe src="https://www.youtube.com/embed/pq12x2MH1L4" title="UMG Editor Demo" allowfullscreen loading="lazy"></iframe>
+          <div class="video-card-info">
+            <h4 data-i18n="index.video3.title">UMG Editor Demo</h4>
+            <p data-i18n="index.video3.desc">Live demonstration of UMG widget editing</p>
+          </div>
+        </div>
+        <div class="video-card reveal reveal-delay-4">
+          <iframe src="https://www.youtube.com/embed/93_Fiil9nd8" title="Multi-Agent Gemini" allowfullscreen loading="lazy"></iframe>
+          <div class="video-card-info">
+            <h4 data-i18n="index.video4.title">Multi-Agent with Gemini</h4>
+            <p data-i18n="index.video4.desc">Multi-agent AI architecture powered by Gemini</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="container">
+      <div class="cta-section reveal">
+        <h2 data-i18n="index.cta.title">Ready to Transform Your UE5 Workflow?</h2>
+        <p data-i18n="index.cta.subtitle">Start with the open source version, or jump straight to the zero-setup commercial release on Fab.</p>
+        <div class="cta-buttons">
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
+            ⭐ <span data-i18n="index.cta.github">Star on GitHub</span>
+          </a>
+          <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+            <span data-i18n="index.cta.fab">Buy on Fab →</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>

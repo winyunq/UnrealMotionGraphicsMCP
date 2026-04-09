@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Features — UMG MCP</title>
+  <meta name="description" content="Complete features and comparison of UMG MCP open source vs commercial versions.">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <nav id="main-nav"></nav>
+
+  <div class="page-hero">
+    <div class="container">
+      <span class="section-label" data-i18n="features.badge">Full Breakdown</span>
+      <h1 class="mt-16" data-i18n="features.title">Features &amp; Comparison</h1>
+      <p class="hero-subtitle" data-i18n="features.subtitle">A complete view of every capability across both versions.</p>
+    </div>
+  </div>
+
+  <!-- FEATURE HIGHLIGHTS -->
+  <section class="section">
+    <div class="container">
+      <div class="feature-grid reveal">
+        <div class="feature-item">
+          <div class="fi-icon">🎨</div>
+          <h4>Widget Creation</h4>
+          <p style="font-size:.85rem;margin-top:8px">Create any UMG widget type by description — Canvas, Text, Button, Image, ScrollBox, and more.</p>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">📐</div>
+          <h4>Layout Control</h4>
+          <p style="font-size:.85rem;margin-top:8px">Position, size, anchor, and align widgets with pixel precision using natural language.</p>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">🎭</div>
+          <h4>Style &amp; Theming</h4>
+          <p style="font-size:.85rem;margin-top:8px">Set colors, fonts, padding, borders, and visual styles across your entire widget hierarchy.</p>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">⚡</div>
+          <h4>Blueprint Logic</h4>
+          <p style="font-size:.85rem;margin-top:8px">Wire up events, create variables, bind properties, and add interaction logic via Blueprint.</p>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">🎬</div>
+          <h4>Animations</h4>
+          <p style="font-size:.85rem;margin-top:8px">Create keyframe animations, set easing curves, and control playback via UMG animation tracks.</p>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">🌊</div>
+          <h4>Materials &amp; HLSL</h4>
+          <p style="font-size:.85rem;margin-top:8px">Build dynamic materials, create shader effects, and write HLSL custom expressions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FULL COMPARISON TABLE -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Complete Comparison</h2>
+        <p>Every feature, side by side.</p>
+      </div>
+      <div class="compare-wrap reveal">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="col-oss">Open Source (GitHub)</th>
+              <th class="col-fab">Commercial (Fab)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="background:rgba(124,58,237,0.05);color:var(--primary-light);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase">Widget API</td></tr>
+            <tr><td>Create/Delete Widgets</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Set Widget Properties</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Layout &amp; Anchoring</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Widget Hierarchy</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Style &amp; Theming API</td><td><span class="partial">Partial</span></td><td><span class="check">✓</span></td></tr>
+
+            <tr><td colspan="3" style="background:rgba(37,99,235,0.05);color:#60a5fa;font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase">Blueprint API</td></tr>
+            <tr><td>Add/Get Variables</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Widget-Variable Binding</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Event Binding</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Blueprint Compilation</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Function Generation</td><td><span class="partial">Basic</span></td><td><span class="check">✓ Advanced</span></td></tr>
+
+            <tr><td colspan="3" style="background:rgba(16,185,129,0.05);color:var(--accent2);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase">Animation API</td></tr>
+            <tr><td>Create Animations</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Add Keyframes</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Easing Curves</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Complex Sequencer</td><td><span class="partial">Basic</span></td><td><span class="check">✓</span></td></tr>
+
+            <tr><td colspan="3" style="background:rgba(6,182,212,0.05);color:var(--accent);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase">Material API</td></tr>
+            <tr><td>Create Materials</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Set Parameters</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>HLSL Custom Expressions</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Material Instances</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+
+            <tr><td colspan="3" style="background:rgba(124,58,237,0.08);color:var(--primary-light);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase">Platform &amp; Setup</td></tr>
+            <tr><td>Python Required</td><td><span class="check" style="color:#f87171">Required</span></td><td><span class="check">Not Required</span></td></tr>
+            <tr><td>UE5 Launcher Install</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Auto Updates</td><td><span class="cross">✗ Manual</span></td><td><span class="check">✓ Auto</span></td></tr>
+            <tr><td>Multi-Agent AI</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>Priority Support</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
+            <tr><td>License</td><td>MIT</td><td>Commercial</td></tr>
+            <tr><td>Price</td><td style="color:var(--accent2)">Free</td><td style="color:var(--primary-light)">Fab Marketplace</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAPABILITY MATRIX -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label" data-i18n="features.matrix.label">API Matrix</span>
+        <h2 data-i18n="features.matrix.title">Capability Matrix</h2>
+        <p>Every MCP tool organized by category and supported widget type.</p>
+      </div>
+      <div class="card-grid reveal">
+        <div class="card">
+          <div class="card-icon">🧩</div>
+          <h3>Container Widgets</h3>
+          <p style="margin-top:10px;font-size:.85rem">CanvasPanel, HorizontalBox, VerticalBox, GridPanel, WrapBox, ScrollBox, Overlay, Border</p>
+          <div class="mt-16">
+            <span class="badge badge-green">Full Support</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:rgba(37,99,235,0.15);border-color:rgba(37,99,235,0.25)">📝</div>
+          <h3>Text &amp; Input</h3>
+          <p style="margin-top:10px;font-size:.85rem">TextBlock, RichTextBlock, EditableText, EditableTextBox, MultiLineEditableText, SpinBox</p>
+          <div class="mt-16">
+            <span class="badge badge-green">Full Support</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.25)">🖱️</div>
+          <h3>Interactive Widgets</h3>
+          <p style="margin-top:10px;font-size:.85rem">Button, CheckBox, ComboBox, Slider, ProgressBar, Image, Throbber, CircularThrobber</p>
+          <div class="mt-16">
+            <span class="badge badge-green">Full Support</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.25)">🎨</div>
+          <h3>Visual &amp; Media</h3>
+          <p style="margin-top:10px;font-size:.85rem">Image, BackgroundBlur, InvalidationBox, RetainerBox, NamedSlot, UserWidget</p>
+          <div class="mt-16">
+            <span class="badge badge-cyan">Partial</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section-sm">
+    <div class="container">
+      <div class="cta-section reveal">
+        <h2>Start Building Today</h2>
+        <p>Whether you choose open source or commercial, your AI-powered UMG workflow starts now.</p>
+        <div class="cta-buttons mt-24">
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">GitHub — Free</a>
+          <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">Buy on Fab →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>
