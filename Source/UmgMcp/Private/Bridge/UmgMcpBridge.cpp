@@ -300,6 +300,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         else if (CommandType == TEXT("get_last_edited_umg_asset") ||
                  CommandType == TEXT("get_recently_edited_umg_assets") ||
                  CommandType == TEXT("get_target_umg_asset") ||
+                 CommandType == TEXT("get_target_widget") ||
+                 CommandType == TEXT("set_target_widget") ||
                  CommandType == TEXT("set_target_umg_asset"))
         {
             ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
