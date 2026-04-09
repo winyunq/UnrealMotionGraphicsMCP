@@ -38,7 +38,7 @@
   "hero.stat.categories": "5",
   "hero.stat.categories.label": "控件 / BP / 动画 / 材质 / HLSL",
   "hero.stat.python": "0",
-  "hero.stat.python.label": "Python 依赖（商业版）",
+  "hero.stat.python.label": "无需 Python（商业版）",
   "hero.stat.agents": "多智能体",
   "hero.stat.agents.label": "AI 架构（商业版）",
 

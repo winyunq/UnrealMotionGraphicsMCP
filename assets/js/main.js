@@ -33,7 +33,10 @@ const I18n = (() => {
     const scripts = document.querySelectorAll('script[src]');
     for (const s of scripts) {
       if (s.src.includes('assets/js/main.js')) {
-        return s.src.replace('assets/js/main.js', '');
+        const url = new URL(s.src, location.href);
+        if (url.origin === location.origin) {
+          return url.pathname.replace(/[^a-zA-Z0-9/._-]/g, '');
+        }
       }
     }
     // fallback: count path depth
@@ -52,10 +55,8 @@ const I18n = (() => {
         }
       }
     });
-    document.querySelectorAll('[data-i18n-html]').forEach(el => {
-      const key = el.getAttribute('data-i18n-html');
-      if (strings[key] !== undefined) el.innerHTML = strings[key];
-    });
+    // data-i18n-html is intentionally omitted to prevent XSS via translation content.
+    // Use data-i18n (textContent) or data-i18n-title (attribute) only.
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
       const key = el.getAttribute('data-i18n-title');
       if (strings[key] !== undefined) el.title = strings[key];
@@ -92,7 +93,13 @@ function getBase() {
   const scripts = document.querySelectorAll('script[src]');
   for (const s of scripts) {
     if (s.src.includes('assets/js/main.js')) {
-      return s.src.replace('assets/js/main.js', '');
+      // Extract only the path prefix; sanitize to allow only safe path characters.
+      const raw = s.src.replace('assets/js/main.js', '');
+      const url = new URL(raw, location.href);
+      // Allow only same-origin paths to prevent open-redirect injection.
+      if (url.origin === location.origin) {
+        return url.pathname.replace(/[^a-zA-Z0-9/._-]/g, '');
+      }
     }
   }
   return './';

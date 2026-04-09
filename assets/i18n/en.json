@@ -38,7 +38,7 @@
   "hero.stat.categories": "Categories",
   "hero.stat.categories.label": "Widget / BP / Anim / Material / HLSL",
   "hero.stat.python": "Python",
-  "hero.stat.python.label": "Required (Fab Version)",
+  "hero.stat.python.label": "Python Not Required (Fab)",
   "hero.stat.agents": "Multi-Agent",
   "hero.stat.agents.label": "AI Architecture (Fab)",
 
