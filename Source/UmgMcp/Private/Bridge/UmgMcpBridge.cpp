@@ -444,14 +444,22 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("create_animation") ||
                  CommandType == TEXT("delete_animation") ||
                  CommandType == TEXT("set_animation_scope") ||
+                 CommandType == TEXT("animation_target") ||
                  CommandType == TEXT("set_widget_scope") ||
+                 CommandType == TEXT("widget_target") ||
                  CommandType == TEXT("set_property_keys") ||
                  CommandType == TEXT("remove_property_track") ||
                  CommandType == TEXT("remove_keys") ||
                  CommandType == TEXT("get_animation_keyframes") ||
                  CommandType == TEXT("get_animated_widgets") ||
                  CommandType == TEXT("get_animation_full_data") ||
-                 CommandType == TEXT("get_widget_animation_data"))
+                 CommandType == TEXT("get_widget_animation_data") ||
+                 CommandType == TEXT("animation_widget_properties") ||
+                 CommandType == TEXT("animation_time_properties") ||
+                 CommandType == TEXT("animation_overview") ||
+                 CommandType == TEXT("animation_append_widget_tracks") ||
+                 CommandType == TEXT("animation_append_time_slice") ||
+                 CommandType == TEXT("animation_delete_widget_keys"))
         {
             ResultJson = SequencerCommands->HandleCommand(CommandType, Params);
         }

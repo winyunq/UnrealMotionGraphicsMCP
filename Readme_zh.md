@@ -226,18 +226,23 @@ flowchart LR
 
 ## UMG 动画 (Sequencer) API 实现状态
 
-| 命令                      |   状态   | 描述                               |
-| :------------------------ | :------: | :--------------------------------- |
-| `set_animation_scope`     | ✅ 已实现 | 设置后续命令的目标动画             |
-| `set_widget_scope`        | ✅ 已实现 | 设置后续命令的目标控件             |
-| `get_all_animations`      | ✅ 已实现 | 获取蓝图中的所有动画列表           |
-| `create_animation`        | ✅ 已实现 | 创建新动画                         |
-| `delete_animation`        | ✅ 已实现 | 删除动画                           |
-| `set_property_keys`       | ✅ 已实现 | 设置属性关键帧（目前仅支持浮点数） |
-| `remove_property_track`   | 🚧 计划中 | 移除属性轨道                       |
-| `remove_keys`             | 🚧 计划中 | 移除特定关键帧                     |
-| `get_animation_keyframes` | 🚧 计划中 | 获取动画的关键帧数据               |
-| `get_animated_widgets`    | 🚧 计划中 | 获取受动画影响的控件列表           |
+| 命令                           |   状态   | 描述                                                                                  |
+| :----------------------------- | :------: | :------------------------------------------------------------------------------------ |
+| `animation_target`             | ✅ 已实现 | 设置/聚焦当前动画（等价 `set_animation_scope`，若不存在会自动创建）。                 |
+| `widget_target`                | ✅ 已实现 | 设置/聚焦当前控件（等价 `set_widget_scope`）。                                        |
+| `animation_overview`           | ✅ 已实现 | 返回关键帧数量、轨道数量、关键时间点、变更的属性列表。                                 |
+| `animation_widget_properties`  | ✅ 已实现 | 按控件视角查看属性时间线（忽略未被动画驱动的属性）。                                   |
+| `animation_time_properties`    | ✅ 已实现 | 按时间切片查看属性值，支持一次查询多个时间点。                                         |
+| `animation_append_widget_tracks` | ✅ 已实现 | 按控件+属性批量追加/覆盖关键帧（仅并集/覆盖，不做删除）。                               |
+| `animation_append_time_slice`  | ✅ 已实现 | 在指定时间为多个控件追加差分式属性值。                                                |
+| `animation_delete_widget_keys` | ✅ 已实现 | 仅删除指定控件+属性在指定时间的关键帧（需 `confirm_delete=true`，符合 Issue 15 安全策略）。 |
+| `create_animation`             | ✅ 已实现 | 创建或聚焦动画，支持自动命名。                                                        |
+| `set_property_keys`            | ✅ 已实现 | 底层轨道写入辅助（支持 float/color/vector2D）。                                       |
+
+说明：
+- `animation_target` / `widget_target` 复用当前 UMG 目标资产，命名自动纠错（不再出现 “animal” 拼写），并在缺失时自动创建。
+- 写入仅做并集/覆盖，不做隐式删除；如需删除，请使用 `animation_delete_widget_keys` 并显式传入 `confirm_delete=true`。
+- 所有动画指令都会返回有价值的计数/时间线信息，便于 AI 复述与复现。
 
 ## UMG 材质 (Material) API 实现状态 (New: 五大核心能力)
 
