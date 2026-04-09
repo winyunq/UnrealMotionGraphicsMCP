@@ -17,7 +17,7 @@ const I18n = (() => {
 
   async function load(lang) {
     if (cache[lang]) return cache[lang];
-    const base = getBasePath();
+    const base = getBase();
     try {
       const res = await fetch(`${base}assets/i18n/${lang}.json`);
       if (!res.ok) throw new Error('Failed to load i18n');
@@ -27,26 +27,6 @@ const I18n = (() => {
       console.warn('i18n load error', e);
       return {};
     }
-  }
-
-  function getBasePath() {
-    const scripts = document.querySelectorAll('script[src]');
-    for (const s of scripts) {
-      if (s.src.includes('assets/js/main.js')) {
-        const url = new URL(s.src, location.href);
-        if (url.origin === location.origin) {
-          // Derive base path by removing the known script suffix, then normalize.
-          const base = url.pathname.replace(/assets\/js\/main\.js$/, '');
-          // Reject if it doesn't look like a clean directory path.
-          if (/^[a-zA-Z0-9/_.-]*$/.test(base) && !base.includes('..')) {
-            return base;
-          }
-        }
-      }
-    }
-    // fallback: count path depth
-    const depth = location.pathname.split('/').filter(Boolean).length;
-    return depth > 1 ? '../'.repeat(depth - 1) : './';
   }
 
   function apply(strings) {
@@ -97,17 +77,22 @@ const I18n = (() => {
 function getBase() {
   const scripts = document.querySelectorAll('script[src]');
   for (const s of scripts) {
-    if (s.src.includes('assets/js/main.js')) {
-      // Extract only the path prefix; validate same-origin and safe characters.
-      const url = new URL(s.src, location.href);
-      if (url.origin === location.origin) {
-        const base = url.pathname.replace(/assets\/js\/main\.js$/, '');
-        // Reject paths containing traversal sequences; allow only safe chars.
-        if (/^[a-zA-Z0-9/_.-]*$/.test(base) && !base.includes('..')) {
-          return base;
-        }
+    if (!s.src.includes('assets/js/main.js')) continue;
+    try {
+      // new URL() fully normalizes the path, decoding %2e%2e and resolving ..
+      const url = new URL(s.src);
+      if (url.origin !== location.origin) continue;
+      // pathname is already normalized; strip the known script suffix
+      const path = url.pathname;
+      const suffix = 'assets/js/main.js';
+      if (!path.endsWith(suffix)) continue;
+      const base = path.slice(0, path.length - suffix.length);
+      // Normalize once more via URL API to be explicit, then validate
+      const normalized = new URL(base || '.', location.origin + '/').pathname;
+      if (/^[/a-zA-Z0-9_.-]*$/.test(normalized) && !normalized.includes('..')) {
+        return normalized;
       }
-    }
+    } catch (_) { /* skip malformed src */ }
   }
   return './';
 }

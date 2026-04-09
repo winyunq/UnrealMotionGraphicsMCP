@@ -993,6 +993,9 @@ p  { color: var(--muted); line-height: 1.75; }
 }
 
 /* ── Scrollbar ─────────────────────────────────────────── */
+/* Firefox scrollbar */
+html { scrollbar-color: rgba(124,58,237,0.4) var(--bg); scrollbar-width: thin; }
+/* WebKit scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 4px; }
