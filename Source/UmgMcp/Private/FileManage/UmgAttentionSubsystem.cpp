@@ -159,6 +159,7 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *AssetPath);
         AttentionTargetAssetPath = AssetPath;
         CachedTargetWidgetBlueprint = TargetBP;
+        CurrentWidgetName.Empty(); // Clear stale widget scope when switching assets unless explicitly set later.
 
         // Also treat setting a target as an 'edit' action to update the history, ensuring consistency.
         UmgAssetHistory.Remove(AssetPath);

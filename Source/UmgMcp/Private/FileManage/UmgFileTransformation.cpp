@@ -22,6 +22,9 @@
 
 // Forward declarations
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget);
+static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& WidgetJson, UWidget* TargetWidget);
+static void MergeChildrenAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget);
+static void UpsertWidgetFromJsonAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget);
 
 bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName);
 
@@ -392,84 +395,34 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
         bReplacingRoot = false;
     }
 
-    if (bReplacingRoot)
-    {
-        // Remove RootWidget first
-        if (WidgetBlueprint->WidgetTree->RootWidget)
-        {
-            WidgetBlueprint->WidgetTree->RemoveWidget(WidgetBlueprint->WidgetTree->RootWidget);
-            WidgetBlueprint->WidgetTree->RootWidget = nullptr;
-        }
+    // Delete-aware append mode: delete_widget exists in this API directory, so apply_json_to_umg
+    // must never implicitly remove widgets. We only upsert/append; explicit deletions stay on the delete tool.
+    const bool bAppendOnlyWrites = true;
 
-        // Ensure all other widgets are removed (only if full replacement)
-        TArray<UWidget*> RemainingWidgets;
-        WidgetBlueprint->WidgetTree->GetAllWidgets(RemainingWidgets);
-        if (RemainingWidgets.Num() > 0)
+    if (bAppendOnlyWrites)
+    {
+        if (bReplacingRoot)
         {
-            UE_LOG(LogUmgMcp, Warning, TEXT("ApplyJsonToUmgAsset_GameThread: Found %d orphaned widgets after removing root. Cleaning up..."), RemainingWidgets.Num());
-            for (UWidget* Widget : RemainingWidgets)
+            if (!WidgetBlueprint->WidgetTree->RootWidget)
             {
-                WidgetBlueprint->WidgetTree->RemoveWidget(Widget);
+                UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: No existing root widget. Creating from JSON (append-only mode)."));
+                UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
+                if (!NewRootWidget)
+                {
+                    UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget from JSON for asset '%s'."), *FinalAssetPath);
+                    return false;
+                }
+                WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
+                UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New root widget set: %s"), *NewRootWidget->GetName());
+            }
+            else
+            {
+                UpsertWidgetFromJsonAppendOnly(RootJsonObject, WidgetBlueprint->WidgetTree, WidgetBlueprint->WidgetTree->RootWidget);
             }
         }
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Existing widget tree cleared."));
-
-        // 6. Recursively create the new widget tree from the JSON data.
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Starting recursive widget creation from JSON."));
-        UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
-        if (!NewRootWidget)
+        else
         {
-            UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget from JSON for asset '%s'."), *FinalAssetPath);
-            return false;
-        }
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New widget tree created."));
-
-        // 7. Set the new root widget on the widget tree.
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Setting new root widget."));
-        WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New root widget set: %s"), *NewRootWidget->GetName());
-    }
-    else
-    {
-        // Replacing a specific child widget
-        UWidget* OldWidget = TargetWidget;
-        UPanelWidget* ParentPanel = OldWidget->GetParent();
-
-        if (!ParentPanel)
-        {
-            UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Target widget '%s' has no parent (and is not RootWidget). Cannot replace."), *TargetWidgetName);
-            return false;
-        }
-
-        int32 ChildIndex = ParentPanel->GetChildIndex(OldWidget);
-        if (ChildIndex == -1) 
-        {
-             UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Could not find index of '%s' in parent."), *TargetWidgetName);
-             return false;
-        }
-        
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Replacing widget '%s' at index %d."), *TargetWidgetName, ChildIndex);
-
-        // Remove old widget
-        ParentPanel->RemoveChild(OldWidget);
-        WidgetBlueprint->WidgetTree->RemoveWidget(OldWidget); // Also remove from tree registry? Or does Panel remove do it? Usually safer to trust Panel, but let's be sure. Actually Panel Remove returns bool.
-
-        // Create new widget (adds to ParentPanel at end)
-        UWidget* NewWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, ParentPanel);
-        if (!NewWidget)
-        {
-            UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create new widget from JSON."));
-            return false;
-        }
-        
-        // Correct the order (move from end to ChildIndex)
-        // Note: NewWidget is currently at valid index (Count-1)
-        int32 CurrentIndex = ParentPanel->GetChildIndex(NewWidget);
-        if (CurrentIndex != ChildIndex)
-        {
-            ParentPanel->RemoveChild(NewWidget);
-            ParentPanel->InsertChildAt(ChildIndex, NewWidget);
-             UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Moved new widget to correct index %d."), ChildIndex);
+            UpsertWidgetFromJsonAppendOnly(RootJsonObject, WidgetBlueprint->WidgetTree, TargetWidget);
         }
     }
 
@@ -516,6 +469,145 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
     UE_LOG(LogUmgMcp, Log, TEXT("Successfully applied JSON to UMG asset '%s'."), *FinalAssetPath);
 
     return true;
+}
+
+static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& WidgetJson, UWidget* TargetWidget)
+{
+    if (!WidgetJson.IsValid() || !TargetWidget)
+    {
+        return;
+    }
+
+    const TSharedPtr<FJsonObject>* PropertiesJsonObjPtr;
+    TSharedPtr<FJsonObject> WidgetProps = MakeShared<FJsonObject>();
+    TSharedPtr<FJsonObject> SlotProps = nullptr;
+
+    if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObjPtr))
+    {
+        TSharedPtr<FJsonObject> SourceProps = *PropertiesJsonObjPtr;
+        for (auto& Pair : SourceProps->Values)
+        {
+            if (Pair.Key == TEXT("Slot"))
+            {
+                const TSharedPtr<FJsonObject>* SlotObjPtr;
+                if (Pair.Value->TryGetObject(SlotObjPtr))
+                {
+                    SlotProps = *SlotObjPtr;
+                }
+            }
+            else
+            {
+                WidgetProps->SetField(Pair.Key, Pair.Value);
+            }
+        }
+    }
+
+    if (WidgetProps->Values.Num() > 0)
+    {
+        TargetWidget->Modify();
+        if (!FJsonObjectConverter::JsonObjectToUStruct(WidgetProps.ToSharedRef(), TargetWidget->GetClass(), TargetWidget, 0, 0))
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("ApplyPropertiesToExistingWidget: Failed to apply properties to '%s'."), *TargetWidget->GetName());
+        }
+    }
+
+    if (SlotProps.IsValid() && TargetWidget->Slot)
+    {
+        TargetWidget->Slot->Modify();
+        TSharedPtr<FJsonObject> NormalizedSlotProps = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(SlotProps);
+        if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), TargetWidget->Slot->GetClass(), TargetWidget->Slot, 0, 0))
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("ApplyPropertiesToExistingWidget: Failed to apply Slot properties to '%s'."), *TargetWidget->GetName());
+        }
+    }
+}
+
+static void MergeChildrenAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget)
+{
+    if (!WidgetJson.IsValid() || !WidgetTree || !TargetWidget)
+    {
+        return;
+    }
+
+    UPanelWidget* ParentPanel = Cast<UPanelWidget>(TargetWidget);
+    if (!ParentPanel)
+    {
+        return;
+    }
+
+    const TArray<TSharedPtr<FJsonValue>>* ChildrenJsonArray;
+    if (!WidgetJson->TryGetArrayField(TEXT("children"), ChildrenJsonArray))
+    {
+        return;
+    }
+
+    TMap<FString, UWidget*> ExistingChildren;
+    for (int32 Index = 0; Index < ParentPanel->GetChildrenCount(); ++Index)
+    {
+        if (UWidget* Child = ParentPanel->GetChildAt(Index))
+        {
+            ExistingChildren.Add(Child->GetName(), Child);
+        }
+    }
+
+    int32 InsertIndex = 0;
+    for (const TSharedPtr<FJsonValue>& ChildValue : *ChildrenJsonArray)
+    {
+        const TSharedPtr<FJsonObject>* ChildObject;
+        if (!ChildValue->TryGetObject(ChildObject))
+        {
+            continue;
+        }
+
+        FString ChildName;
+        (*ChildObject)->TryGetStringField(TEXT("widget_name"), ChildName);
+
+        if (UWidget** ExistingPtr = ChildName.IsEmpty() ? nullptr : ExistingChildren.Find(ChildName))
+        {
+            UpsertWidgetFromJsonAppendOnly(*ChildObject, WidgetTree, *ExistingPtr);
+            const int32 CurrentIndex = ParentPanel->GetChildIndex(*ExistingPtr);
+            InsertIndex = FMath::Max(InsertIndex, CurrentIndex + 1);
+            ExistingChildren.Remove(ChildName);
+        }
+        else
+        {
+            UWidget* NewChild = CreateWidgetFromJson(*ChildObject, WidgetTree, TargetWidget);
+            if (NewChild)
+            {
+                const int32 CurrentIndex = ParentPanel->GetChildIndex(NewChild);
+                if (CurrentIndex != InsertIndex && CurrentIndex != INDEX_NONE)
+                {
+                    ParentPanel->InsertChildAt(InsertIndex, NewChild);
+                }
+                InsertIndex = ParentPanel->GetChildIndex(NewChild) + 1;
+            }
+        }
+    }
+}
+
+static void UpsertWidgetFromJsonAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget)
+{
+    if (!WidgetJson.IsValid() || !WidgetTree || !TargetWidget)
+    {
+        return;
+    }
+
+    FString DeclaredName;
+    WidgetJson->TryGetStringField(TEXT("widget_name"), DeclaredName);
+    if (!DeclaredName.IsEmpty() && DeclaredName != TargetWidget->GetName())
+    {
+        UE_LOG(LogUmgMcp, Warning, TEXT("UpsertWidgetFromJsonAppendOnly: JSON widget '%s' mapped to existing widget '%s'. Keeping existing instance to avoid implicit deletion."), *DeclaredName, *TargetWidget->GetName());
+    }
+
+    FString DeclaredClass;
+    WidgetJson->TryGetStringField(TEXT("widget_class"), DeclaredClass);
+    if (!DeclaredClass.IsEmpty() && DeclaredClass != TargetWidget->GetClass()->GetPathName())
+    {
+        UE_LOG(LogUmgMcp, Warning, TEXT("UpsertWidgetFromJsonAppendOnly: Class mismatch for widget '%s' (JSON: %s, Existing: %s). Preserving existing class."), *TargetWidget->GetName(), *DeclaredClass, *TargetWidget->GetClass()->GetPathName());
+    }
+
+    ApplyPropertiesToExistingWidget(WidgetJson, TargetWidget);
+    MergeChildrenAppendOnly(WidgetJson, WidgetTree, TargetWidget);
 }
 
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget)

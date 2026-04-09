@@ -40,9 +40,13 @@ The Python code is organized to mirror the C++ plugin structure:
 *   `apply_layout`
 *   `apply_json_to_umg` (Deprecated)
 
+`apply_layout`/`apply_json_to_umg` run in append-only mode when delete-capable tools are available; extra widgets stay intact unless explicitly removed.
+
 **Context (FileManage)**
 *   `get_target_umg_asset`
-*   `set_target_umg_asset`
+*   `get_target_widget`
+*   `set_target_umg_asset` (supports `Path:WidgetName` or widget-only focus updates)
+*   `set_target_widget`
 *   `get_last_edited_umg_asset`
 *   `get_recently_edited_umg_assets`
 
