@@ -224,6 +224,17 @@ flowchart LR
  |                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
  |                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
 
+## Bluecode (Draft): Text-First Blueprint Protocol
+
+Goal: reduce chatty, per-node MCP calls by letting AI describe and merge whole function flows in a single text payload. Bias is **easy to write, hard to delete**.
+
+- **Anchor Function**: `bluecode_set_function(path?)` accepts `domain?:FunctionName`. Default domain is current UMG target; if a widget target exists it wins. Ambiguity returns candidates instead of guessing. After binding, the implicit entry/exit sentinels are `begin` and `end`.
+- **Graph Model**: Execution lives in a `node_list` tree with reserved tokens `main` (entry), `begin` (branch root), `end` (implicit empty exit), `return` (explicit exit). Data wiring lives in `connect_list`; unrunnable data nodes fall into a repair bucket, and truly unplaced symbols go to a `floating_list`.
+- **Read Flow**: `bluecode_read_function` walks `main -> end/return`, linearizes execution, and emits numbered expressions (`1:main(i)->2:if(i%2==0)->3:print("hi")->4:return`). Branches use `begin`/`end` grouping so AI can round-trip without needing asset paths.
+- **Write & Merge**: `bluecode_write_function` accepts numbered or plain chains. New nodes default to attach near `end`; right-hand anchors win when both sides are given. Deletions are disallowed—backend matches existing nodes by priority (**id proximity > params > function > node type**) and appends unmatched nodes to the right. Examples: existing `main-print1-print3-end` + input `main-print2-end` → `main-print1-print3-print2-end` (insertion reported); input `main-print2-print3-end` dedupes `print3` → `main-print1-print2-print3-end`.
+- **Unconnectable Symbols**: If a node cannot join execution, Bluecode first tries to treat it as a value parameter, then attempts a cast; failing that it parks the node in `floating_list` with repair hints. Direct `connect_list` edits remain available for surgical pin wiring.
+- **Compile**: `bluecode_compile` compiles the target Blueprint and returns compact JSON (success/errors, touched nodes, unresolved floating nodes) without verbose history.
+
 ## UMG Sequencer API Status
 
 | Command                          | Status | Description                                                                                                      |
