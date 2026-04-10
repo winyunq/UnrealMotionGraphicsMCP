@@ -224,6 +224,19 @@ flowchart LR
 |                    | `delete_node`             |   ✅   | 删除特定节点。                                                 |
 |                    | `compile_blueprint`       |   ✅   | 编译并应用更改。                                               |
 
+## Bluecode：蓝图流程 DSL（设计阶段）
+
+**目标：** 减少逐步的啰嗦调用，让 AI 一次描述完整的执行流，同时保持“易写难删、聚焦人类思维”的行为。
+
+- **定位 (`bluecode_set_function`)**：`路径:域?:函数名` 的鲁棒匹配（默认路径=当前 UMG 目标，若有 widget target 优先生效）。成功后光标默认从 `begin` 到 `end/return`，若存在歧义需返回待消歧信息。
+- **核心基元**：`main`（入口）、`begin`（分支）、`end`（空终止）、`return`（显式返回）。node list 是已经包含执行关系的树；connect list 是必要时的底层连线视图。
+- **读取 (`bluecode_read`)**：从 `main` 到 `end/return` 展开，返回代码式表达，如 `main(i)->if(i%2==0){print(\"hi\")->return; print(\"fail\")->end}`；可附带节点编号（如 `1:main-2:end`）便于精确编辑。
+- **写入 (`bluecode_write`)**：接受 `main-print2-end` 或 `1:main-print(\"hello\")-2:end` 形式。默认右侧挂接到 `end`，显式左右 id 优先且右侧优先。写入不做硬删除，而是按优先级合并（id > 参数 > 函数名 > 节点类型）并向右插入新节点。重复/覆盖示例：
+  - 已有 `main-print1-print3-end`，AI 写 `main-print2-end` -> 结果 `main-print1-print3-print2-end`（返回插入信息）。
+  - 已有 `main-print1-print3-end`，AI 写 `main-print2-print3-end` -> `print3` 被匹配保留，结果 `main-print1-print2-print3-end`。
+- **不可连节点**：无法连线的节点先尝试转换为参数，再尝试一次隐式 cast，否则移入游离列表。必要时 AI 也可直接操作 connect list。
+- **编译 (`bluecode_compile`)**：编译当前 bluecode 图，返回精简 JSON 诊断。
+
 ## UMG 动画 (Sequencer) API 实现状态
 
 | 命令                           |   状态   | 描述                                                                                  |

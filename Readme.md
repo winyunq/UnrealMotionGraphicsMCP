@@ -221,8 +221,21 @@ flowchart LR
  |                             | `connect_data_to_pin`     |   ✅    | Connect pins precisely (Supports `NodeID:PinName` format).                                       |
  |                             | `add_variable`            |   ✅    | Add new member variable.                                                                         |
  |                             | `delete_variable`         |   ✅    | Delete member variable.                                                                          |
- |                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
- |                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
+|                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
+|                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
+
+## Bluecode: Blueprint Flow DSL (Design)
+
+**Goal:** reduce chatty, step-by-step MCP calls by letting AI describe an executable flow in one shot, while keeping human-like focus (easy to append/overwrite, hard to delete).
+
+- **Targeting (`bluecode_set_function`)**: `path:domain?:FunctionName` with robust matching (default path = current UMG target; widget targets take precedence). On success the cursor starts at `begin` and ends at `end`/`return`. Ambiguities should be returned for disambiguation.
+- **Core primitives**: `main` (entry), `begin` (branch node), `end` (empty terminator), `return` (explicit return). Node list is a tree that already implies execution edges; connect list is the low-level wire view when needed.
+- **Read (`bluecode_read`)**: traverse from `main` to `end/return`, returning a flattened code-like expression such as `main(i)->if(i%2==0){print("hi")->return; print("fail")->end}`; nodes may be annotated with ids (`1:main-2:end`) to support precise edits.
+- **Write (`bluecode_write`)**: accepts expressions like `main-print2-end` or `1:main-print("hello")-2:end`. Default attachment is to the right of `end`; explicit left/right ids are honored with right bias. Writes never hard-delete nodes; instead they merge by priority (id match > arg match > function match > node kind) and insert new nodes to the right. Duplicate/intended-overwrite examples:
+  - Existing `main-print1-print3-end`, AI sends `main-print2-end` -> result `main-print1-print3-print2-end` (report insertion).
+  - Existing `main-print1-print3-end`, AI sends `main-print2-print3-end` -> `print3` is matched and preserved, yielding `main-print1-print2-print3-end`.
+- **Non-executable nodes**: if a node cannot be connected, first try to reinterpret it as parameters; then try a single implicit cast; otherwise move it to a floating list. AI can also edit the connect list explicitly for edge cases.
+- **Compile (`bluecode_compile`)**: compiles the current bluecode graph and returns a compact JSON payload with only essential diagnostics.
 
 ## UMG Sequencer API Status
 
