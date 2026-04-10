@@ -839,6 +839,13 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ConnectPins(UEdGraph* Gr
 TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::GetNodes(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params)
 {
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    if (!Graph)
+    {
+        Result->SetBoolField(TEXT("success"), false);
+        Result->SetStringField(TEXT("error"), TEXT("Invalid graph"));
+        return Result;
+    }
+
     TArray<TSharedPtr<FJsonValue>> NodesArray;
     TArray<TSharedPtr<FJsonValue>> ConnectListArray;
     bool bIncludeConnectList = false;

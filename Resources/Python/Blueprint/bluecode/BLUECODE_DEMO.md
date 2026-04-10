@@ -4,6 +4,8 @@
 
 - `main`：字符串数组，顺序即执行连线顺序。
 - `branches`：对象，值为字符串数组；`key = anchorNodeId.pinName`。
+- 节点 token 在 read 结果中通常形如 `NodeTitle#abcdefgh`（`#` 后为节点 ID 前 8 位短标识）。
+- 兼容 `index:token` 写法（例如 `1:main`, `2:PrintString(\"hi\")`），写入时会自动去掉序号前缀。
 - `end`：连空（不再连接后续节点）。
 - `return`：连接回主路径下一节点。
 - `connect_list`：默认不使用；仅在 `bluecode_read_function(include_connect_list=true)` 时返回底层细节。

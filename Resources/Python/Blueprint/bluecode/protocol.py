@@ -5,9 +5,23 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 class BluecodeProtocol:
     """
     Bluecode: append-first blueprint protocol (parallel to legacy blueprint APIs).
+
+    Current limitation:
+    - Nested multi-branch nodes inside branch-walk are collapsed to `return` in read output
+      to keep payload compact and avoid recursive branch explosion.
     """
 
-    TERMINATORS = {"end", "return"}
+    END_TOKEN = "end"
+    RETURN_TOKEN = "return"
+    TERMINATORS = {END_TOKEN, RETURN_TOKEN}
+    MAX_GRAPH_TRAVERSAL_STEPS = 128
+    MAX_BRANCH_TRAVERSAL_STEPS = 64
+    PIN_ALIAS_MAP = {
+        "true": "Then",
+        "false": "Else",
+        "then": "Then",
+        "else": "Else",
+    }
 
     @staticmethod
     async def set_function(connection, function_name: str) -> Dict[str, Any]:
@@ -34,23 +48,23 @@ class BluecodeProtocol:
         start_id = BluecodeProtocol._pick_start_node(nodes, incoming_exec)
         main: List[str] = []
         branches: Dict[str, List[str]] = {}
-        visited_main: Set[str] = set()
+        visited_main_path: Set[str] = set()
 
         current_id = start_id
         step_guard = 0
-        while current_id and step_guard < 128 and current_id in node_map:
+        while current_id and step_guard < BluecodeProtocol.MAX_GRAPH_TRAVERSAL_STEPS and current_id in node_map:
             step_guard += 1
-            if current_id in visited_main:
-                main.append("return")
+            if current_id in visited_main_path:
+                main.append(BluecodeProtocol.RETURN_TOKEN)
                 break
-            visited_main.add(current_id)
+            visited_main_path.add(current_id)
 
             node = node_map[current_id]
             main.append(BluecodeProtocol._node_token(node))
             exec_edges = node.get("exec_outputs", [])
 
             if not exec_edges:
-                main.append("end")
+                main.append(BluecodeProtocol.END_TOKEN)
                 break
 
             if len(exec_edges) == 1:
@@ -63,7 +77,10 @@ class BluecodeProtocol:
                 pin_name = edge.get("from_pin", "next")
                 branch_key = f"{branch_anchor}.{pin_name}"
                 branch_start = edge.get("to_id", "")
-                branch_seq = BluecodeProtocol._walk_branch(branch_start, node_map, visited_main, {current_id})
+                branch_visited_nodes: Set[str] = {current_id}
+                branch_seq = BluecodeProtocol._walk_branch(
+                    branch_start, node_map, visited_main_path, branch_visited_nodes
+                )
                 branches[branch_key] = branch_seq
 
             # continue main from first branch edge
@@ -72,13 +89,14 @@ class BluecodeProtocol:
         result: Dict[str, Any] = {
             "success": True,
             "protocol": "bluecode",
-            "main": main if main else ["main", "end"],
+            "main": main if main else ["main", BluecodeProtocol.END_TOKEN],
             "branches": branches,
-            "floating_nodes": BluecodeProtocol._find_floating_nodes(nodes, incoming_exec, visited_main),
+            "floating_nodes": BluecodeProtocol._find_floating_nodes(nodes, incoming_exec, visited_main_path),
             "notes": [
-                "connect_list 默认为关闭；设置 include_connect_list=true 时返回底层连线。",
-                "main/branches 的字符串数组顺序即执行连接顺序。",
-                "end 表示连空；return 表示回到主路径下一节点。",
+                "connect_list is off by default; set include_connect_list=true for low-level links.",
+                "main/branches string-array order equals execution link order.",
+                "end means connect-to-null; return means reconnect to the next main-flow node.",
+                "index:token format is supported (example: 1:main, 2:PrintString(\"hi\")).",
             ],
         }
         if include_connect_list:
@@ -197,11 +215,12 @@ class BluecodeProtocol:
         return {
             "protocol": "bluecode",
             "rules": {
-                "main": "字符串数组，顺序就是链接顺序",
-                "branches": "对象，value 为字符串数组；key 格式 anchor.pin",
-                "end": "连空",
-                "return": "连接到主路径下一节点",
-                "connect_list_default": "默认不使用不返回，read 时可请求 include_connect_list=true",
+                "main": "String array; array order is execution link order.",
+                "branches": "Object of string arrays; key format is anchorNodeId.pinName.",
+                "end": "Connect-to-null terminator.",
+                "return": "Reconnect to the next main-flow node.",
+                "connect_list_default": "Disabled by default; request include_connect_list=true in read.",
+                "index_token_syntax": "Optional index:token form is supported for write (e.g. 1:main).",
             },
             "cases": [
                 {
@@ -252,30 +271,32 @@ class BluecodeProtocol:
         branch: List[str] = []
         node_id = start_id
         guard = 0
-        while node_id and guard < 64 and node_id in node_map:
+        while node_id and guard < BluecodeProtocol.MAX_BRANCH_TRAVERSAL_STEPS and node_id in node_map:
             guard += 1
             if node_id in local_visited:
-                branch.append("return")
+                branch.append(BluecodeProtocol.RETURN_TOKEN)
                 break
             local_visited.add(node_id)
 
             node = node_map[node_id]
             branch.append(BluecodeProtocol._node_token(node))
             if node_id in main_visited:
-                branch.append("return")
+                branch.append(BluecodeProtocol.RETURN_TOKEN)
                 break
 
             edges = node.get("exec_outputs", [])
             if not edges:
-                branch.append("end")
+                branch.append(BluecodeProtocol.END_TOKEN)
                 break
             if len(edges) > 1:
-                branch.append("return")
+                # Nested multi-branch inside a branch is collapsed to return in this version.
+                # This keeps read output compact and avoids recursive branch explosion.
+                branch.append(BluecodeProtocol.RETURN_TOKEN)
                 break
             node_id = edges[0].get("to_id", "")
 
         if not branch:
-            return ["end"]
+            return [BluecodeProtocol.END_TOKEN]
         return branch
 
     @staticmethod
@@ -316,8 +337,10 @@ class BluecodeProtocol:
         if not value:
             return ""
         if ":" in value:
-            _, rhs = value.split(":", 1)
-            value = rhs.strip()
+            # Allow numeric "index:token" format (e.g. "1:main", "2:PrintString(...)").
+            left, rhs = value.split(":", 1)
+            if left.strip().isdigit():
+                value = rhs.strip()
         value = value.split("#", 1)[0].strip()
         return value
 
@@ -326,10 +349,4 @@ class BluecodeProtocol:
         if not isinstance(key, str) or "." not in key:
             return "", ""
         anchor, pin = key.split(".", 1)
-        pin_map = {
-            "true": "Then",
-            "false": "Else",
-            "then": "Then",
-            "else": "Else",
-        }
-        return anchor.strip(), pin_map.get(pin.strip().lower(), pin.strip())
+        return anchor.strip(), BluecodeProtocol.PIN_ALIAS_MAP.get(pin.strip().lower(), pin.strip())
