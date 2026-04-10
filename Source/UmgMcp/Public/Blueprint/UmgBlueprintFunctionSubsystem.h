@@ -66,7 +66,7 @@ private:
     TSharedPtr<FJsonObject> AddParam(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> CreateNodeInstance(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params, class UEdGraphNode*& OutNode);
 	TSharedPtr<FJsonObject> ConnectPins(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
-	TSharedPtr<FJsonObject> GetNodes(UEdGraph* Graph);
+	TSharedPtr<FJsonObject> GetNodes(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> DeleteNode(class UBlueprint* Blueprint, UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> SetNodeProperty(class UBlueprint* Blueprint, UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> AddVariable(class UWidgetBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);

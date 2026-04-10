@@ -207,7 +207,7 @@ flowchart LR
 |                             | `apply_json_to_umg`              |   ✅    |
 |                             | `apply_layout`                   |   ✅    |
  
- ## UMG Blueprint API Status (New)
+ ## UMG Blueprint API Status (Legacy / Parallel)
  
  | Category                    | API Name                  | Status | Description                                                                                      |
  | --------------------------- | ------------------------- | :----: | ------------------------------------------------------------------------------------------------ |
@@ -223,6 +223,22 @@ flowchart LR
  |                             | `delete_variable`         |   ✅    | Delete member variable.                                                                          |
  |                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
  |                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
+
+## Bluecode API Status (New Protocol, Parallel to Blueprint)
+
+| Category                | API Name                   | Status | Description                                                                                                    |
+| ----------------------- | -------------------------- | :----: | -------------------------------------------------------------------------------------------------------------- |
+| **Context**             | `bluecode_set_function`    |   ✅    | Set active function/graph for bluecode editing (reuses current target blueprint attention).                   |
+| **Read**                | `bluecode_read_function`   |   ✅    | Read active function as bluecode JSON (`main` string-array order = execution order).                          |
+|                         |                            |        | `include_connect_list=false` by default; set `true` only when low-level pin links are required.              |
+| **Write**               | `bluecode_write_function`  |   ✅    | Write bluecode JSON using append-only policy (easy-write / hard-delete).                                      |
+| **Lifecycle**           | `bluecode_compile`         |   ✅    | Compile current blueprint after bluecode writes.                                                               |
+| **Protocol Demo**       | `bluecode_demo`            |   ✅    | Returns detailed loop + multi-branch conversion samples and protocol notes.                                    |
+
+Notes:
+- Temporary protocol name is **bluecode** until final replacement design of legacy blueprint protocol is completed.
+- `main` and each branch are JSON string arrays; sequence order is link order.
+- `end` means connect-to-null; `return` means reconnect to the next node on main flow.
 
 ## UMG Sequencer API Status
 

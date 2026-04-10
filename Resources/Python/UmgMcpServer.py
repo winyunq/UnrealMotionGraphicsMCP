@@ -39,6 +39,7 @@ from FileManage import UMGFileTransformation
 from Bridge import UMGHTMLParser
 from Editor import UMGEditor
 from Material import UMGMaterial
+from Blueprint.bluecode import BluecodeProtocol
 
 
 
@@ -876,6 +877,37 @@ async def search_function_library(query: str = "", class_name: str = "") -> Dict
         payload["className"] = class_name
         
     return await conn.send_command("manage_blueprint_graph", {"subAction": "search_function_library", **payload})
+
+
+# --- Bluecode Protocol Tools (parallel with legacy blueprint protocol) ---
+
+@register_tool("bluecode_set_function", "Sets bluecode edit function/graph context.")
+async def bluecode_set_function(function_name: str) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    return await BluecodeProtocol.set_function(conn, function_name)
+
+
+@register_tool("bluecode_read_function", "Reads active function as bluecode JSON. connect_list is optional.")
+async def bluecode_read_function(include_connect_list: bool = False) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    return await BluecodeProtocol.read_function(conn, include_connect_list)
+
+
+@register_tool("bluecode_write_function", "Writes bluecode JSON with append-only strategy (no delete).")
+async def bluecode_write_function(bluecode: Dict[str, Any], append_to_end: bool = True) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    return await BluecodeProtocol.write_function(conn, bluecode, append_to_end)
+
+
+@register_tool("bluecode_compile", "Compiles current blueprint after bluecode writes.")
+async def bluecode_compile() -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    return await BluecodeProtocol.compile(conn)
+
+
+@register_tool("bluecode_demo", "Returns detailed bluecode demo cases, including loops and multi-branch flows.")
+async def bluecode_demo() -> Dict[str, Any]:
+    return BluecodeProtocol.demo_cases()
 
 # =============================================================================
 #  Category: Animation & Sequencer (Merged from UmgSequencerServer)

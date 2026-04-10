@@ -204,7 +204,7 @@ FString UUmgBlueprintFunctionSubsystem::ExecuteGraphAction(UWidgetBlueprint* Wid
     }
     else if (SubAction == TEXT("get_nodes"))
     {
-        Result = GetNodes(TargetGraph);
+        Result = GetNodes(TargetGraph, Payload);
     }
 
 	if (Result.IsValid())
@@ -836,10 +836,16 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ConnectPins(UEdGraph* Gr
 	return Result;
 }
 
-TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::GetNodes(UEdGraph* Graph)
+TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::GetNodes(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params)
 {
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
     TArray<TSharedPtr<FJsonValue>> NodesArray;
+    TArray<TSharedPtr<FJsonValue>> ConnectListArray;
+    bool bIncludeConnectList = false;
+    if (Params.IsValid())
+    {
+        Params->TryGetBoolField(TEXT("includeConnectList"), bIncludeConnectList);
+    }
     
     // CONTEXT FILTERING
     // If we are in the Event Graph (which is huge), and we have a Cursor, 
@@ -896,17 +902,75 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::GetNodes(UEdGraph* Graph
         TSharedPtr<FJsonObject> NodeObj = MakeShared<FJsonObject>();
         NodeObj->SetStringField(TEXT("id"), Node->NodeGuid.ToString());
         NodeObj->SetStringField(TEXT("name"), Node->GetName());
+        NodeObj->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString());
         // Simple type info?
         NodeObj->SetStringField(TEXT("class"), Node->GetClass()->GetName());
         
         bool bIsExec = false;
         for (UEdGraphPin* Pin : Node->Pins) { if (Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec) { bIsExec = true; break; } }
         NodeObj->SetBoolField(TEXT("isExec"), bIsExec);
+
+        TArray<TSharedPtr<FJsonValue>> ExecOutputs;
+        TArray<TSharedPtr<FJsonValue>> DataOutputs;
+        for (UEdGraphPin* Pin : Node->Pins)
+        {
+            if (Pin->Direction != EGPD_Output)
+            {
+                continue;
+            }
+
+            const bool bPinExec = Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec;
+            for (UEdGraphPin* LinkedPin : Pin->LinkedTo)
+            {
+                if (!LinkedPin)
+                {
+                    continue;
+                }
+
+                UEdGraphNode* LinkedNode = LinkedPin->GetOwningNode();
+                if (!LinkedNode)
+                {
+                    continue;
+                }
+
+                TSharedPtr<FJsonObject> ConnObj = MakeShared<FJsonObject>();
+                ConnObj->SetStringField(TEXT("from_pin"), Pin->PinName.ToString());
+                ConnObj->SetStringField(TEXT("to_id"), LinkedNode->NodeGuid.ToString());
+                ConnObj->SetStringField(TEXT("to_pin"), LinkedPin->PinName.ToString());
+
+                if (bPinExec)
+                {
+                    ExecOutputs.Add(MakeShared<FJsonValueObject>(ConnObj));
+                }
+                else
+                {
+                    DataOutputs.Add(MakeShared<FJsonValueObject>(ConnObj));
+                }
+
+                if (bIncludeConnectList)
+                {
+                    TSharedPtr<FJsonObject> LinkObj = MakeShared<FJsonObject>();
+                    LinkObj->SetStringField(TEXT("from_node_id"), Node->NodeGuid.ToString());
+                    LinkObj->SetStringField(TEXT("from_pin"), Pin->PinName.ToString());
+                    LinkObj->SetStringField(TEXT("to_node_id"), LinkedNode->NodeGuid.ToString());
+                    LinkObj->SetStringField(TEXT("to_pin"), LinkedPin->PinName.ToString());
+                    LinkObj->SetStringField(TEXT("pin_category"), Pin->PinType.PinCategory.ToString());
+                    LinkObj->SetBoolField(TEXT("is_exec"), bPinExec);
+                    ConnectListArray.Add(MakeShared<FJsonValueObject>(LinkObj));
+                }
+            }
+        }
+        NodeObj->SetArrayField(TEXT("exec_outputs"), ExecOutputs);
+        NodeObj->SetArrayField(TEXT("data_outputs"), DataOutputs);
         
         NodesArray.Add(MakeShared<FJsonValueObject>(NodeObj));
     }
     
     Result->SetArrayField(TEXT("nodes"), NodesArray);
+    if (bIncludeConnectList)
+    {
+        Result->SetArrayField(TEXT("connect_list"), ConnectListArray);
+    }
     Result->SetBoolField(TEXT("success"), true);
     return Result;
 }

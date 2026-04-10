@@ -207,7 +207,7 @@ flowchart LR
 |                    | `apply_json_to_umg`              |   ✅   |
 |                    | `apply_layout`                   |   ✅   |
 
-## UMG 蓝图 (Blueprint) API 实现状态 (New)
+## UMG 蓝图 (Blueprint) API 实现状态（旧协议并行保留）
 
 | 分类               | API 名称                  | 状态  | 描述                                                           |
 | ------------------ | ------------------------- | :---: | -------------------------------------------------------------- |
@@ -223,6 +223,22 @@ flowchart LR
 |                    | `delete_variable`         |   ✅   | 删除成员变量。                                                 |
 |                    | `delete_node`             |   ✅   | 删除特定节点。                                                 |
 |                    | `compile_blueprint`       |   ✅   | 编译并应用更改。                                               |
+
+## Bluecode API 实现状态（新协议，并行于 Blueprint）
+
+| 分类           | API 名称                  | 状态 | 描述                                                                                     |
+| -------------- | ------------------------- | :--: | ---------------------------------------------------------------------------------------- |
+| **上下文**     | `bluecode_set_function`   |  ✅   | 设置 bluecode 当前函数/图上下文（复用当前目标蓝图注意力机制）。                          |
+| **读取**       | `bluecode_read_function`  |  ✅   | 读取当前函数为 bluecode JSON（`main` 字符串数组顺序即执行连接顺序）。                    |
+|                |                           |      | 默认 `include_connect_list=false`，只有需要底层引脚连线时才设置为 `true`。               |
+| **写入**       | `bluecode_write_function` |  ✅   | 以 append-only 策略写入 bluecode JSON（易写难删，不做擦除）。                             |
+| **生命周期**   | `bluecode_compile`        |  ✅   | bluecode 写入后编译蓝图。                                                                 |
+| **协议示例**   | `bluecode_demo`           |  ✅   | 返回循环与多分支的详细转换示例及协议说明。                                                 |
+
+说明：
+- 此阶段协议暂命名为 **bluecode**，在设计完成前与旧 blueprint API 并行。
+- `main` 与各分支都使用 JSON 字符串数组表达，数组顺序就是连线顺序。
+- `end` 表示连空，`return` 表示连接回主路径下一节点。
 
 ## UMG 动画 (Sequencer) API 实现状态
 
