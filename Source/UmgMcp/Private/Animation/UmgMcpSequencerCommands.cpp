@@ -22,10 +22,6 @@
 // Additional Sequencer Includes
 #include "Tracks/MovieSceneColorTrack.h"
 #include "Sections/MovieSceneColorSection.h"
-#include "Tracks/MovieSceneVectorTrack.h" 
-#include "Sections/MovieSceneVectorSection.h"
-#include "Tracks/MovieSceneDoubleVectorTrack.h"
-#include "Sections/MovieSceneDoubleVectorSection.h"
 #include "Algo/Sort.h"
 
 // Define a log category for Sequencer commands

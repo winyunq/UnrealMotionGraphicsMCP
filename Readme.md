@@ -6,17 +6,20 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)[![AgentSeal MCP](https://agentseal.org/api/v1/mcp/https-githubcom-winyunq-unrealmotiongraphicsmcp/badge)](https://agentseal.org/mcp/https-githubcom-winyunq-unrealmotiongraphicsmcp)
 
-[Demo Designed A RTS UI](https://youtu.be/O86VCzxyF5o)
+<details>
+<summary>🎬 Click to watch what UMG MCP can do</summary>
 
-[Demo Recreating the UE5 editor](https://youtu.be/h_J70I0m4Ls)
+- [Demo Designed A RTS UI](https://youtu.be/O86VCzxyF5o)
+- [Demo Recreating the UE5 editor](https://youtu.be/h_J70I0m4Ls)
+- [Demo Recreating the UE5 editor in UMG editor](https://youtu.be/pq12x2MH1L4)
+- [Chat with Gemini 3 to editor the UMG file](https://youtu.be/93_Fiil9nd8)
 
-[Demo Recreating the UE5 editor in UMG editor](https://youtu.be/pq12x2MH1L4)
-
-[Chat with Gemini 3 to editor the UMG file](https://youtu.be/93_Fiil9nd8)
+</details>
 
 ---
 
-### 🛍️ Looking for an easier Setup? Try the Fab Version!
+<details>
+<summary>🛍️ <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71">Looking for an easier Setup? → Purchase UMG MCP on Fab Marketplace</a></summary>
 
 If you find manual plugin configuration and MCP environment setup too cumbersome, check out our commercial version on **Fab**:
 [**UMG MCP on Fab Marketplace**](https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71)
@@ -29,7 +32,14 @@ If you find manual plugin configuration and MCP environment setup too cumbersome
 
 ---
 
-### 🚀 Quick Start
+👉 [View Developer Program](#developer-program) — contribute to the project and get Fab access for free.
+
+</details>
+
+---
+
+<details>
+<summary>🚀 Quick Start</summary>
 
 This guide covers the two-step process to install the `UmgMcp` plugin and connect it to your Gemini CLI.
 
@@ -92,11 +102,14 @@ The plugin's Python environment is managed by `uv`. In most cases, it should wor
     uv pip install -e .
     ```
 
+</details>
+
 ---
 
-### 🧪 Experimental: Gemini CLI Skill Support
+<details>
+<summary>🧪 Experimental: Gemini CLI Skill Support</summary>
 
-We are experimenting with the **Gemini CLI Skill** system as an alternative to the standard MCP approach. 
+We are experimenting with the **Gemini CLI Skill** system as an alternative to the standard MCP approach.
 The Skill architecture allows the Python tools to be loaded directly by the CLI runtime, potentially **optimizing context usage** by dynamically enabling/disabling tools via `prompts.json` and avoiding the overhead of managing a separate MCP server process.
 
 > **Note**: The MCP server (configured above) is still the stable and recommended way to use this plugin. Use Skill mode if you want to test the latest integration capabilities.
@@ -115,9 +128,9 @@ To enable Skill mode, add the following to your `settings.json` (replacing `<YOU
   },
 ```
 
----
+</details>
 
-## English
+---
 
 This project provides a powerful, command-line driven workflow for managing Unreal Engine's UMG UI assets. By treating **human-readable `.json` files as the sole Source of Truth**, it fundamentally solves the challenge of versioning binary `.uasset` files in Git.
 
@@ -125,7 +138,8 @@ Inspired by tools like `blender-mcp`, this system allows developers, UI designer
 
 ---
 
-## Prompt Manager
+<details>
+<summary>📋 Prompt Manager</summary>
 
 A visual web tool for configuring system instructions, tool descriptions, and user prompt templates.
 
@@ -143,7 +157,7 @@ Execute the following command in your Python environment:
 ```bash
 python Resources/Python/PromptManager/server.py
 ```
-The browser will automatically open `http://localhost:8085`。
+The browser will automatically open `http://localhost:8085`.
 
 ### Usage Tips
 
@@ -155,18 +169,12 @@ Prompts are crucial for AI tool effectiveness. Use the Prompt Manager to tailor 
 
 Contributions of effective prompt configurations are welcome!
 
----
-
-### AI Authorship & Disclaimer
-
-This project has been developed with significant assistance from **Gemini, an AI**. As such:
-*   **Experimental Nature**: This is an experimental project. Its reliability is not guaranteed.
-*   **Commercial Use**: Commercial use is not recommended without thorough independent validation and understanding of its limitations.
-*   **Disclaimer**: Use at your own risk. The developers and AI are not responsible for any consequences arising from its use.
+</details>
 
 ---
 
-### Current Technical Architecture Overview
+<details>
+<summary>🏗️ Current Technical Architecture</summary>
 
 The system now primarily relies on the `UE5_UMG_MCP` plugin for communication between external clients (like this CLI) and the Unreal Engine Editor.
 
@@ -183,6 +191,22 @@ flowchart LR
         TCP --> API["Unreal API / UMG"]
     end
 ```
+
+</details>
+
+---
+
+<details>
+<summary>⚖️ AI Authorship &amp; Disclaimer</summary>
+
+This project has been developed with significant assistance from **Gemini, an AI**. As such:
+*   **Experimental Nature**: This is an experimental project. Its reliability is not guaranteed.
+*   **Commercial Use**: Commercial use is not recommended without thorough independent validation and understanding of its limitations.
+*   **Disclaimer**: Use at your own risk. The developers and AI are not responsible for any consequences arising from its use.
+
+</details>
+
+---
 
 ## API Status
 
@@ -206,23 +230,23 @@ flowchart LR
 | **File Transformation**     | `export_umg_to_json`             |   ✅    |
 |                             | `apply_json_to_umg`              |   ✅    |
 |                             | `apply_layout`                   |   ✅    |
- 
- ## UMG Blueprint API Status (New)
- 
- | Category                    | API Name                  | Status | Description                                                                                      |
- | --------------------------- | ------------------------- | :----: | ------------------------------------------------------------------------------------------------ |
- | **Context & Attention**     | `set_edit_function`       |   ✅    | Set the current edit context (Function/Event). Supports auto-creating Custom Events.             |
- |                             | `set_cursor_node`         |   ✅    | Explicitly set the "Cursor" node (Program Counter).                                              |
- | **Sensing & Querying**      | `get_function_nodes`      |   ✅    | Get nodes in **Current Context Scope** (Filtered to connected graph to avoid global noise).      |
- |                             | `get_variables`           |   ✅    | Get list of member variables.                                                                    |
- |                             | `search_function_library` |   ✅    | Search callable libraries (C++/BP). Supports Fuzzy Search.                                       |
- | **Actions & Modifications** | `add_step(name)`          |   ✅    | **Core**: Add executable node by Name (e.g. "PrintString"). Auto-Wiring & Auto-Layout supported. |
- |                             | `prepare_value(name)`     |   ✅    | Add Data Node by Name (e.g. "MakeLiteralString", "GetVariable").                                 |
- |                             | `connect_data_to_pin`     |   ✅    | Connect pins precisely (Supports `NodeID:PinName` format).                                       |
- |                             | `add_variable`            |   ✅    | Add new member variable.                                                                         |
- |                             | `delete_variable`         |   ✅    | Delete member variable.                                                                          |
- |                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
- |                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
+
+## UMG Blueprint API Status (New)
+
+| Category                    | API Name                  | Status | Description                                                                                      |
+| --------------------------- | ------------------------- | :----: | ------------------------------------------------------------------------------------------------ |
+| **Context & Attention**     | `set_edit_function`       |   ✅    | Set the current edit context (Function/Event). Supports auto-creating Custom Events.             |
+|                             | `set_cursor_node`         |   ✅    | Explicitly set the "Cursor" node (Program Counter).                                              |
+| **Sensing & Querying**      | `get_function_nodes`      |   ✅    | Get nodes in **Current Context Scope** (Filtered to connected graph to avoid global noise).      |
+|                             | `get_variables`           |   ✅    | Get list of member variables.                                                                    |
+|                             | `search_function_library` |   ✅    | Search callable libraries (C++/BP). Supports Fuzzy Search.                                       |
+| **Actions & Modifications** | `add_step(name)`          |   ✅    | **Core**: Add executable node by Name (e.g. "PrintString"). Auto-Wiring & Auto-Layout supported. |
+|                             | `prepare_value(name)`     |   ✅    | Add Data Node by Name (e.g. "MakeLiteralString", "GetVariable").                                 |
+|                             | `connect_data_to_pin`     |   ✅    | Connect pins precisely (Supports `NodeID:PinName` format).                                       |
+|                             | `add_variable`            |   ✅    | Add new member variable.                                                                         |
+|                             | `delete_variable`         |   ✅    | Delete member variable.                                                                          |
+|                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
+|                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
 
 ## UMG Sequencer API Status
 
@@ -286,6 +310,45 @@ Notes:
 | **Theming** | `apply_global_theme` | 🚧 Planned | Batch apply styles and fonts across multiple widgets based on a theme config. |
 | **Assets**  | `style_create_asset` | 🚧 Planned | Create a standalone Slate Widget Style asset.                                 |
 
-## Project Status Update
+---
 
-I'm sorry, due to Google's cancellation of my student discount, my free time to advance this project is limited. But don't worry, as this has forced me to use AIs from other platforms, which might actually accelerate the support for other platforms in this plugin. Specifically, our upcoming development plan is to add various API key access in the Fab version because I believe you are all tech-savvy, but those who truly need UMG are artists who may not have a technical background. In any case, if you could purchase a paid version of UMG MCP on Fab, that would be wonderful—maybe I could then directly subscribe to Gemini AI for development?
+## Developer Program
+
+> We notice there are many forks but few PRs — here's your invitation to change that.
+
+<details>
+<summary>❓ What is the Developer Program & Why does it exist?</summary>
+
+We are living in the age of AI. Everyone now has the ability to build and contribute to projects with AI assistance. UMG MCP is sincerely provided free of charge for everyone to learn and use — and this should include the Fab version too.
+
+By joining the Developer Program and meeting the contribution criteria, **you will gain access to the private repository during your active development period**.
+
+</details>
+
+<details>
+<summary>🎁 Why is the reward a Fab version license?</summary>
+
+The only reason the Fab version is paid is an economic reality: if it were free, the average social return on labor would drop dramatically. Charging for it is the only mechanism to sustain development. The Fab version of UMG MCP *should* be free — but making it truly free would only force us to work harder for less. Therefore, rewarding contributors with a Fab license serves two purposes: it gives you access to the more polished version, and it gives you the ability to maintain the real, production-grade project.
+
+</details>
+
+<details>
+<summary>🛠️ How to join the UMG MCP Developer Program?</summary>
+
+This is admittedly a bit of a paradox — UMG MCP is designed to serve non-programmers, and programmers may not need it as much. Regardless, here are the paths to contribute:
+
+**Path 1 — Video Content:**
+Create a video specifically about the UMG MCP **Fab version**. Reach a meaningful audience and we'll count it.
+
+**Path 2 — Feature Development:**
+Our design philosophy is simple: *if your tool gets accepted, you're in*. Develop a feature, submit a PR, and if we merge it, you qualify.
+
+**Path 3 — Prompt Engineering:**
+Write system prompts that help the AI more accurately identify and invoke the correct tools — even when all tools are enabled simultaneously. Precision matters here.
+
+**Path 4 — Purchase the Fab version:**
+If you've purchased it, you already have the right to access this project. Simple as that.
+
+**To apply:** Send your GitHub profile to **winyunq@gmail.com**
+
+</details>

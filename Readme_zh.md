@@ -4,19 +4,20 @@
 
 **版本受控的 AI 辅助 UMG 工作流**
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)[![AgentSeal MCP](https://agentseal.org/api/v1/mcp/https-githubcom-winyunq-unrealmotiongraphicsmcp/badge)](https://agentseal.org/mcp/https-githubcom-winyunq-unrealmotiongraphicsmcp)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)![Status: Experimental](https://img.shields.io/badge/status-experimental-red.svg)![Built with AI](https://img.shields.io/badge/Built%20with-AI%20Assistance-blueviolet.svg)[![AgentSeal MCP](https://agentseal.org/api/v1/mcp/https-githubcom-winyunq-unrealmotiongraphicsmcp/badge)](https://agentseal.org/mcp/https-githubcom-winyunq-unrealmotiongraphics<details<details>
+<summary>🎬 点击查看 UMG MCP 能做什么</summary>
 
-[Demo 设计 RTS UI](https://youtu.be/O86VCzxyF5o)
+- [Demo 设计 RTS UI](https://youtu.be/O86VCzxyF5o)
+- [Demo 在 UMG 窗口中复现 UE5 编辑器预览](https://youtu.be/h_J70I0m4Ls)
+- [Demo 在 UMG 编辑器中操作 UMG 控件](https://youtu.be/pq12x2MH1L4)
+- [与 Gemini 3 对话编辑 UMG 文件](https://youtu.be/93_Fiil9nd8)
 
-[Demo 在 UMG 窗口中复现 UE5 编辑器预览](https://youtu.be/h_J70I0m4Ls)
-
-[Demo 在 UMG 编辑器中操作 UMG 控件](https://youtu.be/pq12x2MH1L4)
-
-[与 Gemini 3 对话编辑 UMG 文件](https://youtu.be/93_Fiil9nd8)
+</details>
 
 ---
 
-### 🛍️ 需要更便捷的使用体验？尝试 Fab 版！
+<details>
+<summary>🛍️ <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71">需要更便捷的使用体验？→ 点击前往 Fab 商店购买插件</a></summary>
 
 如果您觉得手动配置插件和 MCP 环境过于繁琐，可以尝试我们在 **Fab** 上架的商业化版本：
 [**Fab 版 UMG MCP 直达链接**](https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71)
@@ -29,13 +30,20 @@
 
 ---
 
-### 🚀 快速开始
+👉 [查看开发者计划](#开发者计划) — 参与贡献，免费获得 Fab 版授权。
+
+</details>
+
+---
+
+<details>
+<summary>🚀 快速开始</summary>
 
 本指南涵盖了安装 `UmgMcp` 插件并将其连接到 Gemini CLI 的两个步骤。
 
 *   **前提条件：** Unreal Engine 5.6 或更高版本。
 
-#### 1. 安装插件 (Install the Plugin)
+#### 1. 安装插件
 
 1.  **进入项目的 Plugins 文件夹：** `YourProject/Plugins/`（如果不存在则创建）。
 2.  **直接克隆仓库**到此目录：
@@ -46,7 +54,7 @@
 
 3.  **重启 Unreal Editor。** 这允许引擎检测并编译新插件。
 
-#### 2. 连接 Gemini CLI (Connect the Gemini CLI)
+#### 2. 连接 Gemini CLI
 
 告诉 Gemini 如何找到并启动 MCP 服务器。
 
@@ -92,9 +100,12 @@
     uv pip install -e .
     ```
 
+</details>
+
 ---
 
-### 🧪 实验性功能：Gemini CLI Skill 支持
+<details>
+<summary>🧪 实验性功能：Gemini CLI Skill 支持</summary>
 
 我们正在尝试使用 **Gemini CLI Skill** 系统作为标准 MCP 方法的替代方案。
 Skill 架构允许 Python 工具直接由 CLI 运行时加载，通过 `prompts.json` 动态启用/禁用工具，潜在地**优化上下文使用**，并避免管理独立 MCP 服务器进程的开销。
@@ -115,9 +126,9 @@ Skill 架构允许 Python 工具直接由 CLI 运行时加载，通过 `prompts.
   },
 ```
 
----
+</details>
 
-## 简体中文 (Chinese)
+---
 
 本项目为管理 Unreal Engine 的 UMG UI 资产提供了一个强大的、命令行驱动的工作流。通过将 **人类可读的 `.json` 文件视为唯一的真理源 (Source of Truth)**，它从根本上解决了在 Git 中对二进制 `.uasset` 文件进行版本控制的挑战。
 
@@ -125,7 +136,8 @@ Skill 架构允许 Python 工具直接由 CLI 运行时加载，通过 `prompts.
 
 ---
 
-## Prompt 管理器 (Prompt Manager)
+<details>
+<summary>📋 Prompt 管理器</summary>
 
 一个用于配置系统指令、工具描述和用户提示模板的可视化 Web 工具。
 
@@ -155,18 +167,12 @@ Prompt 对 AI 工具的有效性至关重要。使用 Prompt 管理器来为 AI 
 
 欢迎贡献有效的 Prompt 配置！
 
----
-
-### AI 署名与免责声明
-
-本项目是在 **Gemini (一种 AI)** 的显著协助下开发的。因此：
-*   **实验性质**：这是一个实验性项目，不保证其可靠性。
-*   **商业用途**：在没有经过彻底的独立验证和了解其局限性的情况下，不建议用于商业用途。
-*   **免责声明**：使用风险自负。开发人员和 AI 对因使用本项目而产生的任何后果概不负责。
+</details>
 
 ---
 
-### 当前技术架构概览
+<details>
+<summary>🏗️ 当前技术架构</summary>
 
 系统目前主要依靠 `UE5_UMG_MCP` 插件在外部客户端（如本 CLI）与 Unreal Engine 编辑器之间进行通信。
 
@@ -183,6 +189,22 @@ flowchart LR
         TCP --> API["Unreal API / UMG"]
     end
 ```
+
+</details>
+
+---
+
+<details>
+<summary>⚖️ AI 署名与免责声明</summary>
+
+本项目是在 **Gemini (一种 AI)** 的显著协助下开发的。因此：
+*   **实验性质**：这是一个实验性项目，不保证其可靠性。
+*   **商业用途**：在没有经过彻底的独立验证和了解其局限性的情况下，不建议用于商业用途。
+*   **免责声明**：使用风险自负。开发人员和 AI 对因使用本项目而产生的任何后果概不负责。
+
+</details>
+
+---
 
 ## API 实现状态
 
@@ -212,7 +234,7 @@ flowchart LR
 | 分类               | API 名称                  | 状态  | 描述                                                           |
 | ------------------ | ------------------------- | :---: | -------------------------------------------------------------- |
 | **上下文与注意力** | `set_edit_function`       |   ✅   | 设置当前编辑上下文（函数/事件）。支持自动创建自定义事件。      |
-|                    | `set_cursor_node`         |   ✅   | 显式设置“光标”节点（程序计数器）。                             |
+|                    | `set_cursor_node`         |   ✅   | 显式设置"光标"节点（程序计数器）。                             |
 | **感知与查询**     | `get_function_nodes`      |   ✅   | 获取**当前上下文作用域**内的节点（过滤掉无关节点以减少噪音）。 |
 |                    | `get_variables`           |   ✅   | 获取成员变量列表。                                             |
 |                    | `search_function_library` |   ✅   | 搜索可调用的库 (C++/BP)。支持模糊搜索。                        |
@@ -226,18 +248,18 @@ flowchart LR
 
 ## UMG 动画 (Sequencer) API 实现状态
 
-| 命令                           |   状态   | 描述                                                                                  |
-| :----------------------------- | :------: | :------------------------------------------------------------------------------------ |
-| `animation_target`             | ✅ 已实现 | 设置/聚焦当前动画（等价 `set_animation_scope`，若不存在会自动创建）。                 |
-| `widget_target`                | ✅ 已实现 | 设置/聚焦当前控件（等价 `set_widget_scope`）。                                        |
-| `animation_overview`           | ✅ 已实现 | 返回关键帧数量、轨道数量、关键时间点、变更的属性列表。                                 |
-| `animation_widget_properties`  | ✅ 已实现 | 按控件视角查看属性时间线（忽略未被动画驱动的属性）。                                   |
-| `animation_time_properties`    | ✅ 已实现 | 按时间切片查看属性值，支持一次查询多个时间点。                                         |
-| `animation_append_widget_tracks` | ✅ 已实现 | 按控件+属性批量追加/覆盖关键帧（仅并集/覆盖，不做删除）。                               |
-| `animation_append_time_slice`  | ✅ 已实现 | 在指定时间为多个控件追加差分式属性值。                                                |
-| `animation_delete_widget_keys` | ✅ 已实现 | 仅删除指定控件+属性在指定时间的关键帧（需 `confirm_delete=true`，符合 Issue 15 安全策略）。 |
-| `create_animation`             | ✅ 已实现 | 创建或聚焦动画，支持自动命名。                                                        |
-| `set_property_keys`            | ✅ 已实现 | 底层轨道写入辅助（支持 float/color/vector2D）。                                       |
+| 命令                             |   状态   | 描述                                                                                        |
+| :------------------------------- | :------: | :------------------------------------------------------------------------------------------ |
+| `animation_target`               | ✅ 已实现 | 设置/聚焦当前动画（等价 `set_animation_scope`，若不存在会自动创建）。                       |
+| `widget_target`                  | ✅ 已实现 | 设置/聚焦当前控件（等价 `set_widget_scope`）。                                              |
+| `animation_overview`             | ✅ 已实现 | 返回关键帧数量、轨道数量、关键时间点、变更的属性列表。                                      |
+| `animation_widget_properties`    | ✅ 已实现 | 按控件视角查看属性时间线（忽略未被动画驱动的属性）。                                        |
+| `animation_time_properties`      | ✅ 已实现 | 按时间切片查看属性值，支持一次查询多个时间点。                                              |
+| `animation_append_widget_tracks` | ✅ 已实现 | 按控件+属性批量追加/覆盖关键帧（仅并集/覆盖，不做删除）。                                   |
+| `animation_append_time_slice`    | ✅ 已实现 | 在指定时间为多个控件追加差分式属性值。                                                      |
+| `animation_delete_widget_keys`   | ✅ 已实现 | 仅删除指定控件+属性在指定时间的关键帧（需 `confirm_delete=true`，符合 Issue 15 安全策略）。 |
+| `create_animation`               | ✅ 已实现 | 创建或聚焦动画，支持自动命名。                                                              |
+| `set_property_keys`              | ✅ 已实现 | 底层轨道写入辅助（支持 float/color/vector2D）。                                             |
 
 说明：
 - `animation_target` / `widget_target` 复用当前 UMG 目标资产，命名自动纠错（不再出现 “animal” 拼写），并在缺失时自动创建。
@@ -263,12 +285,12 @@ flowchart LR
 
 ## UMG HLSL MCP API 实现状态（新增：面向 UMG 的文本编辑闭环）
 
-| 命令                | 状态 | 描述                                                                                         |
-| ------------------- | :--: | -------------------------------------------------------------------------------------------- |
-| `hlsl_set_target`   |  ✅   | 锁定/创建 HLSL 目标材质。校验 UI 材质域 + 单 Custom 节点拓扑；不匹配时可先返回覆写确认。     |
-| `hlsl_get`          |  ✅   | 读取当前 HLSL 代码和结构化输入参数信息。                                                      |
-| `hlsl_set`          |  ✅   | 对 HLSL 与/或参数做增量更新。删除必须显式标记（`delete: true`），避免误删。                   |
-| `hlsl_compile`      |  ✅   | 编译当前 HLSL 目标并返回精简诊断信息，便于 AI 后处理。                                        |
+| 命令              | 状态  | 描述                                                                                     |
+| ----------------- | :---: | ---------------------------------------------------------------------------------------- |
+| `hlsl_set_target` |   ✅   | 锁定/创建 HLSL 目标材质。校验 UI 材质域 + 单 Custom 节点拓扑；不匹配时可先返回覆写确认。 |
+| `hlsl_get`        |   ✅   | 读取当前 HLSL 代码和结构化输入参数信息。                                                 |
+| `hlsl_set`        |   ✅   | 对 HLSL 与/或参数做增量更新。删除必须显式标记（`delete: true`），避免误删。              |
+| `hlsl_compile`    |   ✅   | 编译当前 HLSL 目标并返回精简诊断信息，便于 AI 后处理。                                   |
 
 ### HLSL 协议约定（UMG 垂直优化）
 
@@ -286,6 +308,48 @@ flowchart LR
 | **主题** | `apply_global_theme` |   ⏳    | 根据主题配置批量应用样式、字体和配色。        |
 | **资源** | `style_create_asset` |   ⏳    | 创建独立的 Slate 控件样式资源。               |
 
-## 项目状态更新 (Project Status)
+---
 
-很抱歉，因为google取消了我的学生优惠，因此我空闲的时间无法推进此项目。但是不要担心，因为这迫使我使用其他平台的AI，也许能加速此插件支持其他平台的进度。具体来说，我们接下来的开发计划是在fab版中添加各种API key的接入因为我认为各位都是懂技术的，但是真正需要UMG的应该是不懂技术的美工。无论如何，如果你能在fab上购买一份付费版的UMG MCP，那就再好不过了，也许我就可以直接订阅Gemini AI进行开发了？
+## 开发者计划
+
+> 我们注意到有很多 Fork，但几乎没有 PR — 欢迎你来改变这一点。
+
+<details>
+<summary>❓ 什么是开发者计划，为什么要有开发者计划？</summary>
+
+现在的时代是 AI 的时代，每个人都有能力让 AI 帮忙开发项目。UMG MCP 是真诚地免费提供给大家学习与使用的——事实上这应该包括 Fab 版本。
+
+参与开发者计划，达成对应条件，在你的开发活跃期间，你将可以访问**私有仓库**。
+
+</details>
+
+<details>
+<summary>🎁 为什么开发者计划奖励的是 Fab 版授权？</summary>
+
+Fab 版收费的唯一原因是经济规律：如果它是完全免费的，社会平均劳动时长将大幅降低，最终只会迫使我们付出更多来维持同等价值。Fab 版 UMG MCP 理应免费，但真正免费只会让我们付费更多。
+
+因此，奖励 Fab 版授权的意义有两层：一方面你可以免费访问更高级、更稳定的版本；另一方面，你将有权利参与维护真正的生产级项目。
+
+</details>
+
+<details>
+<summary>🛠️ 如何参加 UMG MCP 开发者计划？</summary>
+
+这确实存在一定矛盾——UMG MCP 的设计服务对象是非编程人员，而编程人员也许并不那么需要它。无论如何，我们提供以下几种参与路径：
+
+**路径一 — 视频内容创作：**
+针对 UMG MCP **Fab 版**制作专项介绍视频，达到一定传播量即可申请。
+
+**路径二 — 功能开发：**
+我们的设计理念很简单：*只要你开发的功能被我们接受，你就达成条件*。提交 PR，合并即认可。
+
+**路径三 — 提示词工程：**
+编写有助于 AI 更精准理解和调用工具的系统提示词——即使在所有工具全部开启的情况下，AI 仍然能精确找到正确的工具，这才算有效贡献。
+
+**路径四 — 购买 Fab 版：**
+购买了 Fab 版，你当然已经有权利访问此项目。
+
+**申请方式：** 将你的 GitHub 信息发送至 **winyunq@qq.com**
+
+</details>
+行开发了？
