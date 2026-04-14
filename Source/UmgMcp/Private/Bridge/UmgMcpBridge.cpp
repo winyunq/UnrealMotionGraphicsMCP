@@ -300,6 +300,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         else if (CommandType == TEXT("get_last_edited_umg_asset") ||
                  CommandType == TEXT("get_recently_edited_umg_assets") ||
                  CommandType == TEXT("get_target_umg_asset") ||
+                 CommandType == TEXT("get_target_widget") ||
+                 CommandType == TEXT("set_target_widget") ||
                  CommandType == TEXT("set_target_umg_asset"))
         {
             ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
@@ -442,14 +444,22 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("create_animation") ||
                  CommandType == TEXT("delete_animation") ||
                  CommandType == TEXT("set_animation_scope") ||
+                 CommandType == TEXT("animation_target") ||
                  CommandType == TEXT("set_widget_scope") ||
+                 CommandType == TEXT("widget_target") ||
                  CommandType == TEXT("set_property_keys") ||
                  CommandType == TEXT("remove_property_track") ||
                  CommandType == TEXT("remove_keys") ||
                  CommandType == TEXT("get_animation_keyframes") ||
                  CommandType == TEXT("get_animated_widgets") ||
                  CommandType == TEXT("get_animation_full_data") ||
-                 CommandType == TEXT("get_widget_animation_data"))
+                 CommandType == TEXT("get_widget_animation_data") ||
+                 CommandType == TEXT("animation_widget_properties") ||
+                 CommandType == TEXT("animation_time_properties") ||
+                 CommandType == TEXT("animation_overview") ||
+                 CommandType == TEXT("animation_append_widget_tracks") ||
+                 CommandType == TEXT("animation_append_time_slice") ||
+                 CommandType == TEXT("animation_delete_widget_keys"))
         {
             ResultJson = SequencerCommands->HandleCommand(CommandType, Params);
         }
@@ -480,7 +490,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
             ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
         }
         // Material Commands (New 5 Pillars)
-        else if (CommandType.StartsWith(TEXT("material_")))
+        else if (CommandType.StartsWith(TEXT("material_")) || CommandType.StartsWith(TEXT("hlsl_")))
         {
              ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
         }
@@ -621,7 +631,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
              }
         }
         // --- Material Commands ---
-        else if (CommandType.StartsWith(TEXT("material_")))
+        else if (CommandType.StartsWith(TEXT("material_")) || CommandType.StartsWith(TEXT("hlsl_")))
         {
             ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
         }
@@ -640,6 +650,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         bool bSuccess = true;
         FString ErrorMessage;
         
+        // Determine success by checking for "success" bool, or "status" string, or absence of "error"
         if (ResultJson->HasField(TEXT("success")))
         {
             bSuccess = ResultJson->GetBoolField(TEXT("success"));
@@ -648,12 +659,33 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                 ErrorMessage = ResultJson->GetStringField(TEXT("error"));
             }
         }
+        else if (ResultJson->HasField(TEXT("status")))
+        {
+            FString InnerStatus;
+            ResultJson->TryGetStringField(TEXT("status"), InnerStatus);
+            bSuccess = (InnerStatus != TEXT("error"));
+            if (!bSuccess && ResultJson->HasField(TEXT("error")))
+            {
+                ErrorMessage = ResultJson->GetStringField(TEXT("error"));
+            }
+            else if (!bSuccess && ResultJson->HasField(TEXT("message")))
+            {
+                ErrorMessage = ResultJson->GetStringField(TEXT("message"));
+            }
+        }
         
         if (bSuccess)
         {
-            // Set success status and include the result
+            // Flatten: copy all fields from ResultJson directly into ResponseJson (skip internal keys)
             ResponseJson->SetStringField(TEXT("status"), TEXT("success"));
-            ResponseJson->SetObjectField(TEXT("result"), ResultJson);
+            for (const auto& Field : ResultJson->Values)
+            {
+                const FString& Key = Field.Key;
+                if (Key != TEXT("success") && Key != TEXT("status"))
+                {
+                    ResponseJson->SetField(Key, Field.Value);
+                }
+            }
         }
         else
         {

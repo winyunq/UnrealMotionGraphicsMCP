@@ -226,18 +226,23 @@ flowchart LR
 
 ## UMG Sequencer API Status
 
-| Command                   | Status        | Description                                         |
-| :------------------------ | :------------ | :-------------------------------------------------- |
-| `set_animation_scope`     | ✅ Implemented | Set the target animation for subsequent commands    |
-| `set_widget_scope`        | ✅ Implemented | Set the target widget for subsequent commands       |
-| `get_all_animations`      | ✅ Implemented | Get list of all animations in the blueprint         |
-| `create_animation`        | ✅ Implemented | Create a new animation                              |
-| `delete_animation`        | ✅ Implemented | Delete an animation                                 |
-| `set_property_keys`       | ✅ Implemented | Set keyframes for a property (Float only currently) |
-| `remove_property_track`   | 🚧 Planned     | Remove a property track                             |
-| `remove_keys`             | 🚧 Planned     | Remove specific keys                                |
-| `get_animation_keyframes` | 🚧 Planned     | Get keyframes for an animation                      |
-| `get_animated_widgets`    | 🚧 Planned     | Get list of widgets affected by animation           |
+| Command                          | Status | Description                                                                                                      |
+| :------------------------------- | :----: | :--------------------------------------------------------------------------------------------------------------- |
+| `animation_target`               |   ✅    | Set/focus the current animation (alias of `set_animation_scope`, auto-creates when missing).                     |
+| `widget_target`                  |   ✅    | Set/focus the current widget (alias of `set_widget_scope`).                                                      |
+| `animation_overview`             |   ✅    | Returns keyframe counts, track counts, key times, and changed properties.                                        |
+| `animation_widget_properties`    |   ✅    | Timeline view: per-widget property changes (ignores unanimated properties).                                      |
+| `animation_time_properties`      |   ✅    | Time-slice view: property values at specific times (multi-time supported).                                       |
+| `animation_append_widget_tracks` |   ✅    | Append/overwrite keys per widget+property (union only, no implicit deletion).                                    |
+| `animation_append_time_slice`    |   ✅    | Append a diff-style time slice for multiple widgets at a given time.                                             |
+| `animation_delete_widget_keys`   |   ✅    | Scoped delete for widget+property at specific times (`confirm_delete=true` required per Issue 15 safety policy). |
+| `create_animation`               |   ✅    | Create or focus an animation with auto naming.                                                                   |
+| `set_property_keys`              |   ✅    | Low-level track write helper (supports float/color/vector2D).                                                    |
+
+Notes:
+- `animation_target`/`widget_target` reuse the current UMG target asset; names are auto-corrected (no “animal” typo) and auto-create when missing.
+- Write paths are union/overwrite only—no implicit deletion. Use `animation_delete_widget_keys` with `confirm_delete=true` for scoped removals.
+- Responses now include counts/timeline context so every sequencer MCP returns actionable data.
 
 ## UMG Material API Status (New: The 5 Core Pillars Strategy)
 
@@ -255,6 +260,23 @@ flowchart LR
 | **Lifecycle**           | `material_compile_asset`       |     ✅     | Submit changes and analyze HLSL compilation errors.                                             |
 | **Maintenance**         | `material_delete`              |     ✅     | Delete node instances or clean up logic by unique handle.                                       |
 |                         | `material_get_pins`            |     ✅     | Introspect pins for a specific node handle.                                                     |
+
+## UMG HLSL MCP API Status (New: Text-Edit Loop for UMG)
+
+| Command             | Status | Description                                                                                                                           |
+| ------------------- | :----: | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `hlsl_set_target`   |   ✅    | Lock/create HLSL target material. Validates UI-domain + single Custom node topology; can request confirmation before overwrite.     |
+| `hlsl_get`          |   ✅    | Read current HLSL code and structured input parameters from the single Custom node.                                                  |
+| `hlsl_set`          |   ✅    | Incremental update of HLSL and/or parameters. Deletion is explicit (`delete: true`) to avoid accidental destructive edits.           |
+| `hlsl_compile`      |   ✅    | Compile current HLSL target and return concise diagnostics for AI post-processing.                                                   |
+
+### HLSL Protocol Contract (UMG-Optimized)
+
+- Material is treated as a single HLSL program.
+- Backend assumes HLSL returns `float4`.
+- Output auto-wiring is fixed: `.rgb -> FinalColor`, `.a -> Opacity`.
+- Input parameters are returned as structured descriptors (`name`, `kind`, `source_handle`) for learning/replay by AI agents.
+- `hlsl_set` is safety-biased: writing is easy, deletion must be explicit.
 
 ## UMG Style & Theming API Status (New)
 

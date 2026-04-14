@@ -47,7 +47,11 @@ TSharedPtr<FJsonObject> FUmgMcpCommonUtils::CreateSuccessResponse(const TSharedP
     
     if (Data.IsValid())
     {
-        ResponseObject->SetObjectField(TEXT("data"), Data);
+        // Merge data fields directly instead of nesting under "data"
+        for (const auto& Field : Data->Values)
+        {
+            ResponseObject->SetField(Field.Key, Field.Value);
+        }
     }
     
     return ResponseObject;

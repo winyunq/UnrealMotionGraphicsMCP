@@ -159,16 +159,25 @@ class ContextManager:
     """Manages the 'attention' context for the AI."""
     def __init__(self):
         self._target_asset_path: Optional[str] = None
+        self._target_widget_name: Optional[str] = None
 
-    def set_target(self, asset_path: str):
-        self._target_asset_path = asset_path
-        logger.info(f"Context set to: {asset_path}")
+    def set_target(self, asset_path: Optional[str] = None, widget_name: Optional[str] = None):
+        if asset_path is not None:
+            self._target_asset_path = asset_path
+            logger.info(f"Context asset set to: {asset_path}")
+        if widget_name is not None:
+            self._target_widget_name = widget_name
+            logger.info(f"Context widget set to: {widget_name}")
 
     def get_target(self) -> Optional[str]:
         return self._target_asset_path
 
+    def get_target_widget(self) -> Optional[str]:
+        return self._target_widget_name
+
     def clear_target(self):
         self._target_asset_path = None
+        self._target_widget_name = None
         logger.info("Context cleared")
 
 # Global Context Manager Instance
@@ -323,6 +332,18 @@ async def get_target_umg_asset() -> Dict[str, Any]:
     umg_attention_client = UMGAttention.UMGAttention(conn)
     return await umg_attention_client.get_target_umg_asset()
 
+@register_tool("get_target_widget", "Gets the focused widget within the current target asset.")
+async def get_target_widget() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    umg_attention_client = UMGAttention.UMGAttention(conn)
+    resp = await umg_attention_client.get_target_widget()
+    if (resp.get("status") == "success" or resp.get("success")) and resp.get("widget_name"):
+        context_manager.set_target(context_manager.get_target(), resp.get("widget_name"))
+    return resp
+
 @register_tool("get_last_edited_umg_asset", "Gets the last edited UMG asset path.")
 async def get_last_edited_umg_asset() -> Dict[str, Any]:
     """
@@ -366,17 +387,80 @@ def normalize_project_path(path: str) -> str:
     return resolved
 
 @register_tool("set_target_umg_asset", "Sets the target UMG asset.")
-async def set_target_umg_asset(asset_path: str) -> Dict[str, Any]:
+async def set_target_umg_asset(asset_path: str, widget_name: Optional[str] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
-    # Normalize path to ensure Unreal accepts it
-    asset_path = normalize_project_path(asset_path)
-    
-    context_manager.set_target(asset_path) # Update local context
+    def split_target(raw_path: str, widget_hint: Optional[str]) -> (Optional[str], Optional[str]):
+        raw = (raw_path or "").strip()
+        target_widget = widget_hint.strip() if widget_hint else None
+        target_path = None
+
+        if ":" in raw:
+            left, right = raw.split(":", 1)
+            if left.strip():
+                target_path = normalize_project_path(left.strip())
+            if right.strip():
+                target_widget = right.strip()
+        elif raw:
+            if raw.startswith("/") or raw.startswith("Content/") or raw.startswith("content/"):
+                target_path = normalize_project_path(raw)
+            else:
+                target_widget = target_widget or raw
+
+        return target_path, target_widget
+
+    def command_failed(payload: Dict[str, Any]) -> bool:
+        if payload.get("status") == "error":
+            return True
+        if "success" in payload and payload.get("success") is False:
+            return True
+        return False
+
+    target_path, target_widget = split_target(asset_path, widget_name)
     conn = get_unreal_connection()
     umg_attention_client = UMGAttention.UMGAttention(conn)
-    return await umg_attention_client.set_target_umg_asset(asset_path)
+    result: Dict[str, Any] = {"status": "success", "success": True}
+
+    resolved_path = target_path or context_manager.get_target()
+    # Resolve path from engine if nothing local is available
+    if not resolved_path:
+        resp = await umg_attention_client.get_target_umg_asset()
+        if not command_failed(resp):
+            resolved_path = resp.get("asset_path")
+            if resolved_path:
+                context_manager.set_target(resolved_path)
+
+    if target_path:
+        resp = await umg_attention_client.set_target_umg_asset(target_path, target_widget)
+        if command_failed(resp):
+            return resp
+        resolved_path = resp.get("asset_path") or target_path
+        result.update(resp)
+    elif not resolved_path:
+        return {"status": "error", "error": "No target UMG asset set. Provide an asset path or set one first."}
+
+    if target_widget:
+        focus_resp = await umg_attention_client.set_target_widget(target_widget)
+        if command_failed(focus_resp):
+            result["focus_warning"] = focus_resp.get("error")
+        result["widget_name"] = target_widget
+
+    context_manager.set_target(resolved_path, target_widget)
+    result.setdefault("asset_path", resolved_path)
+    return result
+
+@register_tool("set_target_widget", "Sets the focused widget within the current target asset.")
+async def set_target_widget(widget_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    umg_attention_client = UMGAttention.UMGAttention(conn)
+    resp = await umg_attention_client.set_target_widget(widget_name)
+    if resp.get("status") == "success" or resp.get("success"):
+        context_manager.set_target(context_manager.get_target(), widget_name)
+    return resp
 
 # =============================================================================
 #  Category: Sensing
@@ -495,7 +579,7 @@ async def export_umg_to_json(asset_path: str, widget_name: str = "Root") -> Dict
     return await umg_file_client.export_umg_to_json(asset_path, widget_name)
 
 @register_tool("apply_layout", "Applies a layout logic to a UMG asset.")
-async def apply_layout(layout_content: str, widget_name: str = "Root") -> Dict[str, Any]:
+async def apply_layout(layout_content: str, widget_name: Optional[str] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -525,35 +609,45 @@ async def apply_layout(layout_content: str, widget_name: str = "Root") -> Dict[s
     if not final_path:
         # Try to get currently open asset from Unreal
         resp = await conn.send_command("get_target_umg_asset")
-        if resp.get("status") == "success":
-            data = resp.get("result", {}).get("data", {})
-            if data:
-                final_path = data.get("asset_path")
-                if final_path:
-                    context_manager.set_target(final_path)
+        if resp.get("status") != "error" and resp.get("success") is not False:
+            final_path = resp.get("asset_path")
+            if final_path:
+                context_manager.set_target(final_path)
     
     if not final_path:
         return {"status": "error", "error": "No target UMG asset set. Use 'set_target_umg_asset' first."}
     
     logger.info(f"Resolved target asset path: {final_path}")
     
+    target_widget = widget_name if widget_name is not None else (context_manager.get_target_widget() or "Root")
+
+    context_manager.set_target(final_path, target_widget)
+
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return await umg_trans_client.apply_json_to_umg(final_path, json_data, widget_name)
+    return await umg_trans_client.apply_json_to_umg(final_path, json_data, target_widget)
 
 @mcp.tool()
-async def apply_json_to_umg(asset_path: str, json_data: dict) -> Dict[str, Any]:
+async def apply_json_to_umg(asset_path: str, json_data: dict, widget_name: Optional[str] = None) -> Dict[str, Any]:
     """Applies a JSON definition to a UMG asset. (Maintained for backward compatibility and specialized agent workflows)"""
     asset_path = normalize_project_path(asset_path)
+    target_widget = widget_name if widget_name is not None else (context_manager.get_target_widget() or "Root")
     conn = get_unreal_connection()
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
-    return await umg_trans_client.apply_json_to_umg(asset_path, json_data, "Root")
+    return await umg_trans_client.apply_json_to_umg(asset_path, json_data, target_widget)
 
 @mcp.tool()
-async def apply_html_to_umg(asset_path: str, html_content: str) -> Dict[str, Any]:
+async def apply_html_to_umg(asset_path: str, html_content: str, widget_name: Optional[str] = None) -> Dict[str, Any]:
     """Applies an HTML definition to a UMG asset. (Maintained for backward compatibility)"""
-    asset_path = normalize_project_path(asset_path)
-    context_manager.set_target(asset_path)
-    return await apply_layout(html_content)
+    target_widget = widget_name
+    parsed_path = asset_path
+    if ":" in asset_path and widget_name is None:
+        left, right = asset_path.split(":", 1)
+        parsed_path = left
+        if right.strip():
+            target_widget = right.strip()
+
+    await set_target_umg_asset(parsed_path, target_widget)
+    return await apply_layout(html_content, target_widget)
 
 
 
@@ -857,6 +951,24 @@ async def get_widget_animation_data(animation_name: str, widget_name: str) -> Di
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return await sequencer_client.get_widget_animation_data(animation_name, widget_name)
 
+@register_tool("animation_widget_properties", "Gets animated properties for a widget (timeline view).")
+async def animation_widget_properties(animation_name: str = "", widget_name: str = "", property_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_widget_properties(animation_name, widget_name, property_name)
+
+@register_tool("animation_time_properties", "Gets property values at specific times.")
+async def animation_time_properties(times: List[float], animation_name: str = "", widget_name: str = "", property_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_time_properties(times, animation_name, widget_name, property_name)
+
+@register_tool("animation_overview", "Summarizes keyframes and tracks for the animation.")
+async def animation_overview(animation_name: str = "", widget_name: str = "", property_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.get_animation_overview(animation_name, widget_name, property_name)
+
 # --- Write (Action) ---
 
 @register_tool("create_animation", "Creates a new animation.")
@@ -868,14 +980,14 @@ async def create_animation(animation_name: str) -> Dict[str, Any]:
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return await sequencer_client.create_animation(asset_path=None, animation_name=animation_name)
 
-@register_tool("delete_animation", "Deletes an animation.")
-async def delete_animation(animation_name: str) -> Dict[str, Any]:
+@register_tool("delete_animation", "Deletes an animation (requires confirm_delete=true).")
+async def delete_animation(animation_name: str, confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return await sequencer_client.delete_animation(asset_path=None, animation_name=animation_name)
+    return await sequencer_client.delete_animation(asset_path=None, animation_name=animation_name, confirm_delete=confirm_delete)
 
 @register_tool("set_property_keys", "Sets keyframes for a property.")
 async def set_property_keys(property_name: str, keys: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -886,23 +998,41 @@ async def set_property_keys(property_name: str, keys: List[Dict[str, Any]]) -> D
     sequencer_client = UMGSequencer.UMGSequencer(conn)
     return await sequencer_client.set_property_keys(property_name, keys)
 
-@register_tool("remove_property_track", "Removes a property track.")
-async def remove_property_track(property_name: str) -> Dict[str, Any]:
+@register_tool("remove_property_track", "Removes a property track (confirm_delete required).")
+async def remove_property_track(property_name: str, confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return await sequencer_client.remove_property_track(property_name)
+    return await sequencer_client.remove_property_track(property_name, confirm_delete)
 
-@register_tool("remove_keys", "Removes specific keys.")
-async def remove_keys(property_name: str, times: List[float]) -> Dict[str, Any]:
+@register_tool("remove_keys", "Removes specific keys (confirm_delete required).")
+async def remove_keys(property_name: str, times: List[float], confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     sequencer_client = UMGSequencer.UMGSequencer(conn)
-    return await sequencer_client.remove_keys(property_name, times)
+    return await sequencer_client.remove_keys(property_name, times, confirm_delete)
+
+@register_tool("animation_append_widget_tracks", "Append/overwrite property keys from the widget perspective.")
+async def animation_append_widget_tracks(widget_name: str, tracks: List[Dict[str, Any]], animation_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.append_widget_tracks(widget_name, tracks, animation_name)
+
+@register_tool("animation_append_time_slice", "Append a time-slice of widget properties (diff recommended).")
+async def animation_append_time_slice(time: float, widgets: List[Dict[str, Any]], animation_name: str = "") -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.append_time_slice(time, widgets, animation_name)
+
+@register_tool("animation_delete_widget_keys", "Delete keys for a widget/property at specific times (confirm_delete required).")
+async def animation_delete_widget_keys(property_name: str, times: List[float], widget_name: str = "", animation_name: str = "", confirm_delete: bool = False) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    sequencer_client = UMGSequencer.UMGSequencer(conn)
+    return await sequencer_client.delete_widget_keys(property_name, times, widget_name, animation_name, confirm_delete)
 
 
 # =============================================================================
@@ -1007,6 +1137,46 @@ async def material_get_graph() -> Dict[str, Any]:
     conn = get_unreal_connection()
     material_client = UMGMaterial.UMGMaterial(conn)
     return await material_client.get_graph()
+
+
+@register_tool("hlsl_set_target", "Set HLSL editing target material; supports create/overwrite flow.")
+async def hlsl_set_target(path: str, confirm_overwrite: bool = False, create_if_not_found: bool = True) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_set_target(path, confirm_overwrite, create_if_not_found)
+
+
+@register_tool("hlsl_get", "Read current HLSL code and parameter definitions.")
+async def hlsl_get() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_get()
+
+
+@register_tool("hlsl_set", "Incrementally update HLSL code and/or parameter list with explicit delete semantics.")
+async def hlsl_set(hlsl: Optional[str] = None, parameters: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_set(hlsl, parameters)
+
+
+@register_tool("hlsl_compile", "Compile current HLSL material target and return concise diagnostics.")
+async def hlsl_compile() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_compile()
 
 # =============================================================================
 #  Category: Dynamic Prompts (Loaded from JSON)
