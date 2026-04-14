@@ -18,10 +18,13 @@
 #include "Tracks/MovieSceneFloatTrack.h"
 #include "Sections/MovieSceneFloatSection.h"
 #include "Channels/MovieSceneFloatChannel.h"
+#include "Channels/MovieSceneDoubleChannel.h"
 #include "Channels/MovieSceneChannelProxy.h"
 // Additional Sequencer Includes
 #include "Tracks/MovieSceneColorTrack.h"
 #include "Sections/MovieSceneColorSection.h"
+#include "Tracks/MovieSceneVectorTrack.h"
+#include "Sections/MovieSceneVectorSection.h"
 #include "Algo/Sort.h"
 
 // Define a log category for Sequencer commands
@@ -477,8 +480,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetWidgetPropertyTimeline(cons
                 const UMovieSceneDoubleVectorSection* VectorSection = Cast<UMovieSceneDoubleVectorSection>(Section);
                 if (!VectorSection) continue;
 
-                const FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
-                TArrayView<const FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
+                FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
+                auto Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
                 if (Channels.Num() < 2) continue;
 
                 const auto Times = Channels[0]->GetData().GetTimes();
@@ -638,8 +641,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetTimeSliceProperties(const T
                     const UMovieSceneDoubleVectorSection* VectorSection = Cast<UMovieSceneDoubleVectorSection>(Section);
                     if (!VectorSection) continue;
 
-                    const FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
-                    TArrayView<const FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
+                FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
+                auto Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
                     if (Channels.Num() < 2) continue;
 
                     double X = 0.0, Y = 0.0;
@@ -760,8 +763,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationOverview(const TSh
             {
                 const UMovieSceneDoubleVectorSection* VectorSection = Cast<UMovieSceneDoubleVectorSection>(Section);
                 if (!VectorSection) continue;
-                const FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
-                TArrayView<const FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
+                FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
+                TArrayView<FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
                 if (Channels.Num() < 2) continue;
                 AccumulateTimes(BindingWidget, PropertyName, TEXT("vector2d"), Channels[0]->GetData().GetTimes());
             }
@@ -1294,10 +1297,12 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::AppendTimeSlice(const TSharedP
         }
 
         TSharedPtr<FJsonObject> PropertiesObj;
-        if (!WidgetObj->TryGetObjectField(TEXT("properties"), PropertiesObj) || !PropertiesObj.IsValid())
+        const TSharedPtr<FJsonObject>* PropertiesObjectPtr = nullptr;
+        if (!WidgetObj->TryGetObjectField(TEXT("properties"), PropertiesObjectPtr) || !PropertiesObjectPtr || !PropertiesObjectPtr->IsValid())
         {
             return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Each widget entry needs a 'properties' object."));
         }
+        PropertiesObj = *PropertiesObjectPtr;
 
         int32 WidgetKeys = 0;
         for (const auto& PropertyPair : PropertiesObj->Values)
@@ -1548,7 +1553,13 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteWidgetKeys(const TShared
                 TArray<int32> Indices = CollectIndices(Times);
                 if (Indices.Num() > 0)
                 {
-                    FloatSection->GetChannel().GetData().RemoveKeys(Indices);
+                    TArray<FKeyHandle> Handles;
+                    Handles.Reserve(Indices.Num());
+                    for (int32 Index : Indices)
+                    {
+                        Handles.Add(FloatSection->GetChannel().GetHandle(Index));
+                    }
+                    FloatSection->GetChannel().DeleteKeys(Handles);
                     RemovedKeys += Indices.Num();
                 }
             }
@@ -1567,10 +1578,16 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteWidgetKeys(const TShared
                 TArray<int32> Indices = CollectIndices(Times);
                 if (Indices.Num() > 0)
                 {
-                    ColorSection->GetRedChannel().GetData().RemoveKeys(Indices);
-                    ColorSection->GetGreenChannel().GetData().RemoveKeys(Indices);
-                    ColorSection->GetBlueChannel().GetData().RemoveKeys(Indices);
-                    ColorSection->GetAlphaChannel().GetData().RemoveKeys(Indices);
+                    TArray<FKeyHandle> Handles;
+                    Handles.Reserve(Indices.Num());
+                    for (int32 Index : Indices)
+                    {
+                        Handles.Add(ColorSection->GetRedChannel().GetHandle(Index));
+                    }
+                    ColorSection->GetRedChannel().DeleteKeys(Handles);
+                    ColorSection->GetGreenChannel().DeleteKeys(Handles);
+                    ColorSection->GetBlueChannel().DeleteKeys(Handles);
+                    ColorSection->GetAlphaChannel().DeleteKeys(Handles);
                     RemovedKeys += Indices.Num();
                 }
             }
@@ -1589,12 +1606,18 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteWidgetKeys(const TShared
                 TArrayView<FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
                 if (Channels.Num() >= 2)
                 {
-                    auto Times = Channels[0]->GetData().GetTimes();
-                    TArray<int32> Indices = CollectIndices(Times);
-                    if (Indices.Num() > 0)
+                auto Times = Channels[0]->GetData().GetTimes();
+                TArray<int32> Indices = CollectIndices(Times);
+                if (Indices.Num() > 0)
                     {
-                        Channels[0]->GetData().RemoveKeys(Indices);
-                        Channels[1]->GetData().RemoveKeys(Indices);
+                    TArray<FKeyHandle> Handles;
+                    Handles.Reserve(Indices.Num());
+                    for (int32 Index : Indices)
+                    {
+                        Handles.Add(Channels[0]->GetHandle(Index));
+                    }
+                    Channels[0]->DeleteKeys(Handles);
+                    Channels[1]->DeleteKeys(Handles);
                         RemovedKeys += Indices.Num();
                     }
                 }
