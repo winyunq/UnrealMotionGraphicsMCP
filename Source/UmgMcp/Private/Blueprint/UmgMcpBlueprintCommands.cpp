@@ -91,13 +91,41 @@ TSharedPtr<FJsonObject> FUmgMcpBlueprintCommands::HandleCreateBlueprint(const TS
 {
     // Get required parameters
     FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("name"), BlueprintName))
+    FString PackagePath = TEXT("/Game/Blueprints/");
+    FString RawPackagePath;
+
+    if (Params->TryGetStringField(TEXT("package_path"), RawPackagePath))
     {
-        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        // If package_path is provided, try to split it into path and name if name is missing
+        if (!Params->HasField(TEXT("name")))
+        {
+            FString Left, Right;
+            if (RawPackagePath.Split(TEXT("/"), &Left, &Right, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+            {
+                PackagePath = Left + TEXT("/");
+                BlueprintName = Right;
+            }
+            else
+            {
+                BlueprintName = RawPackagePath;
+            }
+        }
+        else
+        {
+            PackagePath = RawPackagePath;
+            if (!PackagePath.EndsWith(TEXT("/"))) PackagePath += TEXT("/");
+            Params->TryGetStringField(TEXT("name"), BlueprintName);
+        }
+    }
+    else
+    {
+        if (!Params->TryGetStringField(TEXT("name"), BlueprintName))
+        {
+            return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'name' or 'package_path' parameter"));
+        }
     }
 
     // Check if blueprint already exists
-    FString PackagePath = TEXT("/Game/Blueprints/");
     FString AssetName = BlueprintName;
     if (UEditorAssetLibrary::DoesAssetExist(PackagePath + AssetName))
     {

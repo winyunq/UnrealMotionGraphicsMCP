@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "FileManage/UmgFileTransformation.h"
 #include "UmgMcp.h"
+#include "PropertyNameMappings.h"
 
 #include "Blueprint/UserWidget.h"
 #include "WidgetBlueprint.h"
@@ -40,12 +41,26 @@ TSharedPtr<FJsonObject> UUmgFileTransformation::NormalizeJsonKeysToPascalCase(co
     for (const auto& Pair : SourceJson->Values)
     {
         FString OriginalKey = Pair.Key;
-        FString NormalizedKey = OriginalKey;
+        FString NormalizedKey;
         
-        // Convert first character to uppercase (camelCase → PascalCase)
-        if (NormalizedKey.Len() > 0 && FChar::IsLower(NormalizedKey[0]))
+        // Handle dotted keys (e.g. "slot.position")
+        if (OriginalKey.Contains(TEXT(".")))
         {
-            NormalizedKey[0] = FChar::ToUpper(NormalizedKey[0]);
+            TArray<FString> Parts;
+            OriginalKey.ParseIntoArray(Parts, TEXT("."));
+            for (int32 i = 0; i < Parts.Num(); ++i)
+            {
+                Parts[i] = NormalizePropertyName(Parts[i]);
+            }
+            NormalizedKey = FString::Join(Parts, TEXT("."));
+        }
+        else
+        {
+            NormalizedKey = NormalizePropertyName(OriginalKey);
+        }
+
+        if (NormalizedKey != OriginalKey)
+        {
             UE_LOG(LogUmgMcp, Verbose, TEXT("NormalizeJsonKeys: '%s' → '%s'"), *OriginalKey, *NormalizedKey);
         }
         

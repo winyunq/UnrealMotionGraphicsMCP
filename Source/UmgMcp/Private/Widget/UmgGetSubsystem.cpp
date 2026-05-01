@@ -8,6 +8,8 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
 #include "Components/PanelSlot.h"
+#include "Components/CanvasPanelSlot.h"
+#include "FileManage/UmgFileTransformation.h"
 #include "JsonObjectConverter.h"
 #include "Serialization/JsonWriter.h"
 #include "Dom/JsonObject.h"
@@ -202,17 +204,139 @@ FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprin
     }
 
     TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
-    for (const FString& PropName : Properties)
+    for (const FString& PropPath : Properties)
     {
-        FProperty* Property = FindFProperty<FProperty>(FoundWidget->GetClass(), FName(*PropName));
-        if (Property)
+        TArray<FString> Parts;
+        PropPath.ParseIntoArray(Parts, TEXT("."));
+        
+        UObject* CurrentObject = FoundWidget;
+        int32 PartIndex = 0;
+
+        // If path starts with "Slot", we switch to the Slot object
+        if (Parts.Num() > 1 && Parts[0].Equals(TEXT("Slot"), ESearchCase::IgnoreCase))
         {
-            void* ValuePtr = Property->ContainerPtrToValuePtr<void>(FoundWidget);
-            TSharedPtr<FJsonValue> PropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(Property, ValuePtr);
-            if (PropertyJsonValue.IsValid())
+            CurrentObject = FoundWidget->Slot;
+            PartIndex = 1;
+            
+            if (!CurrentObject)
             {
-                PropertiesJson->SetField(Property->GetName(), PropertyJsonValue);
+                UE_LOG(LogUmgGet, Warning, TEXT("QueryWidgetProperties: Widget '%s' has no slot, but 'Slot' property requested."), *WidgetName);
+                continue;
             }
+
+            // --- ALIAS MAPPING FOR QUERY ---
+            if (Parts.Num() == 2)
+            {
+                if (Parts[1].Equals(TEXT("Position"), ESearchCase::IgnoreCase))
+                {
+                    // Special case: return [Left, Top] from LayoutData.Offsets
+                    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(CurrentObject))
+                    {
+                        FVector2D Pos = CanvasSlot->GetPosition();
+                        TArray<TSharedPtr<FJsonValue>> PosArr;
+                        PosArr.Add(MakeShared<FJsonValueNumber>(Pos.X));
+                        PosArr.Add(MakeShared<FJsonValueNumber>(Pos.Y));
+                        PropertiesJson->SetArrayField(PropPath, PosArr);
+                        UE_LOG(LogUmgGet, Log, TEXT("Query: Mapped 'Slot.Position' to [%f, %f]"), Pos.X, Pos.Y);
+                        continue;
+                    }
+                    else
+                    {
+                        UE_LOG(LogUmgGet, Warning, TEXT("Query: 'Slot.Position' requested but slot is not a CanvasPanelSlot (Type: %s)"), *CurrentObject->GetClass()->GetName());
+                    }
+                }
+                else if (Parts[1].Equals(TEXT("Size"), ESearchCase::IgnoreCase))
+                {
+                    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(CurrentObject))
+                    {
+                        FVector2D Size = CanvasSlot->GetSize();
+                        TArray<TSharedPtr<FJsonValue>> SizeArr;
+                        SizeArr.Add(MakeShared<FJsonValueNumber>(Size.X));
+                        SizeArr.Add(MakeShared<FJsonValueNumber>(Size.Y));
+                        PropertiesJson->SetArrayField(PropPath, SizeArr);
+                        UE_LOG(LogUmgGet, Log, TEXT("Query: Mapped 'Slot.Size' to [%f, %f]"), Size.X, Size.Y);
+                        continue;
+                    }
+                }
+                else if (Parts[1].Equals(TEXT("Anchors"), ESearchCase::IgnoreCase))
+                {
+                    Parts.Reset();
+                    Parts.Add(TEXT("Slot"));
+                    Parts.Add(TEXT("LayoutData"));
+                    Parts.Add(TEXT("Anchors"));
+                    PartIndex = 1; 
+                }
+                else if (Parts[1].Equals(TEXT("Alignment"), ESearchCase::IgnoreCase))
+                {
+                    Parts.Reset();
+                    Parts.Add(TEXT("Slot"));
+                    Parts.Add(TEXT("LayoutData"));
+                    Parts.Add(TEXT("Alignment"));
+                    PartIndex = 1;
+                }
+            }
+        }
+
+        // Traverse the path for properties or struct fields
+        void* CurrentValuePtr = CurrentObject;
+        UStruct* CurrentStruct = CurrentObject ? CurrentObject->GetClass() : nullptr;
+        FProperty* LastProperty = nullptr;
+
+        while (PartIndex < Parts.Num() && CurrentStruct)
+        {
+            FProperty* Property = CurrentStruct->FindPropertyByName(FName(*Parts[PartIndex]));
+            if (!Property)
+            {
+                // Try Case-Insensitive search as a fallback
+                Property = nullptr;
+                for (TFieldIterator<FProperty> It(CurrentStruct); It; ++It)
+                {
+                    if (It->GetName().Equals(Parts[PartIndex], ESearchCase::IgnoreCase))
+                    {
+                        Property = *It;
+                        break;
+                    }
+                }
+            }
+
+            if (Property)
+            {
+                LastProperty = Property;
+                CurrentValuePtr = Property->ContainerPtrToValuePtr<void>(CurrentValuePtr);
+                
+                if (PartIndex == Parts.Num() - 1)
+                {
+                    // Found the target property
+                    TSharedPtr<FJsonValue> PropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(Property, CurrentValuePtr);
+                    if (PropertyJsonValue.IsValid())
+                    {
+                        PropertiesJson->SetField(PropPath, PropertyJsonValue);
+                    }
+                }
+                else
+                {
+                    // Move into struct
+                    if (FStructProperty* StructProp = CastField<FStructProperty>(Property))
+                    {
+                        CurrentStruct = StructProp->Struct;
+                    }
+                    else if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Property))
+                    {
+                        CurrentObject = ObjProp->GetObjectPropertyValue(CurrentValuePtr);
+                        CurrentStruct = CurrentObject ? CurrentObject->GetClass() : nullptr;
+                        CurrentValuePtr = CurrentObject;
+                    }
+                    else
+                    {
+                        break; // Cannot traverse into non-struct/object
+                    }
+                }
+            }
+            else
+            {
+                break; // Property not found
+            }
+            PartIndex++;
         }
     }
 

@@ -13,6 +13,7 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "FileHelpers.h"
 #include "FileManage/UmgFileTransformation.h"
+#include "Components/CanvasPanelSlot.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
 
@@ -63,22 +64,92 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Normalizing property keys for widget '%s'"), *WidgetName);
     TSharedPtr<FJsonObject> NormalizedProperties = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(PropertiesJsonObject);
     
-    // Separate Slot properties from widget properties (Slot must be applied to the Slot object, not the Widget)
-    TSharedPtr<FJsonObject> SlotProperties;
+    // 2. Extract and expand aliases in NormalizedProperties
+    TArray<FString> CurrentKeys;
+    NormalizedProperties->Values.GetKeys(CurrentKeys);
+    for (const FString& Key : CurrentKeys)
+    {
+        if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
+        {
+            TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
+            if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Left"), Val->AsArray()[0]);
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Top"), Val->AsArray()[1]);
+            }
+            NormalizedProperties->RemoveField(Key);
+        }
+        else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
+        {
+            TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
+            if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Right"), Val->AsArray()[0]);
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Bottom"), Val->AsArray()[1]);
+            }
+            NormalizedProperties->RemoveField(Key);
+        }
+        else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
+        {
+            NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->Values[Key]);
+            NormalizedProperties->RemoveField(Key);
+        }
+        else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
+        {
+            NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->Values[Key]);
+            NormalizedProperties->RemoveField(Key);
+        }
+    }
+
+    // 3. Separate Slot properties from widget properties and build nested structures
+    TSharedPtr<FJsonObject> SlotProperties = MakeShared<FJsonObject>();
     if (NormalizedProperties->HasField(TEXT("Slot")))
     {
-        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Detected Slot property for widget '%s'"), *WidgetName);
-        
         SlotProperties = NormalizedProperties->GetObjectField(TEXT("Slot"));
-        
-        // Log the normalized Slot JSON
+        NormalizedProperties->RemoveField(TEXT("Slot"));
+    }
+
+    // Re-scan for any dotted keys (including expanded aliases)
+    NormalizedProperties->Values.GetKeys(CurrentKeys);
+    for (const FString& FullKey : CurrentKeys)
+    {
+        if (FullKey.Contains(TEXT(".")))
+        {
+            TArray<FString> Parts;
+            FullKey.ParseIntoArray(Parts, TEXT("."));
+            
+            TSharedPtr<FJsonObject> TargetObj = NormalizedProperties;
+            if (Parts[0].Equals(TEXT("Slot"), ESearchCase::IgnoreCase))
+            {
+                TargetObj = SlotProperties;
+                Parts.RemoveAt(0);
+            }
+
+            // Safe nested builder
+            for (int32 i = 0; i < Parts.Num() - 1; ++i)
+            {
+                const TSharedPtr<FJsonObject>* ExistingObj = nullptr;
+                if (!TargetObj->TryGetObjectField(Parts[i], ExistingObj))
+                {
+                    TSharedPtr<FJsonObject> NewSubObj = MakeShared<FJsonObject>();
+                    TargetObj->SetObjectField(Parts[i], NewSubObj);
+                    TargetObj = NewSubObj;
+                }
+                else
+                {
+                    TargetObj = ConstCastSharedPtr<FJsonObject>(*ExistingObj);
+                }
+            }
+            TargetObj->SetField(Parts.Last(), NormalizedProperties->Values[FullKey]);
+            NormalizedProperties->RemoveField(FullKey);
+        }
+    }
+
+    if (SlotProperties->Values.Num() > 0)
+    {
+        // Log the collected Slot JSON
         FString SlotJsonString;
         TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&SlotJsonString);
         FJsonSerializer::Serialize(SlotProperties.ToSharedRef(), Writer);
-        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Normalized Slot JSON: %s"), *SlotJsonString);
-        
-        // Remove Slot from widget properties (we'll apply it separately)
-        NormalizedProperties->RemoveField(TEXT("Slot"));
+        UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Final Slot JSON for '%s': %s"), *WidgetName, *SlotJsonString);
     }
 
     WidgetBlueprint->Modify();
@@ -203,6 +274,13 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         {
             UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Resolved Blueprint Asset '%s' to Class '%s'"), *WidgetType, *ClassPath);
         }
+    }
+
+    // 1. Check if widget already exists to prevent duplicates or recursive loops
+    if (UWidget* ExistingWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName)))
+    {
+        UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Widget '%s' already exists in '%s'. Skipping creation."), *WidgetName, *WidgetBlueprint->GetName());
+        return WidgetName;
     }
 
     // 2. If not found or simple name, try native UMG paths
