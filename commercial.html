@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commercial Version — UMG MCP on Fab</title>
+  <meta name="description" content="UMG MCP commercial version — no Python, multi-agent AI, one-click install via UE5 Launcher.">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <nav id="main-nav"></nav>
+
+  <!-- HERO -->
+  <div class="no-python-hero">
+    <div class="container" style="position:relative;z-index:1">
+      <span class="section-label" data-i18n="commercial.badge">Fab Marketplace</span>
+      <h1 class="mt-16" data-i18n="commercial.title">No Python. No Setup.<br>Just Talk.</h1>
+      <p class="hero-subtitle mt-16" data-i18n="commercial.subtitle">The commercial version eliminates all technical friction.</p>
+      <div class="hero-cta mt-32">
+        <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+          🛒 <span data-i18n="commercial.buy.cta">Buy on Fab Marketplace →</span>
+        </a>
+        <a href="#features" class="btn btn-secondary btn-lg">Learn More ↓</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY FEATURES -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="card-grid">
+        <div class="glow-card reveal reveal-delay-1">
+          <div class="card-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.25);font-size:2rem">🐍</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <h3 data-i18n="commercial.feat1.title">Zero Python Dependency</h3>
+            <span class="badge badge-green">New</span>
+          </div>
+          <p data-i18n="commercial.feat1.desc">Pure C++ implementation. No Python environment, no virtual env, no pip installs.</p>
+        </div>
+        <div class="glow-card reveal reveal-delay-2">
+          <div class="card-icon" style="font-size:2rem">🤖</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <h3 data-i18n="commercial.feat2.title">Multi-Agent Architecture</h3>
+            <span class="badge badge-purple">Pro</span>
+          </div>
+          <p data-i18n="commercial.feat2.desc">Specialized AI agents work in parallel — coordinated by an Orchestrator for complex tasks.</p>
+        </div>
+        <div class="glow-card reveal reveal-delay-3">
+          <div class="card-icon" style="background:rgba(37,99,235,0.15);border-color:rgba(37,99,235,0.25);font-size:2rem">⚡</div>
+          <h3 class="mb-8" data-i18n="commercial.feat3.title">One-Click Installation</h3>
+          <p data-i18n="commercial.feat3.desc">Install directly through the Epic Games Launcher. Auto-updates included.</p>
+        </div>
+        <div class="glow-card reveal reveal-delay-4">
+          <div class="card-icon" style="background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.25);font-size:2rem">🎯</div>
+          <h3 class="mb-8" data-i18n="commercial.feat4.title">Priority Support</h3>
+          <p data-i18n="commercial.feat4.desc">Dedicated support channel, faster bug fixes, early access to new features.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MULTI-AGENT ARCHITECTURE -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label" data-i18n="commercial.multiagent.label">Architecture</span>
+        <h2 data-i18n="commercial.multiagent.title">Multi-Agent AI System</h2>
+        <p data-i18n="commercial.multiagent.subtitle">Complex UI tasks are decomposed and handled by specialized agents working in parallel.</p>
+      </div>
+      <div class="diagram-wrap arch-diagram reveal">
+        <svg class="arch-svg" viewBox="0 0 700 380" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Multi-Agent Architecture">
+          <!-- User -->
+          <rect x="260" y="20" width="180" height="55" rx="12" fill="#1a1a2e" stroke="#06b6d4" stroke-width="1.5"/>
+          <text x="350" y="46" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600" font-family="Inter,sans-serif">User Conversation</text>
+          <text x="350" y="63" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter,sans-serif">Natural Language</text>
+
+          <!-- Orchestrator -->
+          <rect x="235" y="130" width="230" height="60" rx="12" fill="#1a1a2e" stroke="#7c3aed" stroke-width="2"/>
+          <text x="350" y="157" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="700" font-family="Inter,sans-serif">Orchestrator Agent</text>
+          <text x="350" y="175" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter,sans-serif">Task Planning &amp; Coordination</text>
+
+          <!-- Sub agents -->
+          <rect x="40" y="260" width="150" height="60" rx="10" fill="#1a1a2e" stroke="#2563eb" stroke-width="1.5"/>
+          <text x="115" y="286" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">Layout Agent</text>
+          <text x="115" y="303" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Widget &amp; Structure</text>
+
+          <rect x="215" y="260" width="150" height="60" rx="10" fill="#1a1a2e" stroke="#7c3aed" stroke-width="1.5"/>
+          <text x="290" y="286" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">Blueprint Agent</text>
+          <text x="290" y="303" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Logic &amp; Events</text>
+
+          <rect x="390" y="260" width="150" height="60" rx="10" fill="#1a1a2e" stroke="#06b6d4" stroke-width="1.5"/>
+          <text x="465" y="286" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">Material Agent</text>
+          <text x="465" y="303" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Visual &amp; HLSL</text>
+
+          <rect x="565" y="260" width="120" height="60" rx="10" fill="#1a1a2e" stroke="#10b981" stroke-width="1.5"/>
+          <text x="625" y="283" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">Anim Agent</text>
+          <text x="625" y="301" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Sequence &amp; Keys</text>
+
+          <!-- User → Orchestrator -->
+          <line class="svg-flow-line" x1="350" y1="75" x2="350" y2="128" stroke="#06b6d4" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <polygon class="svg-flow-arrow" points="345,126 350,134 355,126" fill="#06b6d4"/>
+
+          <!-- Orchestrator → Agents -->
+          <line class="svg-flow-line" x1="280" y1="190" x2="115" y2="258" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="320" y1="190" x2="290" y2="258" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="380" y1="190" x2="465" y2="258" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="430" y1="190" x2="625" y2="258" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+
+          <!-- Label "parallel" -->
+          <text x="350" y="240" text-anchor="middle" fill="#7c3aed" font-size="10" font-family="Inter,sans-serif" opacity="0.8">Parallel Execution</text>
+
+          <!-- Title -->
+          <text x="350" y="12" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Commercial Version — Multi-Agent Architecture</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- VS COMPARISON -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Why Upgrade to Commercial?</h2>
+        <p>The commercial version is built for professionals who need results without setup friction.</p>
+      </div>
+      <div class="two-col reveal">
+        <div>
+          <span class="section-label accent-text">Open Source</span>
+          <h3 class="mt-16">Great for Experimentation</h3>
+          <p class="mt-16">The open source version is fully functional and MIT licensed. Perfect for developers who want to customize, contribute, or understand how it works under the hood.</p>
+          <ul class="mt-24" style="display:flex;flex-direction:column;gap:10px">
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> Full source code access</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> 40+ MCP tools</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> MIT License — use in any project</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:#f87171">✗</span> Requires Python setup</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:#f87171">✗</span> Single agent only</li>
+          </ul>
+        </div>
+        <div>
+          <span class="section-label" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.25);color:var(--primary-light)">Commercial</span>
+          <h3 class="mt-16">Built for Production</h3>
+          <p class="mt-16">Zero friction from install to creation. The commercial version removes every technical barrier so you can focus entirely on building great UE5 interfaces.</p>
+          <ul class="mt-24" style="display:flex;flex-direction:column;gap:10px">
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> Zero Python dependency</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> Multi-agent AI architecture</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> One-click UE5 launcher install</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> Priority support</li>
+            <li style="color:var(--muted);font-size:0.9rem;padding-left:20px;position:relative"><span style="position:absolute;left:0;color:var(--accent2)">✓</span> Commercial updates</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BUY CTA -->
+  <section class="section">
+    <div class="container">
+      <div class="cta-section reveal">
+        <span class="section-label mb-16" style="display:inline-block">Fab Marketplace</span>
+        <h2 data-i18n="commercial.buy.title">Get the Commercial Version</h2>
+        <p data-i18n="commercial.buy.subtitle">Available now on Fab Marketplace. One purchase, lifetime updates.</p>
+        <div class="cta-buttons mt-32">
+          <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+            🛒 <span data-i18n="commercial.buy.cta">Buy on Fab Marketplace →</span>
+          </a>
+          <a href="getting-started.html#commercial" class="btn btn-secondary btn-lg">Setup Guide →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container container-sm">
+      <div class="section-header reveal">
+        <h2 data-i18n="commercial.faq.title">Frequently Asked Questions</h2>
+      </div>
+      <div class="faq-list reveal">
+        <div class="faq-item">
+          <button class="faq-question">Which AI models does the commercial version support? <span class="faq-chevron">▼</span></button>
+          <div class="faq-answer"><p>The commercial version supports any LLM with an API key, including OpenAI GPT-4o, Anthropic Claude, and Google Gemini. You configure your own API key — no subscription beyond the plugin purchase.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">What UE5 versions are supported? <span class="faq-chevron">▼</span></button>
+          <div class="faq-answer"><p>UE5.3 and above are fully supported. UE5.1/5.2 may work but are not officially tested. We track Unreal's latest stable release and update accordingly.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">Is the multi-agent feature only in the commercial version? <span class="faq-chevron">▼</span></button>
+          <div class="faq-answer"><p>Yes. The multi-agent orchestration layer — which decomposes tasks and runs specialized agents in parallel — is exclusive to the commercial version. The open source version uses a single-agent flow.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">Can I use the commercial version for commercial game projects? <span class="faq-chevron">▼</span></button>
+          <div class="faq-answer"><p>Yes. The commercial license covers use in commercial game projects and products. Please review the Fab Marketplace license terms for full details.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">Does the commercial version include updates? <span class="faq-chevron">▼</span></button>
+          <div class="faq-answer"><p>Yes. All updates for the purchased version are included. Major version upgrades may require a separate purchase depending on scope.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">What if I'm not satisfied? <span class="faq-chevron">▼</span></button>
+          <div class="faq-answer"><p>Refund policies are governed by Epic Games' Fab Marketplace terms. We recommend trying the open source version first to ensure compatibility with your workflow before purchasing.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>

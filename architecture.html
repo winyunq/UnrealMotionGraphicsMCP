@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture — UMG MCP</title>
+  <meta name="description" content="Technical architecture of UMG MCP — how AI connects to UE5 UMG via MCP protocol.">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .arch-node {
+      transition: filter 0.3s;
+      cursor: pointer;
+    }
+    .arch-node:hover { filter: brightness(1.3); }
+    .arch-node rect { transition: stroke-width 0.3s; }
+    .arch-node:hover rect { stroke-width: 2.5; }
+
+    .flow-arrow {
+      marker-end: url(#arrowPurple);
+    }
+    .flow-arrow-blue { marker-end: url(#arrowBlue); }
+    .flow-arrow-cyan  { marker-end: url(#arrowCyan);  }
+
+    .component-card {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+    .component-card h4 { margin-bottom: 8px; color: var(--text); }
+    .component-card p  { font-size: .875rem; }
+  </style>
+</head>
+<body>
+  <nav id="main-nav"></nav>
+
+  <div class="page-hero">
+    <div class="container">
+      <span class="section-label" data-i18n="arch.badge">Technical Deep Dive</span>
+      <h1 class="mt-16" data-i18n="arch.title">System Architecture</h1>
+      <p class="hero-subtitle" data-i18n="arch.subtitle">Understand how UMG MCP connects your AI client to Unreal Engine's internals.</p>
+    </div>
+  </div>
+
+  <!-- OSS ARCHITECTURE -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 data-i18n="arch.oss.title">Open Source Architecture</h2>
+        <p>MCP Protocol bridges external AI clients to the UE5 editor in real time.</p>
+      </div>
+      <div class="diagram-wrap arch-diagram reveal">
+        <svg class="arch-svg" viewBox="0 0 760 500" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Detailed OSS architecture">
+          <defs>
+            <marker id="arrowPurple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/>
+            </marker>
+            <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#2563eb"/>
+            </marker>
+            <marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#06b6d4"/>
+            </marker>
+            <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.1"/>
+              <stop offset="100%" stop-color="#1a1a2e" stop-opacity="0.6"/>
+            </linearGradient>
+          </defs>
+
+          <!-- Background zones -->
+          <rect x="10" y="10" width="220" height="480" rx="16" fill="rgba(124,58,237,0.04)" stroke="rgba(124,58,237,0.12)" stroke-width="1"/>
+          <text x="120" y="30" text-anchor="middle" fill="#7c3aed" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="1">EXTERNAL AI ZONE</text>
+
+          <rect x="250" y="10" width="200" height="480" rx="16" fill="rgba(37,99,235,0.04)" stroke="rgba(37,99,235,0.12)" stroke-width="1"/>
+          <text x="350" y="30" text-anchor="middle" fill="#2563eb" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="1">MCP LAYER</text>
+
+          <rect x="470" y="10" width="270" height="480" rx="16" fill="rgba(6,182,212,0.04)" stroke="rgba(6,182,212,0.12)" stroke-width="1"/>
+          <text x="605" y="30" text-anchor="middle" fill="#06b6d4" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="1">UE5 ENGINE ZONE</text>
+
+          <!-- AI Clients group -->
+          <g class="arch-node">
+            <rect x="30" y="50" width="170" height="50" rx="10" fill="#1a1a2e" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="115" y="71" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">Gemini</text>
+            <text x="115" y="87" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Google AI Studio</text>
+          </g>
+          <g class="arch-node">
+            <rect x="30" y="120" width="170" height="50" rx="10" fill="#1a1a2e" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="115" y="141" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">GPT / Claude</text>
+            <text x="115" y="157" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">OpenAI / Anthropic</text>
+          </g>
+          <g class="arch-node">
+            <rect x="30" y="190" width="170" height="50" rx="10" fill="#1a1a2e" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="115" y="211" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">MCP Client</text>
+            <text x="115" y="227" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Claude Desktop / Cursor</text>
+          </g>
+
+          <!-- MCP Server -->
+          <g class="arch-node">
+            <rect x="265" y="100" width="170" height="70" rx="12" fill="#1a1a2e" stroke="#2563eb" stroke-width="2"/>
+            <text x="350" y="127" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="700" font-family="Inter,sans-serif">MCP Server</text>
+            <text x="350" y="145" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Python · stdio/HTTP</text>
+            <text x="350" y="160" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Tool dispatcher</text>
+          </g>
+
+          <!-- Config -->
+          <g class="arch-node">
+            <rect x="265" y="220" width="170" height="50" rx="10" fill="#12121a" stroke="rgba(37,99,235,0.4)" stroke-width="1" stroke-dasharray="5,3"/>
+            <text x="350" y="242" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="Inter,sans-serif">UmgMcpConfig.json</text>
+            <text x="350" y="258" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Port · Settings</text>
+          </g>
+
+          <!-- UmgMcpBridge -->
+          <g class="arch-node">
+            <rect x="488" y="80" width="230" height="90" rx="12" fill="#1a1a2e" stroke="#06b6d4" stroke-width="2"/>
+            <text x="603" y="108" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="700" font-family="Inter,sans-serif">UmgMcpBridge</text>
+            <text x="603" y="126" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">C++ UE5 Plugin</text>
+            <text x="603" y="142" text-anchor="middle" fill="#06b6d4" font-size="10" font-family="Inter,sans-serif">TCP Socket · JSON Parser</text>
+            <text x="603" y="158" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Command Router</text>
+          </g>
+
+          <!-- UE5 API layer -->
+          <g class="arch-node">
+            <rect x="488" y="220" width="230" height="60" rx="10" fill="#1a1a2e" stroke="rgba(6,182,212,0.5)" stroke-width="1.5"/>
+            <text x="603" y="247" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter,sans-serif">UE5 Editor API</text>
+            <text x="603" y="264" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">UMG · Blueprint · Material · Anim</text>
+          </g>
+
+          <!-- Assets -->
+          <g class="arch-node">
+            <rect x="488" y="340" width="100" height="50" rx="8" fill="#12121a" stroke="rgba(16,185,129,0.4)" stroke-width="1"/>
+            <text x="538" y="362" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="Inter,sans-serif">UMG Widget</text>
+            <text x="538" y="378" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">.uasset</text>
+          </g>
+          <g class="arch-node">
+            <rect x="602" y="340" width="100" height="50" rx="8" fill="#12121a" stroke="rgba(37,99,235,0.4)" stroke-width="1"/>
+            <text x="652" y="362" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="Inter,sans-serif">Blueprint</text>
+            <text x="652" y="378" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">.uasset</text>
+          </g>
+
+          <!-- Arrows -->
+          <line class="svg-flow-line flow-arrow" x1="200" y1="75" x2="263" y2="130" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line flow-arrow" x1="200" y1="145" x2="263" y2="135" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line flow-arrow" x1="200" y1="215" x2="263" y2="150" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <text x="228" y="118" fill="#7c3aed" font-size="9" font-family="Inter,sans-serif">MCP Protocol</text>
+
+          <line class="svg-flow-line flow-arrow-blue" x1="435" y1="135" x2="486" y2="120" stroke="#2563eb" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <text x="455" y="115" fill="#2563eb" font-size="9" font-family="Inter,sans-serif">TCP/JSON</text>
+
+          <line class="svg-flow-line flow-arrow-cyan" x1="603" y1="170" x2="603" y2="218" stroke="#06b6d4" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <text x="612" y="198" fill="#06b6d4" font-size="9" font-family="Inter,sans-serif">Unreal API</text>
+
+          <line class="svg-flow-line flow-arrow-cyan" x1="538" y1="280" x2="538" y2="338" stroke="rgba(16,185,129,0.6)" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line flow-arrow-cyan" x1="652" y1="280" x2="652" y2="338" stroke="rgba(37,99,235,0.6)" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+
+          <!-- Data flow label -->
+          <rect x="280" y="400" width="180" height="40" rx="8" fill="rgba(124,58,237,0.08)" stroke="rgba(124,58,237,0.2)" stroke-width="1"/>
+          <text x="370" y="418" text-anchor="middle" fill="#9d5cf6" font-size="10" font-family="Inter,sans-serif">Response: JSON result</text>
+          <text x="370" y="433" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">success/error feedback</text>
+
+          <line x1="488" y1="420" x2="461" y2="420" stroke="rgba(124,58,237,0.4)" stroke-width="1.5" stroke-dasharray="4,2"/>
+          <text x="350" y="478" text-anchor="middle" fill="#6272a4" font-size="9" font-family="Inter,sans-serif">All operations are reversible · Undo supported</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPONENT BREAKDOWN -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Component Breakdown</h2>
+        <p>Each layer of the stack explained.</p>
+      </div>
+      <div class="card-grid reveal">
+        <div class="component-card">
+          <span class="badge badge-purple mb-16" style="display:inline-block">Layer 1</span>
+          <h4>AI Client Layer</h4>
+          <p>Any MCP-compatible AI client (Claude Desktop, Cursor, custom scripts) or AI API (Gemini, GPT, Claude). The client sends natural language queries and calls MCP tools.</p>
+        </div>
+        <div class="component-card">
+          <span class="badge badge-blue mb-16" style="display:inline-block">Layer 2</span>
+          <h4>MCP Server (Python)</h4>
+          <p>Runs as a local Python process. Exposes all UMG operations as typed MCP tools. Receives tool calls, serializes them to JSON, and sends to the UE5 bridge via TCP.</p>
+        </div>
+        <div class="component-card">
+          <span class="badge badge-cyan mb-16" style="display:inline-block">Layer 3</span>
+          <h4>UmgMcpBridge (C++)</h4>
+          <p>Native UE5 C++ plugin. Opens a TCP socket server, listens for JSON commands, routes them to the correct UE5 Unreal API calls, and returns results as JSON.</p>
+        </div>
+        <div class="component-card">
+          <span class="badge badge-green mb-16" style="display:inline-block">Layer 4</span>
+          <h4>UE5 Asset Layer</h4>
+          <p>The actual UMG widgets, Blueprint graphs, materials, and animations modified by the AI. All changes are live in the UE5 editor and can be undone normally.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMMERCIAL MULTI-AGENT -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label badge-purple">Commercial Only</span>
+        <h2 class="mt-16" data-i18n="arch.commercial.title">Commercial Multi-Agent Architecture</h2>
+        <p>The commercial version replaces the Python layer with a native C++ multi-agent orchestration system.</p>
+      </div>
+      <div class="diagram-wrap arch-diagram reveal">
+        <svg class="arch-svg" viewBox="0 0 760 440" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Commercial multi-agent architecture">
+          <!-- User Input -->
+          <rect x="280" y="20" width="200" height="60" rx="12" fill="#1a1a2e" stroke="#06b6d4" stroke-width="1.5"/>
+          <text x="380" y="47" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600" font-family="Inter,sans-serif">User Input</text>
+          <text x="380" y="65" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Natural language · API key configured</text>
+
+          <!-- C++ Agent Runtime -->
+          <rect x="180" y="130" width="400" height="80" rx="14" fill="#1a1a2e" stroke="#7c3aed" stroke-width="2"/>
+          <text x="380" y="158" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="700" font-family="Inter,sans-serif">C++ Agent Runtime</text>
+          <text x="380" y="176" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Orchestrator · Task Planner · Context Manager</text>
+          <text x="380" y="193" text-anchor="middle" fill="#7c3aed" font-size="10" font-family="Inter,sans-serif">No Python dependency — pure native</text>
+
+          <!-- Agents row -->
+          <rect x="30" y="280" width="130" height="70" rx="10" fill="#1a1a2e" stroke="#2563eb" stroke-width="1.5"/>
+          <text x="95" y="308" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600" font-family="Inter,sans-serif">Layout Agent</text>
+          <text x="95" y="326" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">Widget structure</text>
+          <text x="95" y="342" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">&amp; positioning</text>
+
+          <rect x="180" y="280" width="130" height="70" rx="10" fill="#1a1a2e" stroke="#7c3aed" stroke-width="1.5"/>
+          <text x="245" y="308" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600" font-family="Inter,sans-serif">Blueprint Agent</text>
+          <text x="245" y="326" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">Logic, events</text>
+          <text x="245" y="342" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">&amp; bindings</text>
+
+          <rect x="330" y="280" width="130" height="70" rx="10" fill="#1a1a2e" stroke="#06b6d4" stroke-width="1.5"/>
+          <text x="395" y="308" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600" font-family="Inter,sans-serif">Material Agent</text>
+          <text x="395" y="326" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">Visual FX</text>
+          <text x="395" y="342" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">&amp; HLSL shaders</text>
+
+          <rect x="480" y="280" width="130" height="70" rx="10" fill="#1a1a2e" stroke="#10b981" stroke-width="1.5"/>
+          <text x="545" y="308" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600" font-family="Inter,sans-serif">Anim Agent</text>
+          <text x="545" y="326" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">Keyframes</text>
+          <text x="545" y="342" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">&amp; sequencer</text>
+
+          <rect x="630" y="280" width="110" height="70" rx="10" fill="#1a1a2e" stroke="#fbbf24" stroke-width="1.5"/>
+          <text x="685" y="308" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600" font-family="Inter,sans-serif">Style Agent</text>
+          <text x="685" y="326" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">Theme &amp; design</text>
+          <text x="685" y="342" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">system (Phase 2)</text>
+
+          <!-- UE5 base -->
+          <rect x="180" y="400" width="400" height="30" rx="8" fill="rgba(6,182,212,0.08)" stroke="rgba(6,182,212,0.25)" stroke-width="1"/>
+          <text x="380" y="419" text-anchor="middle" fill="#06b6d4" font-size="11" font-family="Inter,sans-serif" font-weight="600">UE5 Editor API — Shared by all agents</text>
+
+          <!-- Arrows user→runtime -->
+          <line class="svg-flow-line" x1="380" y1="80" x2="380" y2="128" stroke="#06b6d4" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <polygon class="svg-flow-arrow" points="375,126 380,134 385,126" fill="#06b6d4"/>
+
+          <!-- runtime→agents -->
+          <line class="svg-flow-line" x1="250" y1="210" x2="95" y2="278" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="300" y1="210" x2="245" y2="278" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="380" y1="210" x2="395" y2="278" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="460" y1="210" x2="545" y2="278" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+          <line class="svg-flow-line" x1="520" y1="210" x2="685" y2="278" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300"/>
+
+          <!-- agents→UE5 -->
+          <line class="svg-flow-line" x1="380" y1="350" x2="380" y2="398" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300" opacity="0.6"/>
+
+          <text x="380" y="260" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="Inter,sans-serif" opacity="0.7">Parallel dispatch</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA FLOW -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container container-sm">
+      <div class="section-header reveal">
+        <h2>Data Flow</h2>
+        <p>A single user request, traced through the entire stack.</p>
+      </div>
+      <div class="steps reveal">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>User sends natural language</h4>
+            <p>e.g. <em style="color:var(--accent)">"Create a health bar at the top left, red fill, white background, 200px wide"</em></p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>AI client processes &amp; selects tools</h4>
+            <p>The LLM determines which MCP tools are needed: <code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">create_widget</code>, <code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">set_widget_property</code>, etc.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>MCP Server routes the call</h4>
+            <p>The tool call is received, validated, serialized to JSON, and forwarded over TCP to the UE5 plugin on <code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">localhost:19202</code>.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h4>UmgMcpBridge executes in UE5</h4>
+            <p>The C++ plugin receives the command, calls the appropriate Unreal Engine API (e.g. <code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">UWidgetBlueprint::AddWidget</code>), and returns a JSON success/error response.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <h4>Result feeds back to AI</h4>
+            <p>The AI receives the result, confirms success, and can immediately continue with the next operation — enabling multi-step UI construction in a single conversation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>

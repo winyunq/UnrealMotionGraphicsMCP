@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow — UMG MCP</title>
+  <meta name="description" content="UMG MCP workflow — from idea to pixel-perfect UE5 UI with AI.">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    .workflow-svg { width: 100%; max-width: 900px; display: block; margin: 0 auto; }
+    .use-case-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+    .use-case-card {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .use-case-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .use-case-card.uc-1::before { background: var(--gradient); }
+    .use-case-card.uc-2::before { background: var(--gradient2); }
+    .use-case-card.uc-3::before { background: linear-gradient(135deg, #10b981, #06b6d4); }
+    .use-case-card h4 { margin: 16px 0 10px; }
+
+    .prompt-example {
+      background: #0d1117;
+      border: 1px solid rgba(6,182,212,0.2);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      font-family: var(--mono);
+      font-size: 0.83rem;
+      color: var(--text);
+      margin: 16px 0;
+      line-height: 1.6;
+    }
+    .prompt-example::before {
+      content: 'User Prompt';
+      display: block;
+      font-size: 0.7rem;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      font-family: var(--font);
+    }
+  </style>
+</head>
+<body>
+  <nav id="main-nav"></nav>
+
+  <div class="page-hero">
+    <div class="container">
+      <span class="section-label" data-i18n="workflow.badge">How to Use</span>
+      <h1 class="mt-16" data-i18n="workflow.title">Workflow &amp; Process</h1>
+      <p class="hero-subtitle" data-i18n="workflow.subtitle">From idea to pixel-perfect UMG — here's the full creative loop.</p>
+    </div>
+  </div>
+
+  <!-- MAIN WORKFLOW DIAGRAM -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>The AI-UMG Creation Loop</h2>
+        <p>Every iteration makes your UI better — no context switching required.</p>
+      </div>
+      <div class="diagram-wrap arch-diagram reveal">
+        <svg class="workflow-svg" viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" aria-label="Workflow diagram">
+          <defs>
+            <marker id="wArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+
+          <!-- Step boxes -->
+          <g>
+            <rect x="10" y="60" width="130" height="80" rx="12" fill="#1a1a2e" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="75" y="95" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter,sans-serif">① Describe</text>
+            <text x="75" y="112" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Natural language</text>
+            <text x="75" y="127" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">UI intent</text>
+          </g>
+          <line class="svg-flow-line" x1="142" y1="100" x2="165" y2="100" stroke="#7c3aed" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300" marker-end="url(#wArrow)"/>
+
+          <g>
+            <rect x="167" y="60" width="130" height="80" rx="12" fill="#1a1a2e" stroke="#2563eb" stroke-width="1.5"/>
+            <text x="232" y="95" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter,sans-serif">② AI Analyzes</text>
+            <text x="232" y="112" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">LLM plans</text>
+            <text x="232" y="127" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">tool sequence</text>
+          </g>
+          <line class="svg-flow-line" x1="299" y1="100" x2="322" y2="100" stroke="#7c3aed" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300" marker-end="url(#wArrow)"/>
+
+          <g>
+            <rect x="324" y="60" width="130" height="80" rx="12" fill="#1a1a2e" stroke="#06b6d4" stroke-width="1.5"/>
+            <text x="389" y="95" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter,sans-serif">③ MCP Calls</text>
+            <text x="389" y="112" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">UMG tools</text>
+            <text x="389" y="127" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">execute</text>
+          </g>
+          <line class="svg-flow-line" x1="456" y1="100" x2="479" y2="100" stroke="#7c3aed" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300" marker-end="url(#wArrow)"/>
+
+          <g>
+            <rect x="481" y="60" width="130" height="80" rx="12" fill="#1a1a2e" stroke="#10b981" stroke-width="1.5"/>
+            <text x="546" y="95" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter,sans-serif">④ UMG Updates</text>
+            <text x="546" y="112" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">Live editor</text>
+            <text x="546" y="127" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">changes</text>
+          </g>
+          <line class="svg-flow-line" x1="613" y1="100" x2="636" y2="100" stroke="#7c3aed" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300" marker-end="url(#wArrow)"/>
+
+          <g>
+            <rect x="638" y="60" width="130" height="80" rx="12" fill="#1a1a2e" stroke="#fbbf24" stroke-width="1.5"/>
+            <text x="703" y="95" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter,sans-serif">⑤ Review</text>
+            <text x="703" y="112" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">You see result</text>
+            <text x="703" y="127" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter,sans-serif">immediately</text>
+          </g>
+          <line class="svg-flow-line" x1="770" y1="100" x2="793" y2="100" stroke="#7c3aed" stroke-width="2" stroke-dasharray="300" stroke-dashoffset="300" marker-end="url(#wArrow)"/>
+
+          <g>
+            <rect x="795" y="60" width="75" height="80" rx="12" fill="rgba(124,58,237,0.15)" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5,3"/>
+            <text x="832" y="103" text-anchor="middle" fill="#9d5cf6" font-size="11" font-weight="700" font-family="Inter,sans-serif">Iterate</text>
+            <text x="832" y="120" text-anchor="middle" fill="#7c3aed" font-size="10" font-family="Inter,sans-serif">↺</text>
+          </g>
+
+          <!-- Loop back arrow -->
+          <path class="svg-flow-line" d="M832 140 Q832 175 440 175 Q48 175 75 142" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="300" stroke-dashoffset="300" fill="none" marker-end="url(#wArrow)" opacity="0.5"/>
+          <text x="440" y="192" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="Inter,sans-serif" opacity="0.7">Iterate until perfect</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- USE CASES -->
+  <section class="section" style="background:var(--surface)">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Real Use Cases</h2>
+        <p>See exactly what you'd say to the AI, and what it does.</p>
+      </div>
+      <div class="use-case-grid">
+        <div class="use-case-card uc-1 reveal reveal-delay-1">
+          <span class="badge badge-purple">Game HUD</span>
+          <h4>RTS Game Interface</h4>
+          <div class="prompt-example">"Create a minimap widget in the bottom-right corner, 200x200px. Add a health bar and resource counters at the top. Use a dark semi-transparent background."</div>
+          <p style="font-size:.85rem">The AI creates a CanvasPanel, adds an Image for the minimap, a ProgressBar for health, TextBlocks for resources, and styles them with the specified colors and transparency.</p>
+        </div>
+        <div class="use-case-card uc-2 reveal reveal-delay-2">
+          <span class="badge badge-blue">Inventory UI</span>
+          <h4>RPG Inventory Screen</h4>
+          <div class="prompt-example">"Build a 6x4 grid inventory. Each slot should be a 64x64 button with a darker background on hover. Add a tooltip panel that appears on the right side."</div>
+          <p style="font-size:.85rem">Creates a UniformGridPanel with 24 Button children, configures hover styles, adds a tooltip overlay with animation states, and wires the hover events in Blueprint.</p>
+        </div>
+        <div class="use-case-card uc-3 reveal reveal-delay-3">
+          <span class="badge badge-green">Material FX</span>
+          <h4>Animated Shader Effect</h4>
+          <div class="prompt-example">"Add a glowing pulsing border effect to the selected inventory slot. Use a sine wave animation on the emissive intensity, cycling every 1.5 seconds."</div>
+          <p style="font-size:.85rem">Creates a material with a Time node feeding a Sine expression, connects to Emissive Color, applies to the slot's brush material, and creates the UMG animation sequence.</p>
+        </div>
+        <div class="use-case-card uc-1 reveal reveal-delay-1">
+          <span class="badge badge-cyan">Main Menu</span>
+          <h4>Cinematic Main Menu</h4>
+          <div class="prompt-example">"Build a main menu with Play, Settings, Quit buttons. Animate them sliding in from the left with 0.1s stagger. Add a blurred background overlay."</div>
+          <p style="font-size:.85rem">Creates a VerticalBox with styled buttons, configures BackgroundBlur, and creates three staggered UMG animations with translate-X keyframes and ease-out curves.</p>
+        </div>
+        <div class="use-case-card uc-2 reveal reveal-delay-2">
+          <span class="badge badge-yellow">Data Binding</span>
+          <h4>Dynamic Stats Dashboard</h4>
+          <div class="prompt-example">"Create a player stats panel. Bind the health text to a PlayerHealth float variable, and the XP bar to a PlayerXP variable. Compile the blueprint."</div>
+          <p style="font-size:.85rem">Adds Blueprint variables, binds TextBlock text to PlayerHealth via a Format Text node, binds ProgressBar percent to PlayerXP, and triggers compilation — all in one step.</p>
+        </div>
+        <div class="use-case-card uc-3 reveal reveal-delay-3">
+          <span class="badge badge-purple">Iteration</span>
+          <h4>Rapid Iteration</h4>
+          <div class="prompt-example">"The health bar looks too thin. Make it 40px tall and round the corners. Also change the fill color to a gradient from green to red based on remaining HP."</div>
+          <p style="font-size:.85rem">Modifies the existing ProgressBar dimensions, applies corner rounding via slot properties, creates a new dynamic material with a Lerp on the fill color, and re-applies it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIPS -->
+  <section class="section">
+    <div class="container container-sm">
+      <div class="section-header reveal">
+        <h2>Tips for Best Results</h2>
+        <p>Get more from your AI UMG sessions.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px" class="reveal">
+        <div class="highlight-box accent">
+          <h4 style="color:var(--accent);margin-bottom:6px">🎯 Be Specific About Sizes &amp; Positions</h4>
+          <p style="font-size:.9rem">Instead of "make it bigger", say "set width to 320px, height to 48px". Exact values produce better results than relative descriptions.</p>
+        </div>
+        <div class="highlight-box">
+          <h4 style="color:var(--primary-light);margin-bottom:6px">🧩 Build Hierarchically</h4>
+          <p style="font-size:.9rem">Start with the outer container, then add children. The AI handles hierarchy best when you describe the structure top-down.</p>
+        </div>
+        <div class="highlight-box green">
+          <h4 style="color:var(--accent2);margin-bottom:6px">🔄 Iterate Incrementally</h4>
+          <p style="font-size:.9rem">Make small changes per message. "Change the button color to #ff6b35" is more reliable than trying to do everything at once.</p>
+        </div>
+        <div class="highlight-box accent">
+          <h4 style="color:var(--accent);margin-bottom:6px">📸 Reference UE5 Widget Names</h4>
+          <p style="font-size:.9rem">Using exact UE5 widget names (CanvasPanel, HorizontalBox, ProgressBar) helps the AI pick the right tool. The AI knows them all.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>
