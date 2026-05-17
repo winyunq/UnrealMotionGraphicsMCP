@@ -69,17 +69,31 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     NormalizedProperties->Values.GetKeys(CurrentKeys);
     for (const FString& Key : CurrentKeys)
     {
-        if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
+        if (Key.StartsWith(TEXT("Slot."), ESearchCase::IgnoreCase))
         {
-            /// 智能反射检测：检查 Slot 是否有原生的 Position 属性
+            // 动态解析出 Slot. 后的第一级属性名
+            FString SubPath = Key.Mid(5); // 移除 "Slot."
+            FString FirstPropName;
+            if (!SubPath.Split(TEXT("."), &FirstPropName, nullptr))
+            {
+                FirstPropName = SubPath;
+            }
+
+            // 动态反射匹配：检查 Slot 是否拥有原生对应的属性
             bool bHasNativeProp = false;
             if (FoundWidget->Slot)
             {
-                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Position")) != nullptr;
+                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(FName(*FirstPropName)) != nullptr;
             }
 
-            /// 仅在没有原生属性时降级到 Canvas 别名处理
-            if (!bHasNativeProp)
+            // [智能反射匹配成功]：直接交付原生反射引擎处理，跳过下面的降级转换
+            if (bHasNativeProp)
+            {
+                continue;
+            }
+
+            // [智能反射匹配失败]：安全降级，进入 Canvas 别名处理层判断
+            if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
             {
                 TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
                 if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
@@ -88,18 +102,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
                     NormalizedProperties->RemoveField(Key);
                 }
             }
-        }
-        else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
-        {
-            /// 智能反射检测：检查 Slot 是否有原生的 Size 属性
-            bool bHasNativeProp = false;
-            if (FoundWidget->Slot)
-            {
-                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Size")) != nullptr;
-            }
-
-            /// 仅在没有原生属性时降级到 Canvas 别名处理
-            if (!bHasNativeProp)
+            else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
             {
                 TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
                 if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
@@ -108,34 +111,12 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
                     NormalizedProperties->RemoveField(Key);
                 }
             }
-        }
-        else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
-        {
-            /// 智能反射检测：检查 Slot 是否有原生的 Anchors 属性
-            bool bHasNativeProp = false;
-            if (FoundWidget->Slot)
-            {
-                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Anchors")) != nullptr;
-            }
-
-            /// 仅在没有原生属性时降级到 Canvas 别名处理
-            if (!bHasNativeProp)
+            else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
             {
                 NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->Values[Key]);
                 NormalizedProperties->RemoveField(Key);
             }
-        }
-        else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
-        {
-            /// 智能反射检测：检查 Slot 是否有原生的 Alignment 属性
-            bool bHasNativeProp = false;
-            if (FoundWidget->Slot)
-            {
-                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Alignment")) != nullptr;
-            }
-
-            /// 仅在没有原生属性时降级到 Canvas 别名处理
-            if (!bHasNativeProp)
+            else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
             {
                 NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->Values[Key]);
                 NormalizedProperties->RemoveField(Key);
