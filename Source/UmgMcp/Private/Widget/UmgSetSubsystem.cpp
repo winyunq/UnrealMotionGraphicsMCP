@@ -71,31 +71,75 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     {
         if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
         {
-            TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
-            if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Left"), Val->AsArray()[0]);
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Top"), Val->AsArray()[1]);
+            /// 智能反射检测：检查 Slot 是否有原生的 Position 属性
+            bool bHasNativeProp = false;
+            if (FoundWidget->Slot)
+            {
+                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Position")) != nullptr;
             }
-            NormalizedProperties->RemoveField(Key);
+
+            /// 仅在没有原生属性时降级到 Canvas 别名处理
+            if (!bHasNativeProp)
+            {
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
+                if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                    NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Left"), Val->AsArray()[0]);
+                    NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Top"), Val->AsArray()[1]);
+                    NormalizedProperties->RemoveField(Key);
+                }
+            }
         }
         else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
         {
-            TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
-            if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Right"), Val->AsArray()[0]);
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Bottom"), Val->AsArray()[1]);
+            /// 智能反射检测：检查 Slot 是否有原生的 Size 属性
+            bool bHasNativeProp = false;
+            if (FoundWidget->Slot)
+            {
+                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Size")) != nullptr;
             }
-            NormalizedProperties->RemoveField(Key);
+
+            /// 仅在没有原生属性时降级到 Canvas 别名处理
+            if (!bHasNativeProp)
+            {
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
+                if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                    NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Right"), Val->AsArray()[0]);
+                    NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Bottom"), Val->AsArray()[1]);
+                    NormalizedProperties->RemoveField(Key);
+                }
+            }
         }
         else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
         {
-            NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->Values[Key]);
-            NormalizedProperties->RemoveField(Key);
+            /// 智能反射检测：检查 Slot 是否有原生的 Anchors 属性
+            bool bHasNativeProp = false;
+            if (FoundWidget->Slot)
+            {
+                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Anchors")) != nullptr;
+            }
+
+            /// 仅在没有原生属性时降级到 Canvas 别名处理
+            if (!bHasNativeProp)
+            {
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->Values[Key]);
+                NormalizedProperties->RemoveField(Key);
+            }
         }
         else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
         {
-            NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->Values[Key]);
-            NormalizedProperties->RemoveField(Key);
+            /// 智能反射检测：检查 Slot 是否有原生的 Alignment 属性
+            bool bHasNativeProp = false;
+            if (FoundWidget->Slot)
+            {
+                bHasNativeProp = FoundWidget->Slot->GetClass()->FindPropertyByName(TEXT("Alignment")) != nullptr;
+            }
+
+            /// 仅在没有原生属性时降级到 Canvas 别名处理
+            if (!bHasNativeProp)
+            {
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->Values[Key]);
+                NormalizedProperties->RemoveField(Key);
+            }
         }
     }
 
