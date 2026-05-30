@@ -22,8 +22,8 @@
 
 DEFINE_LOG_CATEGORY(LogUmgGet);
 
-// --- Helper function for recursive JSON export ---
-static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
+// --- Helper function for recursive simplified tree export ---
+static TSharedPtr<FJsonObject> ExportWidgetToSimplifiedTree(UWidget* Widget)
 {
     if (!Widget)
     {
@@ -31,74 +31,8 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
     }
 
     TSharedPtr<FJsonObject> WidgetJson = MakeShared<FJsonObject>();
-    UObject* DefaultWidget = Widget->GetClass()->GetDefaultObject();
-
     WidgetJson->SetStringField(TEXT("widget_name"), Widget->GetName());
-    WidgetJson->SetStringField(TEXT("widget_class"), Widget->GetClass()->GetPathName());
-
-    TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
-    
-    for (TFieldIterator<FProperty> PropIt(Widget->GetClass()); PropIt; ++PropIt)
-    {
-        FProperty* Property = *PropIt;
-        bool bIsEditorOnly = false;
-#if WITH_EDITOR
-        bIsEditorOnly = Property->HasAnyPropertyFlags(CPF_EditorOnly);
-#endif
-
-        if (Property->HasAnyPropertyFlags(CPF_Edit) && !Property->HasAnyPropertyFlags(CPF_Transient) && !bIsEditorOnly)
-        {
-            void* ValuePtr = Property->ContainerPtrToValuePtr<void>(Widget);
-            void* DefaultValuePtr = Property->ContainerPtrToValuePtr<void>(DefaultWidget);
-
-            if (!Property->Identical(ValuePtr, DefaultValuePtr))
-            {
-                if (Property->GetFName() == TEXT("Slot"))
-                {
-                    if (UPanelSlot* SlotObject = Cast<UPanelSlot>(CastField<FObjectProperty>(Property)->GetObjectPropertyValue_InContainer(Widget)))
-                    {
-                        TSharedPtr<FJsonObject> SlotPropertiesJson = MakeShared<FJsonObject>();
-                        UObject* DefaultSlotObject = SlotObject->GetClass()->GetDefaultObject();
-
-                        for (TFieldIterator<FProperty> SlotPropIt(SlotObject->GetClass()); SlotPropIt; ++SlotPropIt)
-                        {
-                            FProperty* SlotProperty = *SlotPropIt;
-                            if ((SlotProperty->GetFName() != TEXT("Content")) && (SlotProperty->GetFName() != TEXT("Parent")) && SlotProperty->HasAnyPropertyFlags(CPF_Edit) && !SlotProperty->HasAnyPropertyFlags(CPF_Transient))
-                            {
-                                void* SlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(SlotObject);
-                                void* DefaultSlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(DefaultSlotObject);
-                                if (!SlotProperty->Identical(SlotValuePtr, DefaultSlotValuePtr))
-                                {
-                                    TSharedPtr<FJsonValue> SlotPropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(SlotProperty, SlotValuePtr);
-                                    if (SlotPropertyJsonValue.IsValid())
-                                    {
-                                        SlotPropertiesJson->SetField(SlotProperty->GetName(), SlotPropertyJsonValue);
-                                    }
-                                }
-                            }
-                        }
-                        if(SlotPropertiesJson->Values.Num() > 0)
-                        {
-                           PropertiesJson->SetObjectField(TEXT("Slot"), SlotPropertiesJson);
-                        }
-                    }
-                }
-                else
-                {
-                    TSharedPtr<FJsonValue> PropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(Property, ValuePtr);
-                    if (PropertyJsonValue.IsValid())
-                    {
-                        PropertiesJson->SetField(Property->GetName(), PropertyJsonValue);
-                    }
-                }
-            }
-        }
-    }
-    
-    if (PropertiesJson->Values.Num() > 0)
-    {
-        WidgetJson->SetObjectField(TEXT("properties"), PropertiesJson);
-    }
+    WidgetJson->SetStringField(TEXT("widget_type"), Widget->GetClass()->GetName());
 
     TArray<TSharedPtr<FJsonValue>> ChildrenJsonArray;
     if (UPanelWidget* PanelWidget = Cast<UPanelWidget>(Widget))
@@ -107,7 +41,7 @@ static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
         {
             if (UWidget* ChildWidget = PanelWidget->GetChildAt(i))
             {
-                TSharedPtr<FJsonObject> ChildJson = ExportWidgetToJson(ChildWidget);
+                TSharedPtr<FJsonObject> ChildJson = ExportWidgetToSimplifiedTree(ChildWidget);
                 if (ChildJson.IsValid())
                 {
                     ChildrenJsonArray.Add(MakeShared<FJsonValueObject>(ChildJson));
@@ -158,10 +92,30 @@ FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
     {
         UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'. The UMG asset might be empty."), *WidgetBlueprint->GetPathName());
         // Return an empty JSON object for an empty tree
-        return TEXT("{\"widget_name\": \"EmptyWidgetTree\", \"widget_class\": \"/Script/UMG.UserWidget\", \"children\": []}");
+        return TEXT("{\"widget_name\":\"EmptyWidgetTree\",\"widget_type\":\"UserWidget\",\"children\":[]}");
     }
 
-    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToJson(RootWidget);
+    UWidget* ScopedRootWidget = RootWidget;
+    if (GEditor)
+    {
+        if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+        {
+            const FString TargetWidgetName = AttentionSubsystem->GetTargetWidget();
+            if (!TargetWidgetName.IsEmpty())
+            {
+                if (UWidget* TargetWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetWidgetName)))
+                {
+                    ScopedRootWidget = TargetWidget;
+                }
+                else
+                {
+                    UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Target widget '%s' not found in '%s'. Falling back to root widget."), *TargetWidgetName, *WidgetBlueprint->GetPathName());
+                }
+            }
+        }
+    }
+
+    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToSimplifiedTree(ScopedRootWidget);
     if (!RootJsonObject.IsValid())
     {
         UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to convert root widget of '%s' to FJsonObject."), *WidgetBlueprint->GetPathName());

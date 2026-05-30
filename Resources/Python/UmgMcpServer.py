@@ -466,11 +466,12 @@ async def set_target_widget(widget_name: str) -> Dict[str, Any]:
 #  Category: Sensing
 # =============================================================================
 
-@register_tool("get_widget_tree", "Returns a simplified widget tree from the current target widget scope.")
+@register_tool("get_widget_tree", "Returns a simplified widget hierarchy from the current target widget scope with only widget_name/widget_type/children.")
 async def get_widget_tree() -> Dict[str, Any]:
     """
-    Retrieves a simplified, streamlined widget tree style view, starting
-    from the current target widget node and descending through its children.
+    Retrieves a simplified widget hierarchy starting from the current target
+    widget node and descending through children. The output only includes
+    widget_name, widget_type, and children fields.
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)

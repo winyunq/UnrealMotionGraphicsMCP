@@ -18,7 +18,7 @@ class UMGGet:
 
     # --- Sensing ---
     def get_widget_tree(self) -> Dict[str, Any]:
-        """Retrieves a simplified tree-style hierarchy from the current target widget downward."""
+        """Retrieves simplified hierarchy data (widget_name/widget_type/children) from the current target widget downward."""
         return self.client.send_command("get_widget_tree", {})
 
     def query_widget_properties(self, widget_name: str, properties: List[str]) -> Dict[str, Any]:

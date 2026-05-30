@@ -208,6 +208,8 @@ flowchart LR
 
 ## API 实现状态
 
+`get_widget_tree` 返回以当前目标 Widget 作用域为根的精简层级，仅包含 `widget_name`、`widget_type` 和 `children` 字段（不返回详细属性）；`export_umg_to_json` 才是完整 JSON 导出路径。
+
 | 分类               | API 名称                         | 状态  |
 | ------------------ | -------------------------------- | :---: |
 | **上下文与注意力** | `get_target_umg_asset`           |   ✅   |

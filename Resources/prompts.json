@@ -45,7 +45,7 @@
         },
         {
             "name": "get_widget_tree",
-            "description": "Returns a simplified, streamlined widget tree (CLI `tree`-like) from the current target widget node downward. Use this to find `parent_name` for creation.",
+            "description": "Returns a simplified widget hierarchy from the current target widget node downward, containing only `widget_name`, `widget_type`, and `children`. Use this to find `parent_name` for creation.",
             "enabled": true,
             "category": "UMG"
         },
