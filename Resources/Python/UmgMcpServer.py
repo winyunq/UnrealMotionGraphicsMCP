@@ -469,7 +469,7 @@ async def set_target_widget(widget_name: str) -> Dict[str, Any]:
 @register_tool("get_widget_tree", "Returns a simplified widget tree from the current target widget scope.")
 async def get_widget_tree() -> Dict[str, Any]:
     """
-    Retrieves a simplified, streamlined widget tree (tree-command style), starting
+    Retrieves a simplified, streamlined widget tree style view, starting
     from the current target widget node and descending through its children.
     """
     conn = get_unreal_connection()
