@@ -208,12 +208,16 @@ This project has been developed with significant assistance from **Gemini, an AI
 
 ---
 
-## API Status
+## UMG Widget API Status
+
+This section tracks the current **UMG widget API** surface. Use `set_target_umg_asset` to lock the active UMG target (optionally with a widget focus), then call widget tools without repeating the asset path.  
+`get_widget_tree` returns a simplified tree-style hierarchy (CLI `tree`-like) rooted at the current target widget scope, while `export_umg_to_json` is the full JSON export path.
 
 | Category                    | API Name                         | Status |
 | --------------------------- | -------------------------------- | :----: |
 | **Context & Attention**     | `get_target_umg_asset`           |   ✅    |
 |                             | `set_target_umg_asset`           |   ✅    |
+|                             | `set_target_widget`              |   ✅    |
 |                             | `get_last_edited_umg_asset`      |   ✅    |
 |                             | `get_recently_edited_umg_assets` |   ✅    |
 | **Sensing & Querying**      | `get_widget_tree`                |   ✅    |

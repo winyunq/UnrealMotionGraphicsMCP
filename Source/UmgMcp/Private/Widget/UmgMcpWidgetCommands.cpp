@@ -43,6 +43,8 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     if (Command == TEXT("get_widget_tree"))
     {
         UUmgGetSubsystem* GetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
+        // get_widget_tree is intentionally a simplified, streamlined tree-style view
+        // that starts at the current target widget node and expands downward only.
         FString WidgetTreeJsonString = GetSubsystem->GetWidgetTree(TargetBlueprint);
         if (!WidgetTreeJsonString.IsEmpty())
         {
@@ -288,6 +290,5 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
 
     return Response;
 }
-
 
 

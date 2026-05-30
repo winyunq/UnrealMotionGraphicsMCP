@@ -33,7 +33,7 @@
         },
         {
             "name": "set_target_umg_asset",
-            "description": "Sets the **Active Target**. Updates the Cache. If the asset doesn't exist, it will be CREATED.",
+            "description": "Sets the **Active Target** UMG asset (and optional widget focus). Updates the Cache. If the asset doesn't exist, it will be CREATED.",
             "enabled": true,
             "category": "UMG"
         },
@@ -45,7 +45,7 @@
         },
         {
             "name": "get_widget_tree",
-            "description": "Fetches the full hierarchy of widgets. Use this to find `parent_name` for creation.",
+            "description": "Returns a simplified, streamlined widget tree (CLI `tree`-like) from the current target widget node downward. Use this to find `parent_name` for creation.",
             "enabled": true,
             "category": "UMG"
         },
