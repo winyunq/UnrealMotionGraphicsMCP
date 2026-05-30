@@ -23,6 +23,7 @@
 DEFINE_LOG_CATEGORY(LogUmgGet);
 
 // --- Helper function for recursive simplified tree export ---
+// Exports only widget_name, widget_type, and children fields (no property payloads).
 static TSharedPtr<FJsonObject> ExportWidgetToSimplifiedTree(UWidget* Widget)
 {
     if (!Widget)
@@ -81,21 +82,38 @@ FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
         return FString();
     }
     
-    if (!WidgetBlueprint->WidgetTree)
+    UWidgetTree* WidgetTree = WidgetBlueprint->WidgetTree;
+    if (!WidgetTree)
     {
         UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: WidgetTree is null in UWidgetBlueprint '%s'."), *WidgetBlueprint->GetPathName());
         return FString();
     }
 
-    UWidget* RootWidget = WidgetBlueprint->WidgetTree->RootWidget;
+    UWidget* RootWidget = WidgetTree->RootWidget;
     if (!RootWidget)
     {
         UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'. The UMG asset might be empty."), *WidgetBlueprint->GetPathName());
-        // Return an empty JSON object for an empty tree
-        return TEXT("{\"widget_name\":\"EmptyWidgetTree\",\"widget_type\":\"UserWidget\",\"children\":[]}");
+        TSharedPtr<FJsonObject> EmptyTreeJson = MakeShared<FJsonObject>();
+        EmptyTreeJson->SetStringField(TEXT("widget_name"), TEXT("EmptyWidgetTree"));
+        EmptyTreeJson->SetStringField(TEXT("widget_type"), TEXT("Empty"));
+        EmptyTreeJson->SetArrayField(TEXT("children"), {});
+
+        FString EmptyJsonString;
+        TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> EmptyWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&EmptyJsonString);
+        if (FJsonSerializer::Serialize(EmptyTreeJson.ToSharedRef(), EmptyWriter))
+        {
+            EmptyWriter->Close();
+            return EmptyJsonString;
+        }
+        else
+        {
+            EmptyWriter->Close();
+            UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to serialize empty widget tree JSON for '%s'."), *WidgetBlueprint->GetPathName());
+            return FString();
+        }
     }
 
-    UWidget* ScopedRootWidget = RootWidget;
+    UWidget* TreeStartWidget = RootWidget;
     if (GEditor)
     {
         if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
@@ -103,19 +121,19 @@ FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
             const FString TargetWidgetName = AttentionSubsystem->GetTargetWidget();
             if (!TargetWidgetName.IsEmpty())
             {
-                if (UWidget* TargetWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetWidgetName)))
+                if (UWidget* TargetWidget = WidgetTree->FindWidget(FName(*TargetWidgetName)))
                 {
-                    ScopedRootWidget = TargetWidget;
+                    TreeStartWidget = TargetWidget;
                 }
                 else
                 {
-                    UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Target widget '%s' not found in '%s'. Falling back to root widget."), *TargetWidgetName, *WidgetBlueprint->GetPathName());
+                    UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Target widget '%s' not found in '%s'. Falling back to root widget. Verify widget name or call the set_target_widget command with a valid widget."), *TargetWidgetName, *WidgetBlueprint->GetPathName());
                 }
             }
         }
     }
 
-    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToSimplifiedTree(ScopedRootWidget);
+    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToSimplifiedTree(TreeStartWidget);
     if (!RootJsonObject.IsValid())
     {
         UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to convert root widget of '%s' to FJsonObject."), *WidgetBlueprint->GetPathName());
