@@ -47,8 +47,37 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
     bool DeleteWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName);
 
+    /**
+     * @brief Moves a widget under a new target parent container.
+     *
+     * This acts as a standard drag-and-drop operation. The widget is removed from its 
+     * old parent and appended to the target parent container.
+     *
+     * @param WidgetBlueprint The target widget blueprint containing the widgets.
+     * @param TargetParentName The name of the parent container to move the widget into.
+     *                         If empty, the current active target focused in attention subsystem is used.
+     * @param WidgetName The name of the widget to be moved. Cannot be empty.
+     * @return True if the widget was successfully moved, false otherwise.
+     **/
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
-    bool ReparentWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& NewParentName);
+    bool MoveWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& TargetParentName, const FString& WidgetName);
+
+    /**
+     * @brief Performs in-place replacement by wrapping a widget with a new container.
+     *
+     * This function creates a new container widget based on the provided JSON specification,
+     * inserts it into the target widget's original hierarchy position (inheriting the target's 
+     * original parent slot layout properties), and parents the target widget under it.
+     *
+     * @param WidgetBlueprint The target widget blueprint.
+     * @param WidgetName The name of the widget to wrap. If empty, the current active target is used.
+     * @param NewParentWidgetJson A JSON string describing the new parent container to construct.
+     *                            Must contain at least "widget_class" / "widget_type".
+     * @return TArray<FString> An array containing the names of widgets whose slot/layout parameters 
+     *                         were structurally affected (usually includes target widget and wrapper).
+     **/
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
+    TArray<FString> ReparentWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& NewParentWidgetJson);
 
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
     bool SaveAsset(class UWidgetBlueprint* WidgetBlueprint);

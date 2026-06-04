@@ -472,31 +472,31 @@ bool UUmgSetSubsystem::DeleteWidget(UWidgetBlueprint* WidgetBlueprint, const FSt
     return false;
 }
 
-bool UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& NewParentName)
+bool UUmgSetSubsystem::MoveWidget(UWidgetBlueprint* WidgetBlueprint, const FString& TargetParentName, const FString& WidgetName)
 {
     if (!WidgetBlueprint)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Received a null WidgetBlueprint."));
+        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: Received a null WidgetBlueprint."));
         return false;
     }
 
     if (!WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
+        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
         return false;
     }
 
     UWidget* WidgetToMove = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
     if (!WidgetToMove)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to find widget to move: '%s'"), *WidgetName);
+        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: Failed to find widget to move: '%s'"), *WidgetName);
         return false;
     }
 
-    UPanelWidget* NewParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*NewParentName)));
+    UPanelWidget* NewParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetParentName)));
     if (!NewParentWidget)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to find new parent widget: '%s'"), *NewParentName);
+        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: Failed to find target parent widget: '%s'"), *TargetParentName);
         return false;
     }
 
@@ -510,6 +510,216 @@ bool UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBlueprint, const F
     NewParentWidget->AddChild(WidgetToMove);
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     return true;
+}
+
+TArray<FString> UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& NewParentWidgetJson)
+{
+    TArray<FString> AffectedWidgets;
+
+    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Received null WidgetBlueprint or WidgetTree."));
+        return AffectedWidgets;
+    }
+
+    UWidget* WidgetToReplace = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
+    if (!WidgetToReplace)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to find widget to replace '%s'."), *WidgetName);
+        return AffectedWidgets;
+    }
+
+    // 1. Parse JSON
+    TSharedPtr<FJsonObject> JsonObj;
+    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(NewParentWidgetJson);
+    if (!FJsonSerializer::Deserialize(Reader, JsonObj) || !JsonObj.IsValid())
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to parse NewParentWidgetJson."));
+        return AffectedWidgets;
+    }
+
+    FString WidgetClassPath;
+    if (!JsonObj->TryGetStringField(TEXT("widget_class"), WidgetClassPath) && !JsonObj->TryGetStringField(TEXT("widget_type"), WidgetClassPath))
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: JSON is missing 'widget_class' or 'widget_type'."));
+        return AffectedWidgets;
+    }
+
+    // 2. Resolve widget class
+    UClass* WidgetClass = nullptr;
+    if (WidgetClassPath.Contains(TEXT("/")))
+    {
+        WidgetClass = FindObject<UClass>(nullptr, *WidgetClassPath);
+        if (!WidgetClass) WidgetClass = LoadObject<UClass>(nullptr, *WidgetClassPath);
+    }
+    
+    if (!WidgetClass)
+    {
+        FString NativePath = FString::Printf(TEXT("/Script/UMG.%s"), *WidgetClassPath);
+        WidgetClass = FindObject<UClass>(nullptr, *NativePath);
+        if (!WidgetClass) WidgetClass = LoadObject<UClass>(nullptr, *NativePath);
+    }
+
+    if (!WidgetClass)
+    {
+        FString NativePathU = FString::Printf(TEXT("/Script/UMG.U%s"), *WidgetClassPath);
+        WidgetClass = FindObject<UClass>(nullptr, *NativePathU);
+        if (!WidgetClass) WidgetClass = LoadObject<UClass>(nullptr, *NativePathU);
+    }
+
+    if (!WidgetClass)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to find or load class '%s'."), *WidgetClassPath);
+        return AffectedWidgets;
+    }
+
+    // 3. Prevent child loss: block conversion from container to non-container ONLY when there are active children
+    bool bOldIsPanel = WidgetToReplace->IsA(UPanelWidget::StaticClass());
+    bool bNewIsPanel = WidgetClass->IsChildOf(UPanelWidget::StaticClass());
+
+    if (bOldIsPanel && !bNewIsPanel)
+    {
+        UPanelWidget* OldPanel = Cast<UPanelWidget>(WidgetToReplace);
+        if (OldPanel && OldPanel->GetChildrenCount() > 0)
+        {
+            UE_LOG(LogUmgSet, Warning, TEXT("ReparentWidget: Cannot convert container '%s' to non-container '%s' because it has %d active children. Operation aborted to prevent child loss. Please delete children using delete_widget first if this is intentional."), *WidgetName, *WidgetClass->GetName(), OldPanel->GetChildrenCount());
+            return AffectedWidgets;
+        }
+    }
+
+    // 4. Generate name for the new widget (use temp name during replacement to avoid name conflict)
+    FString CustomName;
+    JsonObj->TryGetStringField(TEXT("widget_name"), CustomName);
+    FString TargetName = CustomName;
+    if (TargetName.IsEmpty() || TargetName == WidgetName)
+    {
+        FString CleanClassName = WidgetClass->GetName();
+        if (CleanClassName.StartsWith(TEXT("U")))
+        {
+            CleanClassName.RemoveAt(0);
+        }
+        TargetName = FString::Printf(TEXT("%s_TempConvert"), *CleanClassName);
+    }
+
+    // 5. Construct new widget
+    WidgetBlueprint->Modify();
+    UWidget* NewWidget = WidgetBlueprint->WidgetTree->ConstructWidget<UWidget>(WidgetClass, FName(*TargetName));
+    if (!NewWidget)
+    {
+        UE_LOG(LogUmgSet, Error, TEXT("ReparentWidget: Failed to construct new widget."));
+        return AffectedWidgets;
+    }
+
+    // 6. Inherit properties (Union merge)
+    TSharedPtr<FJsonObject> OldPropsJson = UUmgFileTransformation::ExportWidgetToJson(WidgetToReplace);
+    if (OldPropsJson.IsValid() && OldPropsJson->HasField(TEXT("properties")))
+    {
+        TSharedPtr<FJsonObject> OldProps = OldPropsJson->GetObjectField(TEXT("properties"));
+        // Remove Slot from widget properties since slot properties will be inherited separately
+        OldProps->RemoveField(TEXT("Slot"));
+        FJsonObjectConverter::JsonObjectToUStruct(OldProps.ToSharedRef(), NewWidget->GetClass(), NewWidget, 0, 0);
+    }
+
+    // Apply any new properties specified in the JSON parameter
+    const TSharedPtr<FJsonObject>* PropertiesJsonObjPtr;
+    if (JsonObj->TryGetObjectField(TEXT("properties"), PropertiesJsonObjPtr))
+    {
+        TSharedPtr<FJsonObject> TargetProps = *PropertiesJsonObjPtr;
+        TargetProps->RemoveField(TEXT("Slot"));
+        FJsonObjectConverter::JsonObjectToUStruct(TargetProps.ToSharedRef(), NewWidget->GetClass(), NewWidget, 0, 0);
+    }
+
+    // 7. Setup parent relation & inherit slot layout properties
+    UPanelWidget* OldParent = Cast<UPanelWidget>(WidgetToReplace->GetParent());
+    UPanelSlot* OldSlot = WidgetToReplace->Slot;
+
+    if (OldParent)
+    {
+        OldParent->Modify();
+        int32 ChildIndex = OldParent->GetChildIndex(WidgetToReplace);
+        
+        // Temporarily detach old widget
+        OldParent->RemoveChild(WidgetToReplace);
+        
+        // Insert new widget at the same index
+        UPanelSlot* NewSlot = nullptr;
+        if (ChildIndex != INDEX_NONE)
+        {
+            NewSlot = OldParent->InsertChildAt(ChildIndex, NewWidget);
+        }
+        else
+        {
+            NewSlot = OldParent->AddChild(NewWidget);
+        }
+
+        // Inherit slot settings if slot types are identical
+        if (OldSlot && NewSlot && OldSlot->GetClass() == NewSlot->GetClass())
+        {
+            TSharedRef<FJsonObject> TempSlotJson = MakeShared<FJsonObject>();
+            if (FJsonObjectConverter::UStructToJsonObject(OldSlot->GetClass(), OldSlot, TempSlotJson, 0, 0))
+            {
+                NewSlot->Modify();
+                FJsonObjectConverter::JsonObjectToUStruct(TempSlotJson, NewSlot->GetClass(), NewSlot, 0, 0);
+            }
+        }
+    }
+    else
+    {
+        // Root widget swap case
+        if (WidgetBlueprint->WidgetTree->RootWidget == WidgetToReplace)
+        {
+            WidgetBlueprint->WidgetTree->RootWidget = NewWidget;
+        }
+    }
+
+    // 8. Transfer children if both are containers
+    if (bOldIsPanel && bNewIsPanel)
+    {
+        UPanelWidget* OldPanel = Cast<UPanelWidget>(WidgetToReplace);
+        UPanelWidget* NewPanel = Cast<UPanelWidget>(NewWidget);
+        if (OldPanel && NewPanel)
+        {
+            OldPanel->Modify();
+            NewPanel->Modify();
+            
+            TArray<UWidget*> ChildrenToMove;
+            for (int32 i = 0; i < OldPanel->GetChildrenCount(); ++i)
+            {
+                if (UWidget* Child = OldPanel->GetChildAt(i))
+                {
+                    ChildrenToMove.Add(Child);
+                }
+            }
+            
+            OldPanel->ClearChildren();
+            for (UWidget* Child : ChildrenToMove)
+            {
+                NewPanel->AddChild(Child);
+                AffectedWidgets.Add(Child->GetName()); // Children slots are rebuilt
+            }
+        }
+    }
+
+    // 9. Destroy old widget
+    WidgetBlueprint->WidgetTree->RemoveWidget(WidgetToReplace);
+
+    // 10. Revert name (rename the temporary name back to original widget name if no new custom name was specified)
+    FString FinalName = CustomName;
+    if (FinalName.IsEmpty() || FinalName == WidgetName)
+    {
+        NewWidget->Rename(*WidgetName, nullptr, REN_DontCreateRedirectors | REN_ForceNoResetLoaders);
+        FinalName = WidgetName;
+    }
+
+    if (NewWidget->bIsVariable)
+    {
+        WidgetBlueprint->WidgetVariableNameToGuidMap.Add(NewWidget->GetFName(), FGuid::NewGuid());
+    }
+
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
+    AffectedWidgets.Add(FinalName); // The converted widget itself is affected
+
+    return AffectedWidgets;
 }
 
 bool UUmgSetSubsystem::SaveAsset(UWidgetBlueprint* WidgetBlueprint)

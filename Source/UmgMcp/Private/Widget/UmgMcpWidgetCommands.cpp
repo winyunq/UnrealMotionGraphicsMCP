@@ -246,25 +246,100 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     else if (Command == TEXT("reparent_widget"))
     {
         UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-        FString WidgetName, NewParentName;
-        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName) && Params->TryGetStringField(TEXT("new_parent_name"), NewParentName))
+        FString WidgetName, NewParentWidgetJsonStr;
+
+        // 1. widget_name is optional (fallback to focused target)
+        if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) || WidgetName.IsEmpty())
         {
-            if (SetSubsystem->ReparentWidget(TargetBlueprint, WidgetName, NewParentName))
+            if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
             {
-                Response->SetBoolField(TEXT("success"), true);
-                Response->SetStringField(TEXT("widget"), WidgetName);
-                Response->SetStringField(TEXT("new_parent"), NewParentName);
+                WidgetName = AttentionSubsystem->GetTargetWidget();
             }
-            else
+        }
+
+        if (WidgetName.IsEmpty())
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Widget name to reparent was not specified and no active widget target was focused."));
+            return Response;
+        }
+
+        // 2. new_parent_widget (JSON object or string) is required
+        const TSharedPtr<FJsonObject>* NewParentWidgetPtr = nullptr;
+        if (Params->TryGetObjectField(TEXT("new_parent_widget"), NewParentWidgetPtr))
+        {
+            TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&NewParentWidgetJsonStr);
+            FJsonSerializer::Serialize(NewParentWidgetPtr->ToSharedRef(), Writer);
+            Writer->Close();
+        }
+        else if (Params->TryGetStringField(TEXT("new_parent_widget"), NewParentWidgetJsonStr))
+        {
+            // already a string
+        }
+
+        if (NewParentWidgetJsonStr.IsEmpty())
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Missing required parameter 'new_parent_widget' (JSON container specification)."));
+            return Response;
+        }
+
+        TArray<FString> Affected = SetSubsystem->ReparentWidget(TargetBlueprint, WidgetName, NewParentWidgetJsonStr);
+        if (Affected.Num() > 0)
+        {
+            Response->SetBoolField(TEXT("success"), true);
+            TArray<TSharedPtr<FJsonValue>> AffectedJsonArray;
+            for (const FString& Name : Affected)
             {
-                Response->SetBoolField(TEXT("success"), false);
-                Response->SetStringField(TEXT("error"), TEXT("Failed to reparent widget. Check logs for details."));
+                AffectedJsonArray.Add(MakeShared<FJsonValueString>(Name));
             }
+            Response->SetArrayField(TEXT("affected_widgets"), AffectedJsonArray);
         }
         else
         {
             Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'new_parent_name' parameter."));
+            Response->SetStringField(TEXT("error"), TEXT("Failed to reparent/wrap widget. Check logs for details."));
+        }
+    }
+    else if (Command == TEXT("move_widget"))
+    {
+        UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
+        FString TargetParentName, WidgetName;
+
+        // 1. widget_name (dragged widget) is required
+        if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) || WidgetName.IsEmpty())
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Missing required parameter 'widget_name' (the widget to move)."));
+            return Response;
+        }
+
+        // 2. target (parent to move to) is optional (fallback to focused target)
+        if (!Params->TryGetStringField(TEXT("target"), TargetParentName) || TargetParentName.IsEmpty())
+        {
+            if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+            {
+                TargetParentName = AttentionSubsystem->GetTargetWidget();
+            }
+        }
+
+        if (TargetParentName.IsEmpty())
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Target parent name was not specified and no active widget target was focused."));
+            return Response;
+        }
+
+        if (SetSubsystem->MoveWidget(TargetBlueprint, TargetParentName, WidgetName))
+        {
+            Response->SetBoolField(TEXT("success"), true);
+            Response->SetStringField(TEXT("widget"), WidgetName);
+            Response->SetStringField(TEXT("new_parent"), TargetParentName);
+        }
+        else
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Failed to move widget. Check logs for details."));
         }
     }
     else if (Command == TEXT("save_asset"))
