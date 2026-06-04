@@ -35,14 +35,21 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
             ResultJson->SetBoolField(TEXT("success"), false);
         }
     }
-    else if (CommandType == TEXT("apply_json_to_umg"))
+    else if (CommandType == TEXT("apply_json_to_umg") || CommandType == TEXT("apply_layout"))
     {
         FString AssetPath;
+        Params->TryGetStringField(TEXT("asset_path"), AssetPath); // Optional, can fall back to target asset
+
         FString JsonData;
-        if (Params->TryGetStringField(TEXT("asset_path"), AssetPath) && Params->TryGetStringField(TEXT("json_data"), JsonData))
+        if (Params->TryGetStringField(TEXT("json_data"), JsonData) ||
+            Params->TryGetStringField(TEXT("layout_json"), JsonData) ||
+            Params->TryGetStringField(TEXT("layout_content"), JsonData))
         {
             FString TargetWidgetName;
-            Params->TryGetStringField(TEXT("widget_name"), TargetWidgetName); // Optional
+            if (!Params->TryGetStringField(TEXT("widget_name"), TargetWidgetName))
+            {
+                Params->TryGetStringField(TEXT("target_widget_name"), TargetWidgetName);
+            }
 
             bool bSuccess = UUmgFileTransformation::ApplyJsonStringToUmgAsset(AssetPath, JsonData, TargetWidgetName);
             if (bSuccess)
@@ -62,7 +69,7 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
         }
         else
         {
-            ResultJson->SetStringField(TEXT("error"), TEXT("Missing 'asset_path' or 'json_data' parameter for apply_json_to_umg."));
+            ResultJson->SetStringField(TEXT("error"), TEXT("Missing 'json_data', 'layout_json', or 'layout_content' parameter for layout application."));
             ResultJson->SetBoolField(TEXT("success"), false);
         }
     }

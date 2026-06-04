@@ -435,7 +435,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         }
         // File Transformation Commands
         else if (CommandType == TEXT("export_umg_to_json") ||
-                 CommandType == TEXT("apply_json_to_umg"))
+                 CommandType == TEXT("apply_json_to_umg") ||
+                 CommandType == TEXT("apply_layout"))
         {
             ResultJson = FileTransformationCommands->HandleCommand(CommandType, Params);
         }

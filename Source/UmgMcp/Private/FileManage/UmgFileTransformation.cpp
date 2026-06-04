@@ -334,12 +334,27 @@ bool UUmgFileTransformation::ApplyJsonStringToUmgAsset(const FString& AssetPath,
 // This function is executed on the game thread to ensure thread safety when dealing with UObjects.
 bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
 {
-    // 0. Handle default workspace: if AssetPath is empty, use default path
+    // 0. Handle default workspace: if AssetPath is empty, try to get target from attention subsystem
     FString FinalAssetPath = AssetPath;
     if (FinalAssetPath.IsEmpty() || FinalAssetPath.TrimStartAndEnd().IsEmpty())
     {
-        FinalAssetPath = TEXT("/Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP");
-        UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: No asset path provided. Using default workspace: '%s'."), *FinalAssetPath);
+        if (GEditor)
+        {
+            if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+            {
+                FinalAssetPath = AttentionSubsystem->GetTargetUmgAsset();
+            }
+        }
+        
+        if (FinalAssetPath.IsEmpty() || FinalAssetPath.TrimStartAndEnd().IsEmpty())
+        {
+            FinalAssetPath = TEXT("/Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP");
+            UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: No asset path provided or active target found. Using default workspace: '%s'."), *FinalAssetPath);
+        }
+        else
+        {
+            UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: No asset path provided. Using active target asset: '%s'."), *FinalAssetPath);
+        }
     }
     
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Starting for asset '%s'."), *FinalAssetPath);
