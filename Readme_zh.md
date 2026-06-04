@@ -206,28 +206,29 @@ flowchart LR
 
 ---
 
-## API 实现状态
+## UMG Widget API Status
 
-| 分类               | API 名称                         | 状态  |
-| ------------------ | -------------------------------- | :---: |
-| **上下文与注意力** | `get_target_umg_asset`           |   ✅   |
-|                    | `set_target_umg_asset`           |   ✅   |
-|                    | `get_last_edited_umg_asset`      |   ✅   |
-|                    | `get_recently_edited_umg_assets` |   ✅   |
-| **感知与查询**     | `get_widget_tree`                |   ✅   |
-|                    | `query_widget_properties`        |   ✅   |
-|                    | `get_creatable_widget_types`     |   ✅   |
-|                    | `get_widget_schema`              |   ✅   |
-|                    | `get_layout_data`                |   ✅   |
-|                    | `check_widget_overlap`           |   ✅   |
-| **动作与修改**     | `create_widget`                  |   ✅   |
-|                    | `delete_widget`                  |   ✅   |
-|                    | `set_widget_properties`          |   ✅   |
-|                    | `reparent_widget`                |   ✅   |
-|                    | `save_asset`                     |   ✅   |
-| **文件转换**       | `export_umg_to_json`             |   ✅   |
-|                    | `apply_json_to_umg`              |   ✅   |
-|                    | `apply_layout`                   |   ✅   |
+| 分类               | API 名称                         | 状态  | 描述                                                                                            |
+| ------------------ | -------------------------------- | :---: | ----------------------------------------------------------------------------------------------- |
+| **上下文与注意力** | `get_target_umg_asset`           |   ✅   | 获取当前活跃的 UMG 资产路径。                                                                   |
+|                    | `set_target_umg_asset`           |   ✅   | 设置或创建 UMG 资产。                                                                           |
+|                    | `get_last_edited_umg_asset`      |   ✅   | 获取上次编辑的 UMG 资产路径。                                                                   |
+|                    | `get_recently_edited_umg_assets` |   ✅   | 获取最近编辑的 UMG 资产列表。                                                                   |
+| **感知与查询**     | `get_widget_tree`                |   ✅   | 获取widget target下的子节点，以tree形式展示(非常节约Token)                                      |
+|                    | `query_widget_properties`        |   ✅   | 查询单个控件的具体属性。                                                                        |
+|                    | `get_creatable_widget_types`     |   ✅   | 获取所有可创建的控件类名列表。                                                                  |
+|                    | `get_widget_schema`              |   ✅   | 获取指定控件类的属性 Schema。                                                                   |
+|                    | `get_layout_data`                |   ✅   | 获取所有控件在视口中的布局包围盒坐标。                                                          |
+|                    | `check_widget_overlap`           |   ✅   | 校验当前资产中的控件是否存在空间重叠。                                                          |
+| **动作与修改**     | `create_widget`                  |   ✅   | 创建新的控件。                                                                                  |
+|                    | `delete_widget`                  |   ✅   | 删除指定的控件。                                                                                |
+|                    | `set_widget_properties`          |   ✅   | 设置控件属性（widget_name 缺省时默认修改当前 target；采用并集覆盖写入）。                        |
+|                    | `reparent_widget`                |   ✅   | 重新指定控件的父级。                                                                            |
+|                    | `save_asset`                     |   ✅   | 保存当前活跃的 UMG 资产。                                                                       |
+| **文件转换**       | `export_umg_to_json`             |   ✅   | 将 UMG 资产反编译导出为 JSON 格式。                                                             |
+|                    | `apply_json_to_umg`              |   ✅   | 将 JSON 布局定义应用到 UMG 资产中。                                                             |
+|                    | `apply_layout`                   |   ✅   | 应用整盘的 HTML/JSON 布局代码。                                                                 |
+
 
 ## UMG 蓝图 (Blueprint) API 实现状态 (New)
 

@@ -208,28 +208,29 @@ This project has been developed with significant assistance from **Gemini, an AI
 
 ---
 
-## API Status
+## UMG Widget API Status
 
-| Category                    | API Name                         | Status |
-| --------------------------- | -------------------------------- | :----: |
-| **Context & Attention**     | `get_target_umg_asset`           |   ✅    |
-|                             | `set_target_umg_asset`           |   ✅    |
-|                             | `get_last_edited_umg_asset`      |   ✅    |
-|                             | `get_recently_edited_umg_assets` |   ✅    |
-| **Sensing & Querying**      | `get_widget_tree`                |   ✅    |
-|                             | `query_widget_properties`        |   ✅    |
-|                             | `get_creatable_widget_types`     |   ✅    |
-|                             | `get_widget_schema`              |   ✅    |
-|                             | `get_layout_data`                |   ✅    |
-|                             | `check_widget_overlap`           |   ✅    |
-| **Actions & Modifications** | `create_widget`                  |   ✅    |
-|                             | `delete_widget`                  |   ✅    |
-|                             | `set_widget_properties`          |   ✅    |
-|                             | `reparent_widget`                |   ✅    |
-|                             | `save_asset`                     |   ✅    |
-| **File Transformation**     | `export_umg_to_json`             |   ✅    |
-|                             | `apply_json_to_umg`              |   ✅    |
-|                             | `apply_layout`                   |   ✅    |
+| Category                    | API Name                         | Status | Description                                                                                      |
+| --------------------------- | -------------------------------- | :----: | ------------------------------------------------------------------------------------------------ |
+| **Context & Attention**     | `get_target_umg_asset`           |   ✅    | Get the current active UMG asset path.                                                           |
+|                             | `set_target_umg_asset`           |   ✅    | Set or create the target UMG asset.                                                             |
+|                             | `get_last_edited_umg_asset`      |   ✅    | Get the last edited UMG asset path.                                                              |
+|                             | `get_recently_edited_umg_assets` |   ✅    | Get recently edited UMG assets list.                                                             |
+| **Sensing & Querying**      | `get_widget_tree`                |   ✅    | Get children of the widget target and show them as a tree (highly token-efficient).              |
+|                             | `query_widget_properties`        |   ✅    | Query specific properties of a widget.                                                           |
+|                             | `get_creatable_widget_types`     |   ✅    | Get all creatable widget classes.                                                                |
+|                             | `get_widget_schema`              |   ✅    | Get the property schema of a widget class.                                                       |
+|                             | `get_layout_data`                |   ✅    | Get screen-space layout bounding boxes.                                                          |
+|                             | `check_widget_overlap`           |   ✅    | Check if there are overlapping widgets.                                                          |
+| **Actions & Modifications** | `create_widget`                  |   ✅    | Create a new widget.                                                                             |
+|                             | `delete_widget`                  |   ✅    | Delete a widget.                                                                                 |
+|                             | `set_widget_properties`          |   ✅    | Set properties of a widget (omit widget_name to target active widget; union write fashion).      |
+|                             | `reparent_widget`                |   ✅    | Move a widget to a new parent.                                                                   |
+|                             | `save_asset`                     |   ✅    | Save the active UMG asset.                                                                       |
+| **File Transformation**     | `export_umg_to_json`             |   ✅    | Export UMG asset to JSON format.                                                                 |
+|                             | `apply_json_to_umg`              |   ✅    | Apply JSON layout definition to UMG asset.                                                       |
+|                             | `apply_layout`                   |   ✅    | Apply bulk layout definition (HTML/JSON).                                                        |
+
 
 ## UMG Blueprint API Status (New)
 

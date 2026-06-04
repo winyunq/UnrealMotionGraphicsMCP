@@ -43,24 +43,11 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     if (Command == TEXT("get_widget_tree"))
     {
         UUmgGetSubsystem* GetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
-        FString WidgetTreeJsonString = GetSubsystem->GetWidgetTree(TargetBlueprint);
-        if (!WidgetTreeJsonString.IsEmpty())
+        FString WidgetTreeString = GetSubsystem->GetWidgetTree(TargetBlueprint);
+        if (!WidgetTreeString.IsEmpty())
         {
-            TSharedPtr<FJsonObject> WidgetTreeJson = MakeShareable(new FJsonObject());
-            TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(WidgetTreeJsonString);
-            if (FJsonSerializer::Deserialize(Reader, WidgetTreeJson) && WidgetTreeJson.IsValid())
-            {
-                Response->SetBoolField(TEXT("success"), true);
-                for (const auto& Field : WidgetTreeJson->Values)
-                {
-                    Response->SetField(Field.Key, Field.Value);
-                }
-            }
-            else
-            {
-                Response->SetBoolField(TEXT("success"), false);
-                Response->SetStringField(TEXT("error"), TEXT("Failed to parse widget tree JSON from subsystem."));
-            }
+            Response->SetBoolField(TEXT("success"), true);
+            Response->SetStringField(TEXT("widget_tree"), WidgetTreeString);
         }
         else
         {
@@ -190,8 +177,23 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
         FString WidgetName;
         const TSharedPtr<FJsonObject>* PropertiesPtr;
-        if (Params->TryGetStringField(TEXT("widget_name"), WidgetName) && Params->TryGetObjectField(TEXT("properties"), PropertiesPtr))
+        if (Params->TryGetObjectField(TEXT("properties"), PropertiesPtr))
         {
+            if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) || WidgetName.IsEmpty())
+            {
+                if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+                {
+                    WidgetName = AttentionSubsystem->GetTargetWidget();
+                }
+            }
+
+            if (WidgetName.IsEmpty())
+            {
+                Response->SetBoolField(TEXT("success"), false);
+                Response->SetStringField(TEXT("error"), TEXT("Widget name was not specified and no active widget target was focused. Please specify 'widget_name' or focus a target."));
+                return Response;
+            }
+
             TSharedPtr<FJsonObject> PropertiesJsonObject = *PropertiesPtr;
             FString PropertiesJsonString;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&PropertiesJsonString);
@@ -215,7 +217,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         else
         {
             Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'properties' (as a JSON object) parameter."));
+            Response->SetStringField(TEXT("error"), TEXT("Missing 'properties' (as a JSON object) parameter."));
         }
     }
     else if (Command == TEXT("delete_widget"))

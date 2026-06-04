@@ -139,6 +139,38 @@ void UUmgGetSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
+static void BuildBStyleWidgetTree(UWidget* Widget, int32 Depth, FString& OutTreeString)
+{
+    if (!Widget)
+    {
+        return;
+    }
+
+    FString WidgetName = Widget->GetName();
+    FString WidgetClass = Widget->GetClass()->GetName();
+
+    if (Depth == 1)
+    {
+        OutTreeString += FString::Printf(TEXT("  %s [%s]\n"), *WidgetName, *WidgetClass);
+    }
+    else if (Depth >= 2)
+    {
+        FString Indent = FString::ChrN(Depth * 2, ' ');
+        OutTreeString += FString::Printf(TEXT("%s- %s [%s]\n"), *Indent, *WidgetName, *WidgetClass);
+    }
+
+    if (UPanelWidget* PanelWidget = Cast<UPanelWidget>(Widget))
+    {
+        for (int32 i = 0; i < PanelWidget->GetChildrenCount(); ++i)
+        {
+            if (UWidget* ChildWidget = PanelWidget->GetChildAt(i))
+            {
+                BuildBStyleWidgetTree(ChildWidget, Depth + 1, OutTreeString);
+            }
+        }
+    }
+}
+
 FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
 {
     if (!WidgetBlueprint)
@@ -147,39 +179,25 @@ FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
         return FString();
     }
     
+    FString TreeString;
+    FString BlueprintName = WidgetBlueprint->GetName();
+    TreeString += FString::Printf(TEXT("%s [WidgetBlueprint]\n"), *BlueprintName);
+
     if (!WidgetBlueprint->WidgetTree)
     {
         UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: WidgetTree is null in UWidgetBlueprint '%s'."), *WidgetBlueprint->GetPathName());
-        return FString();
+        return TreeString;
     }
 
     UWidget* RootWidget = WidgetBlueprint->WidgetTree->RootWidget;
     if (!RootWidget)
     {
         UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'. The UMG asset might be empty."), *WidgetBlueprint->GetPathName());
-        // Return an empty JSON object for an empty tree
-        return TEXT("{\"widget_name\": \"EmptyWidgetTree\", \"widget_class\": \"/Script/UMG.UserWidget\", \"children\": []}");
+        return TreeString;
     }
 
-    TSharedPtr<FJsonObject> RootJsonObject = ExportWidgetToJson(RootWidget);
-    if (!RootJsonObject.IsValid())
-    {
-        UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to convert root widget of '%s' to FJsonObject."), *WidgetBlueprint->GetPathName());
-        return FString();
-    }
-
-    FString JsonString;
-    // Use condensed print policy to reduce data size
-    TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> JsonWriter = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&JsonString);
-    if (FJsonSerializer::Serialize(RootJsonObject.ToSharedRef(), JsonWriter))
-    {
-        JsonWriter->Close();
-        return JsonString;
-    }
-    
-    JsonWriter->Close();
-    UE_LOG(LogUmgGet, Error, TEXT("GetWidgetTree: Failed to serialize FJsonObject to string for asset '%s'."), *WidgetBlueprint->GetPathName());
-    return FString();
+    BuildBStyleWidgetTree(RootWidget, 1, TreeString);
+    return TreeString;
 }
 
 FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const TArray<FString>& Properties)
