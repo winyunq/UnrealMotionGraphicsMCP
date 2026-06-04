@@ -3,6 +3,8 @@
 #include "Editor.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "WidgetBlueprint.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Widget.h"
 #include "Logging/LogMacros.h"
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
@@ -228,7 +230,17 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
     }
     
     // Fallback to history
-    return GetLastEditedUMGAsset();
+    FString LastEdited = GetLastEditedUMGAsset();
+    if (!LastEdited.IsEmpty())
+    {
+        return LastEdited;
+    }
+
+    // Auto-create default asset if nothing exists
+    FString DefaultPath = TEXT("/Game/DefaultAndCanBeDelete.DefaultAndCanBeDelete");
+    UE_LOG(LogUmgAttention, Log, TEXT("GetTargetUmgAsset: No active or historical UMG target found. Auto-generating default workspace: %s"), *DefaultPath);
+    MutableThis->SetTargetUmgAsset(DefaultPath);
+    return DefaultPath;
 }
 
 UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
@@ -304,7 +316,24 @@ void UUmgAttentionSubsystem::SetTargetWidget(const FString& WidgetName)
 
 FString UUmgAttentionSubsystem::GetTargetWidget() const
 {
-	return CurrentWidgetName;
+	UWidgetBlueprint* WidgetBP = GetCachedTargetWidgetBlueprint();
+
+	// If a focused widget is set, check if it still exists in the tree (has not been deleted)
+	if (!CurrentWidgetName.IsEmpty() && WidgetBP && WidgetBP->WidgetTree)
+	{
+		if (WidgetBP->WidgetTree->FindWidget(FName(*CurrentWidgetName)))
+		{
+			return CurrentWidgetName;
+		}
+	}
+
+	// Fallback to the RootWidget if unassigned or deleted
+	if (WidgetBP && WidgetBP->WidgetTree && WidgetBP->WidgetTree->RootWidget)
+	{
+		return WidgetBP->WidgetTree->RootWidget->GetName();
+	}
+
+	return TEXT("Root");
 }
 
 void UUmgAttentionSubsystem::SetTargetGraph(const FString& GraphName)

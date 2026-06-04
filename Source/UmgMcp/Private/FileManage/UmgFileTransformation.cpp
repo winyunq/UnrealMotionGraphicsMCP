@@ -2,6 +2,7 @@
 #include "FileManage/UmgFileTransformation.h"
 #include "UmgMcp.h"
 #include "PropertyNameMappings.h"
+#include "FileManage/UmgAttentionSubsystem.h"
 
 #include "Blueprint/UserWidget.h"
 #include "WidgetBlueprint.h"
@@ -26,6 +27,41 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
 static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& WidgetJson, UWidget* TargetWidget);
 static void MergeChildrenAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget);
 static void UpsertWidgetFromJsonAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget);
+
+struct FJsonWidgetInfo
+{
+    FString Name;
+    FString ClassPath;
+    FString ParentName;
+};
+
+static void CollectJsonWidgetInfos(const TSharedPtr<FJsonObject>& JsonNode, const FString& ParentName, TMap<FString, FJsonWidgetInfo>& OutMap)
+{
+    if (!JsonNode.IsValid()) return;
+
+    FJsonWidgetInfo Info;
+    JsonNode->TryGetStringField(TEXT("widget_name"), Info.Name);
+    JsonNode->TryGetStringField(TEXT("widget_class"), Info.ClassPath);
+    Info.ParentName = ParentName;
+
+    if (!Info.Name.IsEmpty())
+    {
+        OutMap.Add(Info.Name, Info);
+    }
+
+    const TArray<TSharedPtr<FJsonValue>>* ChildrenArray = nullptr;
+    if (JsonNode->TryGetArrayField(TEXT("children"), ChildrenArray))
+    {
+        for (const auto& ChildVal : *ChildrenArray)
+        {
+            const TSharedPtr<FJsonObject>* ChildObj;
+            if (ChildVal->TryGetObject(ChildObj))
+            {
+                CollectJsonWidgetInfos(*ChildObj, Info.Name, OutMap);
+            }
+        }
+    }
+}
 
 bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName);
 
@@ -397,47 +433,119 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Preparing to apply JSON. Target: %s"), *TargetWidgetName);
 
     UWidget* TargetWidget = nullptr;
-    bool bReplacingRoot = true;
+    FString ResolvedTargetName = TargetWidgetName;
 
-    if (!TargetWidgetName.IsEmpty() && !TargetWidgetName.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
+    if (ResolvedTargetName.IsEmpty() || ResolvedTargetName.Equals(TEXT("Root"), ESearchCase::IgnoreCase) || ResolvedTargetName.Equals(TEXT("None"), ESearchCase::IgnoreCase))
     {
-        TargetWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetWidgetName));
-        if (!TargetWidget)
+        if (GEditor)
         {
-             UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Target widget '%s' to replace not found."), *TargetWidgetName);
-             return false;
+            if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+            {
+                ResolvedTargetName = AttentionSubsystem->GetTargetWidget();
+            }
         }
-        bReplacingRoot = false;
     }
 
-    // Delete-aware append mode: delete_widget exists in this API directory, so apply_json_to_umg
-    // must never implicitly remove widgets. We only upsert/append; explicit deletions stay on the delete tool.
-    const bool bAppendOnlyWrites = true;
-
-    if (bAppendOnlyWrites)
+    if (!ResolvedTargetName.IsEmpty() && !ResolvedTargetName.Equals(TEXT("Root"), ESearchCase::IgnoreCase) && !ResolvedTargetName.Equals(TEXT("None"), ESearchCase::IgnoreCase))
     {
-        if (bReplacingRoot)
+        TargetWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*ResolvedTargetName));
+    }
+
+    if (!TargetWidget)
+    {
+        TargetWidget = WidgetBlueprint->WidgetTree->RootWidget;
+    }
+
+    // Collect JSON widgets and validate structure consistency
+    TMap<FString, FJsonWidgetInfo> JsonWidgets;
+    CollectJsonWidgetInfos(RootJsonObject, TargetWidget ? TargetWidget->GetName() : TEXT("Root"), JsonWidgets);
+
+    bool bHasOverlap = false;
+    for (const auto& Pair : JsonWidgets)
+    {
+        const FString& WidgetName = Pair.Key;
+        const FJsonWidgetInfo& JsonInfo = Pair.Value;
+
+        UWidget* ExistingWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
+        if (ExistingWidget)
         {
-            if (!WidgetBlueprint->WidgetTree->RootWidget)
+            bHasOverlap = true;
+
+            // Class matching check
+            FString ExistingClassPath = ExistingWidget->GetClass()->GetPathName();
+            if (!JsonInfo.ClassPath.IsEmpty() && !JsonInfo.ClassPath.Equals(ExistingClassPath, ESearchCase::IgnoreCase))
             {
-                UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: No existing root widget. Creating from JSON (append-only mode)."));
-                UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
-                if (!NewRootWidget)
-                {
-                    UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget from JSON for asset '%s'."), *FinalAssetPath);
-                    return false;
-                }
-                WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
-                UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New root widget set: %s"), *NewRootWidget->GetName());
+                UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Class mismatch for widget '%s' (JSON: %s, Existing: %s)."),
+                    *WidgetName, *JsonInfo.ClassPath, *ExistingClassPath);
+                return false;
             }
-            else
+
+            // Parent matching check
+            UWidget* ExistingParent = ExistingWidget->GetParent();
+            FString ExistingParentName = ExistingParent ? ExistingParent->GetName() : TEXT("Root");
+            FString ExpectedParentName = JsonInfo.ParentName;
+
+            bool bParentMatches = false;
+            if (ExpectedParentName.Equals(ExistingParentName, ESearchCase::IgnoreCase))
             {
-                UpsertWidgetFromJsonAppendOnly(RootJsonObject, WidgetBlueprint->WidgetTree, WidgetBlueprint->WidgetTree->RootWidget);
+                bParentMatches = true;
             }
+            else if (ExpectedParentName.Equals(TEXT("Root"), ESearchCase::IgnoreCase) && !ExistingParent)
+            {
+                bParentMatches = true;
+            }
+            else if (TargetWidget && ExpectedParentName.Equals(TargetWidget->GetName(), ESearchCase::IgnoreCase) && ExistingParent == TargetWidget)
+            {
+                bParentMatches = true;
+            }
+
+            if (!bParentMatches)
+            {
+                UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Parent mismatch for widget '%s' (JSON parent: %s, UE tree parent: %s)."),
+                    *WidgetName, *ExpectedParentName, *ExistingParentName);
+                return false;
+            }
+        }
+    }
+
+    if (!bHasOverlap)
+    {
+        // Unique names: apply_layout occurs on TargetWidget (which defaults to RootWidget)
+        if (!TargetWidget)
+        {
+            UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Unique names and no root. Creating root widget."));
+            UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
+            if (!NewRootWidget)
+            {
+                UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget."));
+                return false;
+            }
+            WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
         }
         else
         {
+            UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Unique names. Creating subtree under TargetWidget '%s'."), *TargetWidget->GetName());
+            UWidget* NewSubtree = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, TargetWidget);
+            if (!NewSubtree)
+            {
+                UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create subtree under TargetWidget '%s'."), *TargetWidget->GetName());
+                return false;
+            }
+        }
+    }
+    else
+    {
+        // Overlap: incremental tree merging
+        if (TargetWidget)
+        {
             UpsertWidgetFromJsonAppendOnly(RootJsonObject, WidgetBlueprint->WidgetTree, TargetWidget);
+        }
+        else
+        {
+            // Fallback for empty tree (should not happen since we have overlap)
+            UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
+            if (!NewRootWidget) return false;
+            WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
         }
     }
 
