@@ -1307,7 +1307,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::AppendTimeSlice(const TSharedP
         int32 WidgetKeys = 0;
         for (const auto& PropertyPair : PropertiesObj->Values)
         {
-            FString PropertyName = PropertyPair.Key;
+            FString PropertyName(PropertyPair.Key.ToView());
             TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
             KeyObj->SetNumberField(TEXT("time"), TimeSeconds);
             KeyObj->SetField(TEXT("value"), PropertyPair.Value);

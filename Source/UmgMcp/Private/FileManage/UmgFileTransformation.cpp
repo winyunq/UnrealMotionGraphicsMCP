@@ -9,6 +9,9 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
 #include "Components/PanelSlot.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/VerticalBox.h"
+#include "Async/Async.h"
 #include "Components/TextBlock.h"
 #include "JsonObjectConverter.h"
 #include "Serialization/JsonWriter.h"
@@ -20,13 +23,294 @@
 #include "Async/Async.h"
 #include "WidgetBlueprintFactory.h"
 #include "AssetRegistry/AssetRegistryModule.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-
+#include "Preview/UmgPreviewRenderUtils.h"
+#include "Widget/UmgMcpPropertyJsonUtils.h"
 // Forward declarations
 static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* ParentWidget);
 static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& WidgetJson, UWidget* TargetWidget);
 static void MergeChildrenAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget);
 static void UpsertWidgetFromJsonAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, UWidgetTree* WidgetTree, UWidget* TargetWidget);
+
+/** Extract slot properties from properties.Slot and/or top-level SlotData. */
+static TSharedPtr<FJsonObject> ExtractSlotPropsFromWidgetJson(const TSharedPtr<FJsonObject>& WidgetJson)
+{
+    if (!WidgetJson.IsValid())
+    {
+        return nullptr;
+    }
+
+    TSharedPtr<FJsonObject> SlotProps = nullptr;
+
+    const TSharedPtr<FJsonObject>* SlotDataPtr = nullptr;
+    if (WidgetJson->TryGetObjectField(TEXT("SlotData"), SlotDataPtr) ||
+        WidgetJson->TryGetObjectField(TEXT("slot_data"), SlotDataPtr))
+    {
+        SlotProps = MakeShared<FJsonObject>(*(*SlotDataPtr));
+    }
+
+    const TSharedPtr<FJsonObject>* PropertiesJsonObjPtr = nullptr;
+    if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObjPtr))
+    {
+        const TSharedPtr<FJsonObject>* SlotObjPtr = nullptr;
+        if ((*PropertiesJsonObjPtr)->TryGetObjectField(TEXT("Slot"), SlotObjPtr))
+        {
+            if (!SlotProps.IsValid())
+            {
+                SlotProps = MakeShared<FJsonObject>(*(*SlotObjPtr));
+            }
+            else
+            {
+                for (const auto& Pair : (*SlotObjPtr)->Values)
+                {
+                    SlotProps->SetField(Pair.Key, Pair.Value);
+                }
+            }
+        }
+    }
+
+    return SlotProps;
+}
+
+/** Apply slot JSON to the widget's current UPanelSlot with parent-type validation. */
+static bool ApplySlotPropertiesToWidget(UWidget* Widget, const TSharedPtr<FJsonObject>& SlotProps, FString* OutRejectedKeys = nullptr)
+{
+    if (!Widget || !SlotProps.IsValid() || !Widget->Slot)
+    {
+        return true;
+    }
+
+    UPanelSlot* Slot = Widget->Slot;
+    TSharedPtr<FJsonObject> NormalizedSlotProps = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(SlotProps);
+
+    // Canvas aliases: Size[w,h] -> LayoutData.Offsets.Right/Bottom; Anchors -> LayoutData.Anchors
+    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
+    {
+        TSharedPtr<FJsonValue> SizeVal = NormalizedSlotProps->TryGetField(TEXT("Size"));
+        if (SizeVal.IsValid() && SizeVal->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& Arr = SizeVal->AsArray();
+            if (Arr.Num() >= 2)
+            {
+                TSharedPtr<FJsonObject> LayoutData = NormalizedSlotProps->HasField(TEXT("LayoutData"))
+                    ? MakeShared<FJsonObject>(*NormalizedSlotProps->GetObjectField(TEXT("LayoutData")))
+                    : MakeShared<FJsonObject>();
+
+                TSharedPtr<FJsonObject> Offsets = LayoutData->HasField(TEXT("Offsets"))
+                    ? MakeShared<FJsonObject>(*LayoutData->GetObjectField(TEXT("Offsets")))
+                    : MakeShared<FJsonObject>();
+
+                if (!Offsets->HasField(TEXT("Left"))) { Offsets->SetNumberField(TEXT("Left"), 0.0); }
+                if (!Offsets->HasField(TEXT("Top"))) { Offsets->SetNumberField(TEXT("Top"), 0.0); }
+                Offsets->SetNumberField(TEXT("Right"), Arr[0]->AsNumber());
+                Offsets->SetNumberField(TEXT("Bottom"), Arr[1]->AsNumber());
+                LayoutData->SetObjectField(TEXT("Offsets"), Offsets);
+                NormalizedSlotProps->SetObjectField(TEXT("LayoutData"), LayoutData);
+                NormalizedSlotProps->RemoveField(TEXT("Size"));
+            }
+        }
+
+        if (NormalizedSlotProps->HasField(TEXT("Anchors")))
+        {
+            TSharedPtr<FJsonObject> LayoutData = NormalizedSlotProps->HasField(TEXT("LayoutData"))
+                ? MakeShared<FJsonObject>(*NormalizedSlotProps->GetObjectField(TEXT("LayoutData")))
+                : MakeShared<FJsonObject>();
+            LayoutData->SetObjectField(TEXT("Anchors"), NormalizedSlotProps->GetObjectField(TEXT("Anchors")));
+            NormalizedSlotProps->SetObjectField(TEXT("LayoutData"), LayoutData);
+            NormalizedSlotProps->RemoveField(TEXT("Anchors"));
+        }
+    }
+
+    // Whitelist filter per slot class
+    static TMap<FString, TSet<FString>> AllowedSlotKeys;
+    if (AllowedSlotKeys.Num() == 0)
+    {
+        AllowedSlotKeys.Add(TEXT("VerticalBoxSlot"), {"Size", "Padding", "HorizontalAlignment", "VerticalAlignment"});
+        AllowedSlotKeys.Add(TEXT("HorizontalBoxSlot"), {"Size", "Padding", "HorizontalAlignment", "VerticalAlignment"});
+        AllowedSlotKeys.Add(TEXT("CanvasPanelSlot"), {"LayoutData", "Alignment", "AutoSize", "ZOrder"});
+        AllowedSlotKeys.Add(TEXT("GridSlot"), {"Row", "Column", "RowSpan", "ColumnSpan", "HorizontalAlignment", "VerticalAlignment", "Padding"});
+        AllowedSlotKeys.Add(TEXT("OverlaySlot"), {"HorizontalAlignment", "VerticalAlignment", "Padding"});
+        AllowedSlotKeys.Add(TEXT("ScrollBoxSlot"), {"Padding", "HorizontalAlignment", "VerticalAlignment"});
+        AllowedSlotKeys.Add(TEXT("WrapBoxSlot"), {"Padding", "FillEmptySpace", "HorizontalAlignment", "VerticalAlignment"});
+    }
+
+    const FString SlotClassName = Slot->GetClass()->GetName();
+    if (const TSet<FString>* Allowed = AllowedSlotKeys.Find(SlotClassName))
+    {
+        TSharedPtr<FJsonObject> Filtered = MakeShared<FJsonObject>();
+        TArray<FString> Rejected;
+        for (const auto& Pair : NormalizedSlotProps->Values)
+        {
+            const FString Key(Pair.Key.ToView());
+            if (Allowed->Contains(Key))
+            {
+                Filtered->SetField(Pair.Key, Pair.Value);
+            }
+            else
+            {
+                Rejected.Add(Key);
+            }
+        }
+        if (Rejected.Num() > 0)
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("ApplySlotProperties: Rejected keys for '%s' (%s): %s"),
+                *Widget->GetName(), *SlotClassName, *FString::Join(Rejected, TEXT(", ")));
+            if (OutRejectedKeys)
+            {
+                *OutRejectedKeys = FString::Join(Rejected, TEXT(", "));
+            }
+        }
+        NormalizedSlotProps = Filtered;
+    }
+
+    const bool bHasCanvasOnly =
+        NormalizedSlotProps->HasField(TEXT("Anchors")) ||
+        NormalizedSlotProps->HasField(TEXT("LayoutData")) ||
+        NormalizedSlotProps->HasField(TEXT("Position"));
+
+    if (bHasCanvasOnly && !Cast<UCanvasPanelSlot>(Slot))
+    {
+        UE_LOG(LogUmgMcp, Warning,
+            TEXT("ApplySlotProperties: Discarding canvas-only keys for '%s' (slot type: %s)."),
+            *Widget->GetName(), *Slot->GetClass()->GetName());
+
+        TSharedPtr<FJsonObject> Filtered = MakeShared<FJsonObject>();
+        for (const auto& Pair : NormalizedSlotProps->Values)
+        {
+            const FString Key(Pair.Key.ToView());
+            if (Key != TEXT("Anchors") && Key != TEXT("LayoutData") && Key != TEXT("Position") && Key != TEXT("Alignment"))
+            {
+                Filtered->SetField(Pair.Key, Pair.Value);
+            }
+        }
+        NormalizedSlotProps = Filtered;
+    }
+
+    if (NormalizedSlotProps->Values.Num() == 0)
+    {
+        return true;
+    }
+
+    Slot->Modify();
+    if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), Slot->GetClass(), Slot, 0, 0))
+    {
+        UE_LOG(LogUmgMcp, Warning,
+            TEXT("ApplySlotProperties: Issues applying slot properties to '%s' (slot: %s)."),
+            *Widget->GetName(), *Slot->GetClass()->GetName());
+        return false;
+    }
+    return true;
+}
+
+static FApplyJsonToUmgResult MakeApplyError(const FString& Message)
+{
+    FApplyJsonToUmgResult Result;
+    Result.bSuccess = false;
+    Result.bApplied = false;
+    Result.ErrorMessage = Message;
+    return Result;
+}
+
+static FApplyJsonToUmgResult MakeApplySuccess(TArray<FString>&& Reparented = {})
+{
+    FApplyJsonToUmgResult Result;
+    Result.bSuccess = true;
+    Result.bApplied = true;
+    Result.ReparentedWidgets = MoveTemp(Reparented);
+    return Result;
+}
+
+struct FDeferredReparent
+{
+    FString WidgetName;
+    FString ExpectedParentName;
+};
+
+static bool ExecuteReparent(UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const FString& ExpectedParentName, FString& OutError)
+{
+    UWidget* WidgetToMove = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
+    if (!WidgetToMove)
+    {
+        OutError = FString::Printf(TEXT("Widget '%s' not found for reparent."), *WidgetName);
+        return false;
+    }
+
+    UPanelWidget* NewParent = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*ExpectedParentName)));
+    if (!NewParent)
+    {
+        OutError = FString::Printf(TEXT("Expected parent '%s' not found for widget '%s'."), *ExpectedParentName, *WidgetName);
+        return false;
+    }
+
+    if (WidgetToMove->GetParent() == NewParent)
+    {
+        return true;
+    }
+
+    WidgetBlueprint->Modify();
+    if (UPanelWidget* OldParent = WidgetToMove->GetParent())
+    {
+        OldParent->RemoveChild(WidgetToMove);
+    }
+    NewParent->AddChild(WidgetToMove);
+    return true;
+}
+
+static bool IsSingleChildPanelWidget(UWidget* Widget)
+{
+    if (!Widget)
+    {
+        return false;
+    }
+    const FName ClassName = Widget->GetClass()->GetFName();
+    return ClassName == FName(TEXT("Button")) || ClassName == FName(TEXT("Border")) || ClassName == FName(TEXT("SizeBox"));
+}
+
+static UPanelWidget* EnsureSingleChildCapacity(UPanelWidget* ParentPanel, UWidgetTree* WidgetTree)
+{
+    if (!ParentPanel || !WidgetTree || !IsSingleChildPanelWidget(ParentPanel))
+    {
+        return ParentPanel;
+    }
+
+    if (ParentPanel->GetChildrenCount() == 0)
+    {
+        return ParentPanel;
+    }
+
+    if (UVerticalBox* ExistingVBox = Cast<UVerticalBox>(ParentPanel->GetChildAt(0)))
+    {
+        return ExistingVBox;
+    }
+
+    WidgetTree->Modify();
+    ParentPanel->Modify();
+
+    const FString WrapperName = ParentPanel->GetName() + TEXT("_Wrap");
+    UVerticalBox* Wrapper = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), *WrapperName);
+    if (!Wrapper)
+    {
+        UE_LOG(LogUmgMcp, Warning, TEXT("EnsureSingleChildCapacity: Failed to create wrapper for '%s'."), *ParentPanel->GetName());
+        return ParentPanel;
+    }
+
+    TArray<UWidget*> ChildrenToMove;
+    for (int32 Idx = 0; Idx < ParentPanel->GetChildrenCount(); ++Idx)
+    {
+        ChildrenToMove.Add(ParentPanel->GetChildAt(Idx));
+    }
+
+    for (UWidget* Child : ChildrenToMove)
+    {
+        ParentPanel->RemoveChild(Child);
+        Wrapper->AddChild(Child);
+    }
+
+    ParentPanel->AddChild(Wrapper);
+    UE_LOG(LogUmgMcp, Log, TEXT("EnsureSingleChildCapacity: Wrapped %d children of '%s' into '%s'."),
+        ChildrenToMove.Num(), *ParentPanel->GetName(), *WrapperName);
+
+    return Wrapper;
+}
 
 struct FJsonWidgetInfo
 {
@@ -63,7 +347,7 @@ static void CollectJsonWidgetInfos(const TSharedPtr<FJsonObject>& JsonNode, cons
     }
 }
 
-bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName);
+FApplyJsonToUmgResult ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName);
 
 TSharedPtr<FJsonObject> UUmgFileTransformation::NormalizeJsonKeysToPascalCase(const TSharedPtr<FJsonObject>& SourceJson)
 {
@@ -76,9 +360,9 @@ TSharedPtr<FJsonObject> UUmgFileTransformation::NormalizeJsonKeysToPascalCase(co
     
     for (const auto& Pair : SourceJson->Values)
     {
-        FString OriginalKey = Pair.Key;
+        FString OriginalKey(Pair.Key.ToView());
         FString NormalizedKey;
-        
+
         // Handle dotted keys (e.g. "slot.position")
         if (OriginalKey.Contains(TEXT(".")))
         {
@@ -99,7 +383,7 @@ TSharedPtr<FJsonObject> UUmgFileTransformation::NormalizeJsonKeysToPascalCase(co
         {
             UE_LOG(LogUmgMcp, Verbose, TEXT("NormalizeJsonKeys: '%s' → '%s'"), *OriginalKey, *NormalizedKey);
         }
-        
+
         // Recursively process nested objects and arrays
         TSharedPtr<FJsonValue> Value = Pair.Value;
         if (Value->Type == EJson::Object)
@@ -174,46 +458,14 @@ TSharedPtr<FJsonObject> UUmgFileTransformation::ExportWidgetToJson(UWidget* Widg
             {
                 if (Property->GetFName() == TEXT("Slot"))
                 {
-                    if (UPanelSlot* SlotObject = Cast<UPanelSlot>(CastField<FObjectProperty>(Property)->GetObjectPropertyValue_InContainer(Widget)))
+                    if (TSharedPtr<FJsonObject> SlotPropertiesJson = FUmgMcpPropertyJsonUtils::SerializePanelSlotProperties(Widget->Slot))
                     {
-                        TSharedPtr<FJsonObject> SlotPropertiesJson = MakeShared<FJsonObject>();
-                        UObject* DefaultSlotObject = SlotObject->GetClass()->GetDefaultObject();
-
-                        for (TFieldIterator<FProperty> SlotPropIt(SlotObject->GetClass()); SlotPropIt; ++SlotPropIt)
-                        {
-                            FProperty* SlotProperty = *SlotPropIt;
-                            FName SlotPropertyName = SlotProperty->GetFName();
-
-                            if (SlotPropertyName == TEXT("Content") || SlotPropertyName == TEXT("Parent"))
-                            {
-                                continue;
-                            }
-
-                            if (SlotProperty->HasAnyPropertyFlags(CPF_Edit) && !SlotProperty->HasAnyPropertyFlags(CPF_Transient))
-                            {
-                                void* SlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(SlotObject);
-                                void* DefaultSlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(DefaultSlotObject);
-
-                                if (!SlotProperty->Identical(SlotValuePtr, DefaultSlotValuePtr))
-                                {
-                                    TSharedPtr<FJsonValue> SlotPropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(SlotProperty, SlotValuePtr);
-                                    if (SlotPropertyJsonValue.IsValid())
-                                    {
-                                        SlotPropertiesJson->SetField(SlotProperty->GetName(), SlotPropertyJsonValue);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if(SlotPropertiesJson->Values.Num() > 0)
-                        {
-                           PropertiesJson->SetObjectField(TEXT("Slot"), SlotPropertiesJson);
-                        }
+                        PropertiesJson->SetObjectField(TEXT("Slot"), SlotPropertiesJson);
                     }
                 }
                 else
                 {
-                    TSharedPtr<FJsonValue> PropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(Property, ValuePtr);
+                    TSharedPtr<FJsonValue> PropertyJsonValue = FUmgMcpPropertyJsonUtils::PropertyToJsonValue(Property, ValuePtr);
                     if (PropertyJsonValue.IsValid())
                     {
                         PropertiesJson->SetField(Property->GetName(), PropertyJsonValue);
@@ -315,25 +567,36 @@ FString UUmgFileTransformation::ExportUmgAssetToJsonString(const FString& AssetP
     }
 }
 
-bool UUmgFileTransformation::ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
+FApplyJsonToUmgResult UUmgFileTransformation::ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
 {
-    // Dispatch the task to the game thread asynchronously ("fire and forget").
-    // The original implementation used a blocking wait which could cause the editor to freeze or deadlock.
-    // We capture parameters by value to ensure they are valid when the task eventually executes.
-    FFunctionGraphTask::CreateAndDispatchWhenReady([AssetPath, JsonData, TargetWidgetName]()
+    if (IsInGameThread())
     {
-        ApplyJsonToUmgAsset_GameThread(AssetPath, JsonData, TargetWidgetName);
-    }, TStatId(), nullptr, ENamedThreads::GameThread);
+        return ApplyJsonToUmgAsset_GameThread(AssetPath, JsonData, TargetWidgetName);
+    }
 
-    // Return true to indicate the task was successfully dispatched.
-    // The operation itself runs in the background and the result will be visible in the editor.
-    return true;
+    TPromise<FApplyJsonToUmgResult> Promise;
+    TFuture<FApplyJsonToUmgResult> Future = Promise.GetFuture();
+
+    AsyncTask(ENamedThreads::GameThread, [AssetPath, JsonData, TargetWidgetName, Promise = MoveTemp(Promise)]() mutable
+    {
+        Promise.SetValue(ApplyJsonToUmgAsset_GameThread(AssetPath, JsonData, TargetWidgetName));
+    });
+
+    if (Future.WaitFor(FTimespan::FromSeconds(60.0)))
+    {
+        return Future.Get();
+    }
+
+    return MakeApplyError(TEXT("Apply JSON timed out waiting for GameThread (60s)."));
 }
 
 
 // This function is executed on the game thread to ensure thread safety when dealing with UObjects.
-bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
+FApplyJsonToUmgResult ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName)
 {
+    TArray<FString> ReparentedWidgets;
+    TArray<FDeferredReparent> PendingReparents;
+
     // 0. Handle default workspace: if AssetPath is empty, try to get target from attention subsystem
     FString FinalAssetPath = AssetPath;
     if (FinalAssetPath.IsEmpty() || FinalAssetPath.TrimStartAndEnd().IsEmpty())
@@ -345,7 +608,7 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
                 FinalAssetPath = AttentionSubsystem->GetTargetUmgAsset();
             }
         }
-        
+
         if (FinalAssetPath.IsEmpty() || FinalAssetPath.TrimStartAndEnd().IsEmpty())
         {
             FinalAssetPath = TEXT("/Game/UnrealMotionGraphicsMCP.UnrealMotionGraphicsMCP");
@@ -366,7 +629,7 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
     if (!FJsonSerializer::Deserialize(Reader, RootJsonObject) || !RootJsonObject.IsValid())
     {
         UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to parse JSON data."));
-        return false;
+        return MakeApplyError(TEXT("Failed to parse JSON data."));
     }
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: JSON data parsed successfully."));
 
@@ -392,10 +655,9 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
             if (!Package)
             {
                 UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create package at '%s'."), *PackagePath);
-                return false;
+                return MakeApplyError(FString::Printf(TEXT("Failed to create package at '%s'."), *PackagePath));
             }
-            
-            // Create the Widget Blueprint using the factory
+
             UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
             WidgetBlueprint = Cast<UWidgetBlueprint>(Factory->FactoryCreateNew(
                 UWidgetBlueprint::StaticClass(),
@@ -405,25 +667,24 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
                 nullptr,
                 GWarn
             ));
-            
+
             if (!WidgetBlueprint)
             {
                 UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create new Widget Blueprint at '%s'."), *FinalAssetPath);
-                return false;
+                return MakeApplyError(FString::Printf(TEXT("Failed to create new Widget Blueprint at '%s'."), *FinalAssetPath));
             }
-            
-            bIsNewlyCreated = true;  // Mark as newly created
-            
-            // Mark package as dirty and notify asset registry
+
+            bIsNewlyCreated = true;
+
             Package->MarkPackageDirty();
             FAssetRegistryModule::AssetCreated(WidgetBlueprint);
-            
+
             UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: New Widget Blueprint created at '%s'."), *FinalAssetPath);
         }
         else
         {
             UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Invalid asset path format '%s'."), *FinalAssetPath);
-            return false;
+            return MakeApplyError(FString::Printf(TEXT("Invalid asset path format '%s'."), *FinalAssetPath));
         }
     }
     else
@@ -431,11 +692,16 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
         UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Widget Blueprint loaded."));
     }
 
+    if (!WidgetBlueprint)
+    {
+        return MakeApplyError(TEXT("Widget Blueprint is null after load/create."));
+    }
+
     // 3. Ensure the WidgetTree is valid.
     if (!WidgetBlueprint->WidgetTree)
     {
         UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: WidgetTree is null in UWidgetBlueprint '%s'."), *FinalAssetPath);
-        return false;
+        return MakeApplyError(FString::Printf(TEXT("WidgetTree is null in '%s'."), *FinalAssetPath));
     }
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: WidgetTree is valid."));
 
@@ -492,7 +758,9 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
             {
                 UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Class mismatch for widget '%s' (JSON: %s, Existing: %s)."),
                     *WidgetName, *JsonInfo.ClassPath, *ExistingClassPath);
-                return false;
+                return MakeApplyError(FString::Printf(
+                    TEXT("Class mismatch for widget '%s' (JSON: %s, Existing: %s)."),
+                    *WidgetName, *JsonInfo.ClassPath, *ExistingClassPath));
             }
 
             // Parent matching check
@@ -516,9 +784,9 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
 
             if (!bParentMatches)
             {
-                UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Parent mismatch for widget '%s' (JSON parent: %s, UE tree parent: %s)."),
+                UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Deferring reparent for '%s' (JSON parent: %s, UE parent: %s)."),
                     *WidgetName, *ExpectedParentName, *ExistingParentName);
-                return false;
+                PendingReparents.Add({WidgetName, ExpectedParentName});
             }
         }
     }
@@ -533,7 +801,7 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
             if (!NewRootWidget)
             {
                 UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create root widget."));
-                return false;
+                return MakeApplyError(TEXT("Failed to create root widget."));
             }
             WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
         }
@@ -544,7 +812,7 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
             if (!NewSubtree)
             {
                 UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Failed to create subtree under TargetWidget '%s'."), *TargetWidget->GetName());
-                return false;
+                return MakeApplyError(FString::Printf(TEXT("Failed to create subtree under '%s'."), *TargetWidget->GetName()));
             }
         }
     }
@@ -559,9 +827,19 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
         {
             // Fallback for empty tree (should not happen since we have overlap)
             UWidget* NewRootWidget = CreateWidgetFromJson(RootJsonObject, WidgetBlueprint->WidgetTree, nullptr);
-            if (!NewRootWidget) return false;
+            if (!NewRootWidget) return MakeApplyError(TEXT("Failed to create root widget (overlap fallback)."));
             WidgetBlueprint->WidgetTree->RootWidget = NewRootWidget;
         }
+    }
+
+    for (const FDeferredReparent& Item : PendingReparents)
+    {
+        FString ReparentError;
+        if (!ExecuteReparent(WidgetBlueprint, Item.WidgetName, Item.ExpectedParentName, ReparentError))
+        {
+            return MakeApplyError(ReparentError);
+        }
+        ReparentedWidgets.Add(Item.WidgetName);
     }
 
     // 7.5. Verify widget tree integrity before marking as modified
@@ -569,10 +847,9 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
     if (!WidgetBlueprint->WidgetTree->RootWidget)
     {
         UE_LOG(LogUmgMcp, Error, TEXT("ApplyJsonToUmgAsset_GameThread: Root widget became null after assignment!"));
-        return false;
+        return MakeApplyError(TEXT("Root widget became null after assignment."));
     }
-    
-    // Ensure all widgets are properly owned by the WidgetTree
+
     TArray<UWidget*> AllWidgets;
     WidgetBlueprint->WidgetTree->GetAllWidgets(AllWidgets);
     UE_LOG(LogUmgMcp, Log, TEXT("ApplyJsonToUmgAsset_GameThread: Widget tree contains %d widgets."), AllWidgets.Num());
@@ -600,13 +877,15 @@ bool ApplyJsonToUmgAsset_GameThread(const FString& AssetPath, const FString& Jso
         }
     }
     
-    // 9. Notify the editor that the blueprint has changed structurally
-    // This forces the UI to refresh and show the new widgets
-    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
+    // 9. Refresh GeneratedClass so preview/lint see the new tree.
+    // We intentionally avoid MarkBlueprintAsStructurallyModified here: the original author
+    // documented it as crash-prone in this code path. A plain CompileBlueprint on the
+    // GameThread is sufficient to regenerate the class without that risk.
+    FUmgPreviewRenderUtils::CompileWidgetBlueprint(WidgetBlueprint);
     
     UE_LOG(LogUmgMcp, Log, TEXT("Successfully applied JSON to UMG asset '%s'."), *FinalAssetPath);
 
-    return true;
+    return MakeApplySuccess(MoveTemp(ReparentedWidgets));
 }
 
 static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& WidgetJson, UWidget* TargetWidget)
@@ -618,24 +897,17 @@ static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& Widge
 
     const TSharedPtr<FJsonObject>* PropertiesJsonObjPtr;
     TSharedPtr<FJsonObject> WidgetProps = MakeShared<FJsonObject>();
-    TSharedPtr<FJsonObject> SlotProps = nullptr;
+    TSharedPtr<FJsonObject> SlotProps = ExtractSlotPropsFromWidgetJson(WidgetJson);
 
     if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObjPtr))
     {
         TSharedPtr<FJsonObject> SourceProps = *PropertiesJsonObjPtr;
         for (auto& Pair : SourceProps->Values)
         {
-            if (Pair.Key == TEXT("Slot"))
+            const FString Key(Pair.Key.ToView());
+            if (Key != TEXT("Slot"))
             {
-                const TSharedPtr<FJsonObject>* SlotObjPtr;
-                if (Pair.Value->TryGetObject(SlotObjPtr))
-                {
-                    SlotProps = *SlotObjPtr;
-                }
-            }
-            else
-            {
-                WidgetProps->SetField(Pair.Key, Pair.Value);
+                WidgetProps->SetField(Key, Pair.Value);
             }
         }
     }
@@ -649,14 +921,9 @@ static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& Widge
         }
     }
 
-    if (SlotProps.IsValid() && TargetWidget->Slot)
+    if (SlotProps.IsValid())
     {
-        TargetWidget->Slot->Modify();
-        TSharedPtr<FJsonObject> NormalizedSlotProps = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(SlotProps);
-        if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), TargetWidget->Slot->GetClass(), TargetWidget->Slot, 0, 0))
-        {
-            UE_LOG(LogUmgMcp, Warning, TEXT("ApplyPropertiesToExistingWidget: Failed to apply Slot properties to '%s'."), *TargetWidget->GetName());
-        }
+        ApplySlotPropertiesToWidget(TargetWidget, SlotProps);
     }
 }
 
@@ -709,8 +976,9 @@ static void MergeChildrenAppendOnly(const TSharedPtr<FJsonObject>& WidgetJson, U
         }
         else
         {
-            UWidget* NewChild = CreateWidgetFromJson(*ChildObject, WidgetTree, TargetWidget);
-            if (NewChild)
+            UPanelWidget* EffectiveParent = EnsureSingleChildCapacity(ParentPanel, WidgetTree);
+            UWidget* NewChild = CreateWidgetFromJson(*ChildObject, WidgetTree, EffectiveParent);
+            if (NewChild && EffectiveParent == ParentPanel)
             {
                 const int32 CurrentIndex = ParentPanel->GetChildIndex(NewChild);
                 if (CurrentIndex != InsertIndex && CurrentIndex != INDEX_NONE)
@@ -802,25 +1070,17 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
     // 2. Prepare Property JSONs
     const TSharedPtr<FJsonObject>* PropertiesJsonObjPtr;
     TSharedPtr<FJsonObject> WidgetProps = MakeShared<FJsonObject>();
-    TSharedPtr<FJsonObject> SlotProps = nullptr;
+    TSharedPtr<FJsonObject> SlotProps = ExtractSlotPropsFromWidgetJson(WidgetJson);
 
     if (WidgetJson->TryGetObjectField(TEXT("properties"), PropertiesJsonObjPtr))
     {
-        // Copy properties to a new object so we can remove 'Slot' without modifying source
         TSharedPtr<FJsonObject> SourceProps = *PropertiesJsonObjPtr;
         for (auto& Pair : SourceProps->Values)
         {
-            if (Pair.Key == TEXT("Slot"))
+            const FString Key(Pair.Key.ToView());
+            if (Key != TEXT("Slot"))
             {
-                const TSharedPtr<FJsonObject>* SlotObjPtr;
-                if (Pair.Value->TryGetObject(SlotObjPtr))
-                {
-                    SlotProps = *SlotObjPtr;
-                }
-            }
-            else
-            {
-                WidgetProps->SetField(Pair.Key, Pair.Value);
+                WidgetProps->SetField(Key, Pair.Value);
             }
         }
     }
@@ -834,45 +1094,13 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
         }
     }
 
-    // 4. Apply Slot Properties
+    // 4. Apply Slot Properties (properties.Slot or top-level SlotData)
     if (SlotProps.IsValid())
     {
-        // Normalize JSON keys from camelCase to PascalCase to match C++ UPROPERTY names
         UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Processing Slot properties for widget '%s'"), *WidgetName);
-        TSharedPtr<FJsonObject> NormalizedSlotProps = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(SlotProps);
-        
-        // Log the normalized Slot JSON for debugging
-        FString SlotPropsString;
-        TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&SlotPropsString);
-        FJsonSerializer::Serialize(NormalizedSlotProps.ToSharedRef(), Writer);
-        UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Normalized Slot JSON for '%s': %s"), *WidgetName, *SlotPropsString);
-        
         if (NewSlot)
         {
-            UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying Slot properties to NewSlot (class: %s)"), *NewSlot->GetClass()->GetName());
-            
-            if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), NewSlot->GetClass(), NewSlot, 0, 0))
-            {
-                UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying Slot properties to '%s'."), *WidgetName);
-            }
-            else
-            {
-                UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Successfully applied Slot properties to '%s'"), *WidgetName);
-            }
-        }
-        else if (NewWidget->Slot)
-        {
-             // Fallback to NewWidget->Slot if AddChild didn't return one but it exists (e.g. RootWidget might not have slot, but this branch is for children)
-             UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Applying Slot properties to NewWidget->Slot (class: %s)"), *NewWidget->Slot->GetClass()->GetName());
-             
-             if (!FJsonObjectConverter::JsonObjectToUStruct(NormalizedSlotProps.ToSharedRef(), NewWidget->Slot->GetClass(), NewWidget->Slot, 0, 0))
-             {
-                 UE_LOG(LogUmgMcp, Warning, TEXT("CreateWidgetFromJson: Issues applying Slot properties to '%s' (fallback)."), *WidgetName);
-             }
-             else
-             {
-                 UE_LOG(LogUmgMcp, Log, TEXT("CreateWidgetFromJson: Successfully applied Slot properties to '%s' (fallback)"), *WidgetName);
-             }
+            ApplySlotPropertiesToWidget(NewWidget, SlotProps);
         }
         else
         {

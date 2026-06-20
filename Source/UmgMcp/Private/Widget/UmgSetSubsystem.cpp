@@ -2,6 +2,7 @@
 
 #include "Widget/UmgSetSubsystem.h"
 #include "FileManage/UmgAttentionSubsystem.h"
+#include "Theme/UmgThemeSubsystem.h"
 #include "Editor.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
@@ -16,6 +17,144 @@
 #include "Components/CanvasPanelSlot.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
+
+namespace UmgSetInternal
+{
+	static bool ValidateSlotJsonKeys(UStruct* SlotClass, const TSharedPtr<FJsonObject>& SlotJson, FString& OutInvalidKey)
+	{
+		if (!SlotClass || !SlotJson.IsValid())
+		{
+			return true;
+		}
+
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : SlotJson->Values)
+		{
+			if (!SlotClass->FindPropertyByName(FName(*Field.Key)))
+			{
+				OutInvalidKey = Field.Key;
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static FString NormalizeSizeRuleString(const FString& InRule)
+	{
+		if (InRule.Equals(TEXT("Auto"), ESearchCase::IgnoreCase)
+			|| InRule.Equals(TEXT("Automatic"), ESearchCase::IgnoreCase))
+		{
+			return TEXT("Automatic");
+		}
+		if (InRule.Equals(TEXT("Fill"), ESearchCase::IgnoreCase))
+		{
+			return TEXT("Fill");
+		}
+		return InRule;
+	}
+
+	static FString NormalizeHorizontalAlignmentString(const FString& InAlign)
+	{
+		if (InAlign.StartsWith(TEXT("HAlign_"), ESearchCase::IgnoreCase))
+		{
+			return InAlign;
+		}
+
+		static const TMap<FString, FString> AliasMap = {
+			{TEXT("Left"), TEXT("HAlign_Left")},
+			{TEXT("Center"), TEXT("HAlign_Center")},
+			{TEXT("Right"), TEXT("HAlign_Right")},
+			{TEXT("Fill"), TEXT("HAlign_Fill")},
+		};
+
+		if (const FString* Mapped = AliasMap.Find(InAlign))
+		{
+			return *Mapped;
+		}
+
+		return InAlign;
+	}
+
+	static FString NormalizeVerticalAlignmentString(const FString& InAlign)
+	{
+		if (InAlign.StartsWith(TEXT("VAlign_"), ESearchCase::IgnoreCase))
+		{
+			return InAlign;
+		}
+
+		static const TMap<FString, FString> AliasMap = {
+			{TEXT("Top"), TEXT("VAlign_Top")},
+			{TEXT("Center"), TEXT("VAlign_Center")},
+			{TEXT("Bottom"), TEXT("VAlign_Bottom")},
+			{TEXT("Fill"), TEXT("VAlign_Fill")},
+		};
+
+		if (const FString* Mapped = AliasMap.Find(InAlign))
+		{
+			return *Mapped;
+		}
+
+		return InAlign;
+	}
+
+	static void NormalizeSlotJsonRecursively(const TSharedPtr<FJsonObject>& SlotJson)
+	{
+		if (!SlotJson.IsValid())
+		{
+			return;
+		}
+
+		TArray<FString> FieldKeys;
+		FieldKeys.Reserve(SlotJson->Values.Num());
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : SlotJson->Values)
+		{
+			FieldKeys.Add(Pair.Key);
+		}
+
+		for (const FString& FieldKey : FieldKeys)
+		{
+			TSharedPtr<FJsonValue> FieldValue = SlotJson->TryGetField(FieldKey);
+			if (!FieldValue.IsValid())
+			{
+				continue;
+			}
+
+			if (FieldKey.Equals(TEXT("Size"), ESearchCase::IgnoreCase) && FieldValue->Type == EJson::Object)
+			{
+				TSharedPtr<FJsonObject> SizeObject = FieldValue->AsObject();
+				if (SizeObject.IsValid())
+				{
+					FString SizeRule;
+					if (SizeObject->TryGetStringField(TEXT("SizeRule"), SizeRule))
+					{
+						SizeObject->SetStringField(TEXT("SizeRule"), NormalizeSizeRuleString(SizeRule));
+					}
+					NormalizeSlotJsonRecursively(SizeObject);
+					SlotJson->SetObjectField(FieldKey, SizeObject);
+				}
+				continue;
+			}
+
+			if (FieldKey.Equals(TEXT("HorizontalAlignment"), ESearchCase::IgnoreCase) && FieldValue->Type == EJson::String)
+			{
+				SlotJson->SetStringField(FieldKey, NormalizeHorizontalAlignmentString(FieldValue->AsString()));
+				continue;
+			}
+
+			if (FieldKey.Equals(TEXT("VerticalAlignment"), ESearchCase::IgnoreCase) && FieldValue->Type == EJson::String)
+			{
+				SlotJson->SetStringField(FieldKey, NormalizeVerticalAlignmentString(FieldValue->AsString()));
+				continue;
+			}
+
+			if (FieldValue->Type == EJson::Object)
+			{
+				TSharedPtr<FJsonObject> ChildObject = FieldValue->AsObject();
+				NormalizeSlotJsonRecursively(ChildObject);
+				SlotJson->SetObjectField(FieldKey, ChildObject);
+			}
+		}
+	}
+}
 
 void UUmgSetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -60,13 +199,29 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
         return false;
     }
 
+    if (GEditor)
+    {
+        if (UUmgThemeSubsystem* ThemeSubsystem = GEditor->GetEditorSubsystem<UUmgThemeSubsystem>())
+        {
+            UE_LOG(LogUmgSet, Verbose, TEXT("SetWidgetProperties: resolving theme tokens for widget '%s' (%d top-level keys)"), *WidgetName, PropertiesJsonObject->Values.Num());
+            ThemeSubsystem->ProcessJsonTokens(PropertiesJsonObject);
+        }
+        else
+        {
+            UE_LOG(LogUmgSet, Warning, TEXT("SetWidgetProperties: UmgThemeSubsystem unavailable; skipping @token resolution for widget '%s'."), *WidgetName);
+        }
+    }
+
     // Normalize JSON keys from camelCase to PascalCase (especially important for Slot properties)
     UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Normalizing property keys for widget '%s'"), *WidgetName);
     TSharedPtr<FJsonObject> NormalizedProperties = UUmgFileTransformation::NormalizeJsonKeysToPascalCase(PropertiesJsonObject);
-    
+
     // 2. Extract and expand aliases in NormalizedProperties
     TArray<FString> CurrentKeys;
-    NormalizedProperties->Values.GetKeys(CurrentKeys);
+    for (const auto& Pair : NormalizedProperties->Values)
+    {
+        CurrentKeys.Add(FString(Pair.Key.ToView()));
+    }
     for (const FString& Key : CurrentKeys)
     {
         if (Key.StartsWith(TEXT("Slot."), ESearchCase::IgnoreCase))
@@ -95,8 +250,8 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             // [智能反射匹配失败]：安全降级，进入 Canvas 别名处理层判断
             if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
             {
-                TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
-                if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
+                if (Val.IsValid() && Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Left"), Val->AsArray()[0]);
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Top"), Val->AsArray()[1]);
                     NormalizedProperties->RemoveField(Key);
@@ -104,8 +259,8 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             }
             else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
             {
-                TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
-                if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
+                if (Val.IsValid() && Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Right"), Val->AsArray()[0]);
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Bottom"), Val->AsArray()[1]);
                     NormalizedProperties->RemoveField(Key);
@@ -113,12 +268,12 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             }
             else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
             {
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->Values[Key]);
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->TryGetField(Key));
                 NormalizedProperties->RemoveField(Key);
             }
             else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
             {
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->Values[Key]);
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->TryGetField(Key));
                 NormalizedProperties->RemoveField(Key);
             }
         }
@@ -133,7 +288,11 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     }
 
     // Re-scan for any dotted keys (including expanded aliases)
-    NormalizedProperties->Values.GetKeys(CurrentKeys);
+    CurrentKeys.Reset();
+    for (const auto& Pair : NormalizedProperties->Values)
+    {
+        CurrentKeys.Add(FString(Pair.Key.ToView()));
+    }
     for (const FString& FullKey : CurrentKeys)
     {
         if (FullKey.Contains(TEXT(".")))
@@ -163,7 +322,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
                     TargetObj = ConstCastSharedPtr<FJsonObject>(*ExistingObj);
                 }
             }
-            TargetObj->SetField(Parts.Last(), NormalizedProperties->Values[FullKey]);
+            TargetObj->SetField(Parts.Last(), NormalizedProperties->TryGetField(FullKey));
             NormalizedProperties->RemoveField(FullKey);
         }
     }
@@ -212,7 +371,8 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     {
         for (const auto& Pair : NormalizedProperties->Values)
         {
-            FProperty* Prop = FoundWidget->GetClass()->FindPropertyByName(FName(*Pair.Key));
+            const FString Key(Pair.Key.ToView());
+            FProperty* Prop = FoundWidget->GetClass()->FindPropertyByName(FName(*Key));
             if (!Prop) continue;
 
             // SPECIAL CASE: Auto-resolve Object Pointers from paths
@@ -232,19 +392,48 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
 
             // Fallback: Use standard converter for this specific field
             TSharedPtr<FJsonObject> SinglePropJson = MakeShared<FJsonObject>();
-            SinglePropJson->SetField(Pair.Key, Pair.Value);
+            SinglePropJson->SetField(Key, Pair.Value);
             FJsonObjectConverter::JsonObjectToUStruct(SinglePropJson.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0);
         }
     }
-    
+
     // Apply Slot properties separately (CRITICAL: must apply to Slot object, not Widget object)
-    if (SlotProperties.IsValid() && FoundWidget->Slot)
+    if (SlotProperties.IsValid() && SlotProperties->Values.Num() > 0)
     {
+        if (!FoundWidget->Slot)
+        {
+            UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Slot properties provided for '%s' but widget has no Slot."), *WidgetName);
+            return false;
+        }
+
+        FString InvalidSlotKey;
+        if (!UmgSetInternal::ValidateSlotJsonKeys(FoundWidget->Slot->GetClass(), SlotProperties, InvalidSlotKey))
+        {
+            UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Slot property '%s' is invalid for slot class '%s' on widget '%s'."),
+                *InvalidSlotKey, *FoundWidget->Slot->GetClass()->GetName(), *WidgetName);
+            return false;
+        }
+
+        UmgSetInternal::NormalizeSlotJsonRecursively(SlotProperties);
+
         UE_LOG(LogUmgSet, Log, TEXT("SetWidgetProperties: Applying Slot properties to Slot object (class: %s)"), *FoundWidget->Slot->GetClass()->GetName());
         FoundWidget->Slot->Modify();
 
-        // Standard converter is usually fine for Slots (mostly numeric/enums)
-        FJsonObjectConverter::JsonObjectToUStruct(SlotProperties.ToSharedRef(), FoundWidget->Slot->GetClass(), FoundWidget->Slot, 0, 0);
+        const bool bSlotApplied = FJsonObjectConverter::JsonObjectToUStruct(
+            SlotProperties.ToSharedRef(),
+            FoundWidget->Slot->GetClass(),
+            FoundWidget->Slot,
+            0,
+            0);
+        if (!bSlotApplied)
+        {
+            FString NormalizedSlotJsonString;
+            TSharedRef<TJsonWriter<>> NormalizedWriter = TJsonWriterFactory<>::Create(&NormalizedSlotJsonString);
+            FJsonSerializer::Serialize(SlotProperties.ToSharedRef(), NormalizedWriter);
+            UE_LOG(LogUmgSet, Error, TEXT("SetWidgetProperties: Failed to apply Slot properties to widget '%s'. Normalized slot JSON: %s"),
+                *WidgetName, *NormalizedSlotJsonString);
+            return false;
+        }
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
@@ -465,10 +654,12 @@ bool UUmgSetSubsystem::DeleteWidget(UWidgetBlueprint* WidgetBlueprint, const FSt
 
     if (WidgetBlueprint->WidgetTree->RemoveWidget(FoundWidget))
     {
+        UE_LOG(LogUmgSet, Log, TEXT("DeleteWidget: Eliminated widget '%s' from asset '%s'."), *WidgetName, *WidgetBlueprint->GetPathName());
         FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
         return true;
     }
 
+    UE_LOG(LogUmgSet, Warning, TEXT("DeleteWidget: Elimination of widget '%s' failed."), *WidgetName);
     return false;
 }
 
@@ -552,7 +743,7 @@ TArray<FString> UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBluepri
         WidgetClass = FindObject<UClass>(nullptr, *WidgetClassPath);
         if (!WidgetClass) WidgetClass = LoadObject<UClass>(nullptr, *WidgetClassPath);
     }
-    
+
     if (!WidgetClass)
     {
         FString NativePath = FString::Printf(TEXT("/Script/UMG.%s"), *WidgetClassPath);
@@ -637,10 +828,10 @@ TArray<FString> UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBluepri
     {
         OldParent->Modify();
         int32 ChildIndex = OldParent->GetChildIndex(WidgetToReplace);
-        
+
         // Temporarily detach old widget
         OldParent->RemoveChild(WidgetToReplace);
-        
+
         // Insert new widget at the same index
         UPanelSlot* NewSlot = nullptr;
         if (ChildIndex != INDEX_NONE)
@@ -681,7 +872,7 @@ TArray<FString> UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBluepri
         {
             OldPanel->Modify();
             NewPanel->Modify();
-            
+
             TArray<UWidget*> ChildrenToMove;
             for (int32 i = 0; i < OldPanel->GetChildrenCount(); ++i)
             {
@@ -690,7 +881,7 @@ TArray<FString> UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBluepri
                     ChildrenToMove.Add(Child);
                 }
             }
-            
+
             OldPanel->ClearChildren();
             for (UWidget* Child : ChildrenToMove)
             {

@@ -10,6 +10,15 @@
 class UWidget;
 class FJsonObject;
 
+/** Result of applying JSON layout to a UMG asset (synchronous, GameThread-confirmed). */
+struct FApplyJsonToUmgResult
+{
+    bool bSuccess = false;
+    bool bApplied = false;
+    FString ErrorMessage;
+    TArray<FString> ReparentedWidgets;
+};
+
 /**
  * @brief Handles the "compilation" and "decompilation" of UMG assets to and from JSON.
  *
@@ -49,7 +58,8 @@ public:
      * @param TargetWidgetName Optional. The name of the specific widget to replace. If empty or "Root", the entire widget tree (RootWidget) is replaced.
      * @return True if the operation was successful, false otherwise.
      */
-    static bool ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName = TEXT(""));
+    /** Synchronous apply — blocks until GameThread apply completes and returns confirmed result. */
+    static FApplyJsonToUmgResult ApplyJsonStringToUmgAsset(const FString& AssetPath, const FString& JsonData, const FString& TargetWidgetName = TEXT(""));
 
     /**
      * Normalizes JSON keys from camelCase to PascalCase to match C++ UPROPERTY names.

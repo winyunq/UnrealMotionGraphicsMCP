@@ -16,6 +16,8 @@
 #include "Widget/UmgMcpWidgetCommands.h" 
 #include "FileManage/UmgMcpFileTransformationCommands.h"
 #include "Animation/UmgMcpSequencerCommands.h" // Add Sequencer Commands
+#include "Storybook/UmgMcpStorybookCommands.h"
+#include "Orchestration/UmgMcpOrchestrationCommands.h"
 
 #include "UmgMcpBridge.generated.h"
 
@@ -25,6 +27,8 @@ class FUmgMcpWidgetCommands; // Forward declaration for Widget Commands
 class FUmgMcpFileTransformationCommands; // Forward declaration for File Transformation Commands
 class FUmgMcpSequencerCommands; // Forward declaration for Sequencer Commands
 class FUmgMcpMaterialCommands; // Forward declaration for Material Commands
+class FUmgMcpStorybookCommands;
+class FUmgMcpOrchestrationCommands;
 
 /**
  * @brief The central communication hub for the UMG MCP plugin.
@@ -66,6 +70,8 @@ private:
     TSharedPtr<FUmgMcpFileTransformationCommands> FileTransformationCommands;
     TSharedPtr<FUmgMcpSequencerCommands> SequencerCommands; // Add Sequencer Commands
     TSharedPtr<FUmgMcpMaterialCommands> MaterialCommands;
+    TSharedPtr<FUmgMcpStorybookCommands> StorybookCommands;
+    TSharedPtr<FUmgMcpOrchestrationCommands> OrchestrationCommands;
 
     // Server state variables
     bool bIsRunning;

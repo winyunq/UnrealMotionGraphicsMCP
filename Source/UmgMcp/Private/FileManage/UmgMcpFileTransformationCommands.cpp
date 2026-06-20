@@ -51,7 +51,8 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
                 Params->TryGetStringField(TEXT("target_widget_name"), TargetWidgetName);
             }
 
-            bool bSuccess = UUmgFileTransformation::ApplyJsonStringToUmgAsset(AssetPath, JsonData, TargetWidgetName);
+            const FApplyJsonToUmgResult ApplyResult = UUmgFileTransformation::ApplyJsonStringToUmgAsset(AssetPath, JsonData, TargetWidgetName);
+            const bool bSuccess = ApplyResult.bSuccess;
             if (bSuccess)
             {
                 ResultJson->SetStringField(TEXT("asset_path"), AssetPath);
@@ -60,11 +61,24 @@ TSharedPtr<FJsonObject> FUmgMcpFileTransformationCommands::HandleCommand(const F
                     ResultJson->SetStringField(TEXT("target_widget"), TargetWidgetName);
                 }
                 ResultJson->SetBoolField(TEXT("success"), true);
+                ResultJson->SetBoolField(TEXT("applied"), ApplyResult.bApplied);
+                if (ApplyResult.ReparentedWidgets.Num() > 0)
+                {
+                    TArray<TSharedPtr<FJsonValue>> ReparentedArray;
+                    for (const FString& Name : ApplyResult.ReparentedWidgets)
+                    {
+                        ReparentedArray.Add(MakeShared<FJsonValueString>(Name));
+                    }
+                    ResultJson->SetArrayField(TEXT("reparented_widgets"), ReparentedArray);
+                }
             }
             else
             {
-                ResultJson->SetStringField(TEXT("error"), TEXT("Failed to apply JSON data to UMG asset."));
+                ResultJson->SetStringField(TEXT("error"), ApplyResult.ErrorMessage.IsEmpty()
+                    ? TEXT("Failed to apply JSON data to UMG asset.")
+                    : ApplyResult.ErrorMessage);
                 ResultJson->SetBoolField(TEXT("success"), false);
+                ResultJson->SetBoolField(TEXT("applied"), false);
             }
         }
         else

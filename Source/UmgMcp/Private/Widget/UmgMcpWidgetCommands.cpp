@@ -3,12 +3,83 @@
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "Widget/UmgGetSubsystem.h"
 #include "Widget/UmgSetSubsystem.h"
+#include "Lint/UmgLintSubsystem.h"
 #include "FileManage/UmgAttentionSubsystem.h"
 #include "Editor.h"
 #include "Serialization/JsonSerializer.h"
 #include "Dom/JsonObject.h"
 #include "WidgetBlueprint.h"
 #include "Misc/PackageName.h"
+
+namespace UmgMcpWidgetCommandsInternal
+{
+	static bool MergeJsonIntoResponse(const FString& JsonString, TSharedPtr<FJsonObject>& OutResponse)
+	{
+		TSharedPtr<FJsonObject> Parsed;
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonString);
+		if (!FJsonSerializer::Deserialize(Reader, Parsed) || !Parsed.IsValid())
+		{
+			return false;
+		}
+
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : Parsed->Values)
+		{
+			OutResponse->SetField(Field.Key, Field.Value);
+		}
+		return true;
+	}
+
+	static FUmgLintOptions ParseLintOptions(const TSharedPtr<FJsonObject>& Params)
+	{
+		FUmgLintOptions Options;
+		if (!Params.IsValid())
+		{
+			return Options;
+		}
+
+		double ViewportW = Options.ViewportWidth;
+		double ViewportH = Options.ViewportHeight;
+		double DepthThreshold = Options.DepthThreshold;
+
+		if (Params->TryGetNumberField(TEXT("viewport_w"), ViewportW))
+		{
+			Options.ViewportWidth = static_cast<int32>(ViewportW);
+		}
+		else if (Params->TryGetNumberField(TEXT("viewport_width"), ViewportW))
+		{
+			Options.ViewportWidth = static_cast<int32>(ViewportW);
+		}
+
+		if (Params->TryGetNumberField(TEXT("viewport_h"), ViewportH))
+		{
+			Options.ViewportHeight = static_cast<int32>(ViewportH);
+		}
+		else if (Params->TryGetNumberField(TEXT("viewport_height"), ViewportH))
+		{
+			Options.ViewportHeight = static_cast<int32>(ViewportH);
+		}
+
+		if (Params->TryGetNumberField(TEXT("depth_threshold"), DepthThreshold))
+		{
+			Options.DepthThreshold = static_cast<int32>(DepthThreshold);
+		}
+
+		const TArray<TSharedPtr<FJsonValue>>* RulesArray = nullptr;
+		if (Params->TryGetArrayField(TEXT("rules"), RulesArray))
+		{
+			for (const TSharedPtr<FJsonValue>& RuleValue : *RulesArray)
+			{
+				FString RuleName;
+				if (RuleValue->TryGetString(RuleName) && !RuleName.IsEmpty())
+				{
+					Options.Rules.Add(RuleName);
+				}
+			}
+		}
+
+		return Options;
+	}
+}
 
 
 
@@ -75,7 +146,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 Response->SetBoolField(TEXT("success"), true);
                 for (const auto& Field : QueriedProperties->Values)
                 {
-                    Response->SetField(Field.Key, Field.Value);
+                    Response->SetField(Field.Key.ToView(), Field.Value);
                 }
             }
             else
@@ -88,6 +159,102 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         {
             Response->SetBoolField(TEXT("success"), false);
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_name' or 'properties' parameter."));
+        }
+    }
+    else if (Command == TEXT("get_layout_data"))
+    {
+        UUmgLintSubsystem* LintSubsystem = GEditor->GetEditorSubsystem<UUmgLintSubsystem>();
+        int32 ViewportWidth = 1920;
+        int32 ViewportHeight = 1080;
+
+        double WidthValue = ViewportWidth;
+        double HeightValue = ViewportHeight;
+        const TSharedPtr<FJsonObject>* ResolutionObject = nullptr;
+        if (Params->TryGetObjectField(TEXT("resolution"), ResolutionObject) && ResolutionObject && ResolutionObject->IsValid())
+        {
+            (*ResolutionObject)->TryGetNumberField(TEXT("width"), WidthValue);
+            (*ResolutionObject)->TryGetNumberField(TEXT("height"), HeightValue);
+        }
+        else
+        {
+            Params->TryGetNumberField(TEXT("viewport_w"), WidthValue);
+            Params->TryGetNumberField(TEXT("viewport_h"), HeightValue);
+            Params->TryGetNumberField(TEXT("viewport_width"), WidthValue);
+            Params->TryGetNumberField(TEXT("viewport_height"), HeightValue);
+        }
+
+        ViewportWidth = static_cast<int32>(WidthValue);
+        ViewportHeight = static_cast<int32>(HeightValue);
+
+        const FString LayoutJson = LintSubsystem->GetLayoutDataFromPreview(TargetBlueprint, ViewportWidth, ViewportHeight);
+        if (UmgMcpWidgetCommandsInternal::MergeJsonIntoResponse(LayoutJson, Response))
+        {
+            if (!Response->HasField(TEXT("success")))
+            {
+                Response->SetBoolField(TEXT("success"), true);
+            }
+        }
+        else
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Failed to parse layout data response."));
+        }
+    }
+    else if (Command == TEXT("lint_umg_asset"))
+    {
+        UUmgLintSubsystem* LintSubsystem = GEditor->GetEditorSubsystem<UUmgLintSubsystem>();
+        const FUmgLintOptions Options = UmgMcpWidgetCommandsInternal::ParseLintOptions(Params);
+        const FString LintJson = LintSubsystem->AnalyzeAsset(TargetBlueprint, Options);
+        if (UmgMcpWidgetCommandsInternal::MergeJsonIntoResponse(LintJson, Response))
+        {
+            if (!Response->HasField(TEXT("success")))
+            {
+                Response->SetBoolField(TEXT("success"), true);
+            }
+        }
+        else
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Failed to parse lint report."));
+        }
+    }
+    else if (Command == TEXT("check_widget_overlap"))
+    {
+        UUmgLintSubsystem* LintSubsystem = GEditor->GetEditorSubsystem<UUmgLintSubsystem>();
+        FUmgLintOptions Options = UmgMcpWidgetCommandsInternal::ParseLintOptions(Params);
+        Options.Rules = { TEXT("layout-overlap") };
+
+        const FString LintJson = LintSubsystem->AnalyzeAsset(TargetBlueprint, Options);
+        if (UmgMcpWidgetCommandsInternal::MergeJsonIntoResponse(LintJson, Response))
+        {
+            bool bHasOverlap = false;
+            const TArray<TSharedPtr<FJsonValue>>* IssuesArray = nullptr;
+            if (Response->TryGetArrayField(TEXT("issues"), IssuesArray))
+            {
+                for (const TSharedPtr<FJsonValue>& IssueValue : *IssuesArray)
+                {
+                    const TSharedPtr<FJsonObject>* IssueObject = nullptr;
+                    if (IssueValue->TryGetObject(IssueObject) && IssueObject && IssueObject->IsValid())
+                    {
+                        FString RuleId;
+                        if ((*IssueObject)->TryGetStringField(TEXT("ruleId"), RuleId) && RuleId == TEXT("layout-overlap"))
+                        {
+                            bHasOverlap = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            Response->SetBoolField(TEXT("has_overlap"), bHasOverlap);
+            if (!Response->HasField(TEXT("success")))
+            {
+                Response->SetBoolField(TEXT("success"), true);
+            }
+        }
+        else
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Failed to parse overlap check response."));
         }
     }
     else if (Command == TEXT("get_widget_schema"))
@@ -104,7 +271,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 Response->SetBoolField(TEXT("success"), true);
                 for (const auto& Field : SchemaJson->Values)
                 {
-                    Response->SetField(Field.Key, Field.Value);
+                    Response->SetField(Field.Key.ToView(), Field.Value);
                 }
             }
             else
@@ -229,6 +396,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             if (SetSubsystem->DeleteWidget(TargetBlueprint, WidgetName))
             {
                 Response->SetBoolField(TEXT("success"), true);
+                Response->SetStringField(TEXT("eliminated_widget"), WidgetName);
                 Response->SetStringField(TEXT("deleted_widget"), WidgetName);
             }
             else
@@ -365,6 +533,5 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
 
     return Response;
 }
-
 
 

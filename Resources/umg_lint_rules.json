@@ -1,0 +1,12 @@
+{
+  "depth_threshold": 10,
+  "naming_conventions": [
+    { "class_suffix": "Button", "prefix": "Btn_" },
+    { "class_suffix": "TextBlock", "prefix": "Txt_" },
+    { "class_suffix": "Image", "prefix": "Img_" },
+    { "class_suffix": "EditableTextBox", "prefix": "Edt_" },
+    { "class_suffix": "CheckBox", "prefix": "Chk_" },
+    { "class_suffix": "Slider", "prefix": "Sld_" },
+    { "class_suffix": "ProgressBar", "prefix": "Prg_" }
+  ]
+}

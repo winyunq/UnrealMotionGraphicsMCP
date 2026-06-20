@@ -13,6 +13,97 @@
 #include "Misc/ScopeLock.h"
 #include "HAL/PlatformTime.h"
 
+namespace MCPServerTransport
+{
+	static bool SendAllBytes(const TSharedPtr<FSocket>& Socket, const uint8* Data, int32 TotalBytes)
+	{
+		if (!Socket.IsValid() || TotalBytes <= 0)
+		{
+			return true;
+		}
+
+		int32 TotalSent = 0;
+		while (TotalSent < TotalBytes)
+		{
+			int32 BytesSent = 0;
+			if (!Socket->Send(Data + TotalSent, TotalBytes - TotalSent, BytesSent))
+			{
+				UE_LOG(LogUmgMcp, Error, TEXT("MCPServerRunnable: Socket send failed after %d/%d bytes"), TotalSent, TotalBytes);
+				return false;
+			}
+
+			if (BytesSent <= 0)
+			{
+				UE_LOG(LogUmgMcp, Error, TEXT("MCPServerRunnable: Socket send returned 0 bytes (%d/%d)"), TotalSent, TotalBytes);
+				return false;
+			}
+
+			TotalSent += BytesSent;
+		}
+
+		return true;
+	}
+
+	static void RedactImageField(TSharedPtr<FJsonObject>& JsonObject, const TCHAR* FieldName)
+	{
+		if (!JsonObject.IsValid() || !JsonObject->HasField(FieldName))
+		{
+			return;
+		}
+
+		FString Base64Value;
+		if (!JsonObject->TryGetStringField(FieldName, Base64Value))
+		{
+			return;
+		}
+
+		JsonObject->RemoveField(FieldName);
+		JsonObject->SetNumberField(TEXT("image_base64_bytes"), Base64Value.Len());
+	}
+
+	static FString SummarizeResponseForLog(const FString& Response)
+	{
+		TSharedPtr<FJsonObject> JsonObject;
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response);
+		if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
+		{
+			return FString::Printf(TEXT("<unparsed response, %d chars>"), Response.Len());
+		}
+
+		RedactImageField(JsonObject, TEXT("image_base64"));
+
+		const TArray<TSharedPtr<FJsonValue>>* RendersArray = nullptr;
+		if (JsonObject->TryGetArrayField(TEXT("renders"), RendersArray))
+		{
+			TArray<TSharedPtr<FJsonValue>> RedactedRenders;
+			for (const TSharedPtr<FJsonValue>& RenderValue : *RendersArray)
+			{
+				const TSharedPtr<FJsonObject>* RenderObjectPtr = nullptr;
+				if (RenderValue->TryGetObject(RenderObjectPtr) && RenderObjectPtr && RenderObjectPtr->IsValid())
+				{
+					TSharedPtr<FJsonObject> RenderCopy = MakeShared<FJsonObject>();
+					for (const auto& Field : (*RenderObjectPtr)->Values)
+					{
+						RenderCopy->SetField(Field.Key.ToView(), Field.Value);
+					}
+					RedactImageField(RenderCopy, TEXT("image_base64"));
+					RedactedRenders.Add(MakeShared<FJsonValueObject>(RenderCopy));
+				}
+				else
+				{
+					RedactedRenders.Add(RenderValue);
+				}
+			}
+			JsonObject->SetArrayField(TEXT("renders"), RedactedRenders);
+		}
+
+		FString Summary;
+		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Summary);
+		FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
+		return Summary;
+	}
+}
+
 FMCPServerRunnable::FMCPServerRunnable(UUmgMcpBridge* InBridge, TSharedPtr<FSocket> InListenerSocket)
     : Bridge(InBridge)
     , ListenerSocket(InListenerSocket)
@@ -193,21 +284,30 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     // Execute command
     FString Response = Bridge->ExecuteCommand(CommandType, Params);
     
-    // Send response
-    int32 BytesSent = 0;
-    
-    // Convert to UTF8
+    // Send response (loop until all UTF-8 bytes and delimiter are sent)
     FTCHARToUTF8 Utf8Response(*Response);
-    
-    // Send the string content
-    if (Utf8Response.Length() > 0)
+    const int32 ResponseByteCount = Utf8Response.Length();
+
+    if (ResponseByteCount > 0)
     {
-        Client->Send((const uint8*)Utf8Response.Get(), Utf8Response.Length(), BytesSent);
+        if (!MCPServerTransport::SendAllBytes(Client, reinterpret_cast<const uint8*>(Utf8Response.Get()), ResponseByteCount))
+        {
+            UE_LOG(LogUmgMcp, Error, TEXT("MCPServerRunnable: Failed to send full response body (%d bytes)"), ResponseByteCount);
+            return;
+        }
     }
-    
-    // Send the null delimiter
-    uint8 Delimiter = 0;
-    Client->Send(&Delimiter, 1, BytesSent);
-    
-    UE_LOG(LogUmgMcp, Display, TEXT("[UMGMCP-Message] Sent response: %s"), *Response);
+
+    const uint8 Delimiter = 0;
+    if (!MCPServerTransport::SendAllBytes(Client, &Delimiter, 1))
+    {
+        UE_LOG(LogUmgMcp, Error, TEXT("MCPServerRunnable: Failed to send response delimiter"));
+        return;
+    }
+
+    UE_LOG(
+        LogUmgMcp,
+        Display,
+        TEXT("[UMGMCP-Message] Sent response (%d utf8 bytes): %s"),
+        ResponseByteCount,
+        *MCPServerTransport::SummarizeResponseForLog(Response));
 }

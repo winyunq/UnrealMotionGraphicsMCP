@@ -379,3 +379,10 @@ void UUmgAttentionSubsystem::SetCursorPosition(const FVector2D& NewPosition)
 {
     CurrentNodePosition = NewPosition;
 }
+
+int32 UUmgAttentionSubsystem::IncrementPatchRevision()
+{
+    ++PatchRevisionCounter;
+    UE_LOG(LogUmgAttention, Log, TEXT("Patch revision incremented to %d"), PatchRevisionCounter);
+    return PatchRevisionCounter;
+}

@@ -28,12 +28,12 @@ public:
     /**
      * @brief Sets or updates properties of a specified widget in a UWidgetBlueprint.
      *
-     * This function performs an incremental "union write" (merging properties). 
-     * Only the properties explicitly specified in the incoming JSON payload will be modified; 
+     * This function performs an incremental "union write" (merging properties).
+     * Only the properties explicitly specified in the incoming JSON payload will be modified;
      * all unspecified properties will remain untouched and retain their existing values.
      *
      * @param WidgetBlueprint The target widget blueprint containing the widget.
-     * @param WidgetName The name of the widget to edit. If empty or omitted at the command level, 
+     * @param WidgetName The name of the widget to edit. If empty or omitted at the command level,
      *                   the active target widget currently focused in the attention context will be used.
      * @param PropertiesJson A JSON formatted string containing the properties to modify.
      * @return True if the properties were successfully set and applied, false otherwise.
@@ -50,7 +50,7 @@ public:
     /**
      * @brief Moves a widget under a new target parent container.
      *
-     * This acts as a standard drag-and-drop operation. The widget is removed from its 
+     * This acts as a standard drag-and-drop operation. The widget is removed from its
      * old parent and appended to the target parent container.
      *
      * @param WidgetBlueprint The target widget blueprint containing the widgets.
@@ -66,14 +66,14 @@ public:
      * @brief Performs in-place replacement by wrapping a widget with a new container.
      *
      * This function creates a new container widget based on the provided JSON specification,
-     * inserts it into the target widget's original hierarchy position (inheriting the target's 
+     * inserts it into the target widget's original hierarchy position (inheriting the target's
      * original parent slot layout properties), and parents the target widget under it.
      *
      * @param WidgetBlueprint The target widget blueprint.
      * @param WidgetName The name of the widget to wrap. If empty, the current active target is used.
      * @param NewParentWidgetJson A JSON string describing the new parent container to construct.
      *                            Must contain at least "widget_class" / "widget_type".
-     * @return TArray<FString> An array containing the names of widgets whose slot/layout parameters 
+     * @return TArray<FString> An array containing the names of widgets whose slot/layout parameters
      *                         were structurally affected (usually includes target widget and wrapper).
      **/
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")

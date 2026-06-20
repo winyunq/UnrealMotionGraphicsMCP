@@ -18,6 +18,8 @@ except ImportError:
     UNREAL_HOST = "127.0.0.1"
     UNREAL_PORT = 7999
 
+from helpers.mcp_transport import read_until_null_delimiter, summarize_response_for_log
+
 class UnrealConnection:
     """Connection helper for Skill mode."""
     async def send_command(self, command: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -29,9 +31,14 @@ class UnrealConnection:
             
             if writer.can_write_eof():
                 writer.write_eof()
-                
-            data = await reader.read(1024 * 1024) # 1MB buffer
-            response_str = data.decode('utf-8').split('\0')[0]
+
+            response_data = await read_until_null_delimiter(reader)
+            response_str = response_data.decode('utf-8')
+            logger.info(
+                "[UMGMCP-Message] Received (%d bytes): %s",
+                len(response_data),
+                summarize_response_for_log(response_str),
+            )
             writer.close()
             await writer.wait_closed()
             return json.loads(response_str)

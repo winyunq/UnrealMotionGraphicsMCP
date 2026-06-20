@@ -41,7 +41,10 @@ public class UmgMcp : ModuleRules
 				"UMG", // Add this line
 				"MovieScene",
 				"MovieSceneTracks",
-				"MaterialEditor"
+				"MaterialEditor",
+				"RenderCore",
+				"ImageWrapper",
+				"RHI"
 			}
 		);
 		
