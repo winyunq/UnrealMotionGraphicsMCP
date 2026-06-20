@@ -1,0 +1,14 @@
+{
+    "components": [
+        {
+            "id": "example_button_row",
+            "asset_path": "/Game/UI/Examples/WBP_StorybookDemo",
+            "description": "Example catalog entry. Replace asset_path with your Widget Blueprint.",
+            "variants": [
+                { "widget_name": "PrimaryButton", "label": "primary" },
+                { "widget_name": "SecondaryButton", "label": "secondary" },
+                { "widget_name": "DisabledButton", "label": "disabled" }
+            ]
+        }
+    ]
+}

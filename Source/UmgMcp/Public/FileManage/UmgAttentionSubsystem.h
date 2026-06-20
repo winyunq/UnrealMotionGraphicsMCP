@@ -123,6 +123,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
     void SetCursorPosition(const FVector2D& NewPosition);
 
+    /** Monotonic revision counter bumped after successful patch_apply. */
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+    int32 GetPatchRevision() const { return PatchRevisionCounter; }
+
+    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Attention")
+    int32 IncrementPatchRevision();
+
 private:
 	void HandleAssetOpened(UObject* Asset, class IAssetEditorInstance* EditorInstance);
 
@@ -142,6 +149,8 @@ private:
     FString CurrentGraphName;
     FString LastEditedNodeId; // The "Program Counter"
     FVector2D CurrentNodePosition; // The visual cursor
+
+    int32 PatchRevisionCounter = 0;
 
 protected:
 	TArray<FString> UmgAssetHistory;

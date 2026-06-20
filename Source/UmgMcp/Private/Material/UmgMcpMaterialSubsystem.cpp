@@ -787,7 +787,7 @@ bool UUmgMcpMaterialSubsystem::SetNodeProperties(const FString& NodeHandle, cons
     // Use Reflection to apply properties
     for (const auto& Elem : Properties->Values)
     {
-        FString PropName = Elem.Key;
+        FString PropName(Elem.Key.ToView());
         TSharedPtr<FJsonValue> JsonVal = Elem.Value;
         
         FProperty* Prop = TargetObject->GetClass()->FindPropertyByName(*PropName);

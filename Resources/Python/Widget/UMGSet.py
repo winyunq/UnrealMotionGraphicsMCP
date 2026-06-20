@@ -1,7 +1,7 @@
 # UMGSet.py
 
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 class UMGSet:
     def __init__(self, client):
@@ -26,9 +26,31 @@ class UMGSet:
         params = {"widget_name": widget_name}
         return self.client.send_command("delete_widget", params)
 
-    def reparent_widget(self, widget_name: str, new_parent_name: str) -> Dict[str, Any]:
-        """Moves a widget to be a child of a different parent."""
-        params = {"widget_name": widget_name, "new_parent_name": new_parent_name}
+    def move_widget(self, widget_name: str, target: str) -> Dict[str, Any]:
+        """Moves a widget under a different parent panel."""
+        params = {"widget_name": widget_name, "target": target}
+        return self.client.send_command("move_widget", params)
+
+    def reparent_widget(
+        self,
+        widget_name: str,
+        new_parent_widget: Optional[Dict[str, Any]] = None,
+        new_parent_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Converts/reparents a widget using the C++ new_parent_widget JSON spec.
+        For simple parent moves, pass new_parent_name and it will call move_widget.
+        """
+        if new_parent_name and not new_parent_widget:
+            return self.move_widget(widget_name, new_parent_name)
+
+        if not new_parent_widget:
+            return {
+                "success": False,
+                "error": "reparent_widget requires new_parent_widget JSON or new_parent_name for move_widget.",
+            }
+
+        params = {"widget_name": widget_name, "new_parent_widget": new_parent_widget}
         return self.client.send_command("reparent_widget", params)
 
     def save_asset(self) -> Dict[str, Any]:

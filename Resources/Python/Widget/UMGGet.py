@@ -37,3 +37,21 @@ class UMGGet:
         if widget_names:
             params["widget_names"] = widget_names
         return self.client.send_command("check_widget_overlap", params)
+
+    def lint_umg_asset(
+        self,
+        rules: Optional[List[str]] = None,
+        viewport_w: int = 1920,
+        viewport_h: int = 1080,
+        depth_threshold: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Runs ESLint-style lint checks on the active UMG asset."""
+        params: Dict[str, Any] = {
+            "viewport_w": viewport_w,
+            "viewport_h": viewport_h,
+        }
+        if rules:
+            params["rules"] = rules
+        if depth_threshold is not None:
+            params["depth_threshold"] = depth_threshold
+        return self.client.send_command("lint_umg_asset", params)

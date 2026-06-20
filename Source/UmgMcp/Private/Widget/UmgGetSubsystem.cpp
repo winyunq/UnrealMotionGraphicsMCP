@@ -10,6 +10,7 @@
 #include "Components/PanelSlot.h"
 #include "Components/CanvasPanelSlot.h"
 #include "FileManage/UmgFileTransformation.h"
+#include "Widget/UmgMcpPropertyJsonUtils.h"
 #include "JsonObjectConverter.h"
 #include "Serialization/JsonWriter.h"
 #include "Dom/JsonObject.h"
@@ -21,109 +22,6 @@
 // --- End Includes ---
 
 DEFINE_LOG_CATEGORY(LogUmgGet);
-
-// --- Helper function for recursive JSON export ---
-static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
-{
-    if (!Widget)
-    {
-        return nullptr;
-    }
-
-    TSharedPtr<FJsonObject> WidgetJson = MakeShared<FJsonObject>();
-    UObject* DefaultWidget = Widget->GetClass()->GetDefaultObject();
-
-    WidgetJson->SetStringField(TEXT("widget_name"), Widget->GetName());
-    WidgetJson->SetStringField(TEXT("widget_class"), Widget->GetClass()->GetPathName());
-
-    TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
-    
-    for (TFieldIterator<FProperty> PropIt(Widget->GetClass()); PropIt; ++PropIt)
-    {
-        FProperty* Property = *PropIt;
-        bool bIsEditorOnly = false;
-#if WITH_EDITOR
-        bIsEditorOnly = Property->HasAnyPropertyFlags(CPF_EditorOnly);
-#endif
-
-        if (Property->HasAnyPropertyFlags(CPF_Edit) && !Property->HasAnyPropertyFlags(CPF_Transient) && !bIsEditorOnly)
-        {
-            void* ValuePtr = Property->ContainerPtrToValuePtr<void>(Widget);
-            void* DefaultValuePtr = Property->ContainerPtrToValuePtr<void>(DefaultWidget);
-
-            if (!Property->Identical(ValuePtr, DefaultValuePtr))
-            {
-                if (Property->GetFName() == TEXT("Slot"))
-                {
-                    if (UPanelSlot* SlotObject = Cast<UPanelSlot>(CastField<FObjectProperty>(Property)->GetObjectPropertyValue_InContainer(Widget)))
-                    {
-                        TSharedPtr<FJsonObject> SlotPropertiesJson = MakeShared<FJsonObject>();
-                        UObject* DefaultSlotObject = SlotObject->GetClass()->GetDefaultObject();
-
-                        for (TFieldIterator<FProperty> SlotPropIt(SlotObject->GetClass()); SlotPropIt; ++SlotPropIt)
-                        {
-                            FProperty* SlotProperty = *SlotPropIt;
-                            if ((SlotProperty->GetFName() != TEXT("Content")) && (SlotProperty->GetFName() != TEXT("Parent")) && SlotProperty->HasAnyPropertyFlags(CPF_Edit) && !SlotProperty->HasAnyPropertyFlags(CPF_Transient))
-                            {
-                                void* SlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(SlotObject);
-                                void* DefaultSlotValuePtr = SlotProperty->ContainerPtrToValuePtr<void>(DefaultSlotObject);
-                                if (!SlotProperty->Identical(SlotValuePtr, DefaultSlotValuePtr))
-                                {
-                                    TSharedPtr<FJsonValue> SlotPropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(SlotProperty, SlotValuePtr);
-                                    if (SlotPropertyJsonValue.IsValid())
-                                    {
-                                        SlotPropertiesJson->SetField(SlotProperty->GetName(), SlotPropertyJsonValue);
-                                    }
-                                }
-                            }
-                        }
-                        if(SlotPropertiesJson->Values.Num() > 0)
-                        {
-                           PropertiesJson->SetObjectField(TEXT("Slot"), SlotPropertiesJson);
-                        }
-                    }
-                }
-                else
-                {
-                    TSharedPtr<FJsonValue> PropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(Property, ValuePtr);
-                    if (PropertyJsonValue.IsValid())
-                    {
-                        PropertiesJson->SetField(Property->GetName(), PropertyJsonValue);
-                    }
-                }
-            }
-        }
-    }
-    
-    if (PropertiesJson->Values.Num() > 0)
-    {
-        WidgetJson->SetObjectField(TEXT("properties"), PropertiesJson);
-    }
-
-    TArray<TSharedPtr<FJsonValue>> ChildrenJsonArray;
-    if (UPanelWidget* PanelWidget = Cast<UPanelWidget>(Widget))
-    {
-        for (int32 i = 0; i < PanelWidget->GetChildrenCount(); ++i)
-        {
-            if (UWidget* ChildWidget = PanelWidget->GetChildAt(i))
-            {
-                TSharedPtr<FJsonObject> ChildJson = ExportWidgetToJson(ChildWidget);
-                if (ChildJson.IsValid())
-                {
-                    ChildrenJsonArray.Add(MakeShared<FJsonValueObject>(ChildJson));
-                }
-            }
-        }
-    }
-    
-    if (ChildrenJsonArray.Num() > 0)
-    {
-        WidgetJson->SetArrayField(TEXT("children"), ChildrenJsonArray);
-    }
-
-    return WidgetJson;
-}
-
 
 // --- Subsystem Implementation ---
 
@@ -226,6 +124,21 @@ FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprin
     {
         TArray<FString> Parts;
         PropPath.ParseIntoArray(Parts, TEXT("."));
+
+        // Whole "Slot" must never go through FJsonObjectConverter on the UObject property
+        // (Widget.Slot -> Content -> Widget causes infinite recursion / stack overflow).
+        if (Parts.Num() == 1 && Parts[0].Equals(TEXT("Slot"), ESearchCase::IgnoreCase))
+        {
+            if (TSharedPtr<FJsonObject> SlotJson = FUmgMcpPropertyJsonUtils::SerializePanelSlotProperties(FoundWidget->Slot))
+            {
+                PropertiesJson->SetObjectField(PropPath, SlotJson);
+            }
+            else
+            {
+                PropertiesJson->SetObjectField(PropPath, MakeShared<FJsonObject>());
+            }
+            continue;
+        }
         
         UObject* CurrentObject = FoundWidget;
         int32 PartIndex = 0;
@@ -325,7 +238,7 @@ FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprin
                 if (PartIndex == Parts.Num() - 1)
                 {
                     // Found the target property
-                    TSharedPtr<FJsonValue> PropertyJsonValue = FJsonObjectConverter::UPropertyToJsonValue(Property, CurrentValuePtr);
+                    TSharedPtr<FJsonValue> PropertyJsonValue = FUmgMcpPropertyJsonUtils::PropertyToJsonValue(Property, CurrentValuePtr);
                     if (PropertyJsonValue.IsValid())
                     {
                         PropertiesJson->SetField(PropPath, PropertyJsonValue);

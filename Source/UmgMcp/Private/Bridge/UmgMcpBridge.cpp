@@ -60,6 +60,7 @@
 #include "Material/UmgMcpMaterialCommands.h" // Add Material Commands
 #include "Blueprint/UmgBlueprintFunctionSubsystem.h"
 #include "FileManage/UmgAttentionSubsystem.h"
+#include "Orchestration/UmgMcpOrchestrationCommands.h"
 
 
 
@@ -72,6 +73,8 @@ UUmgMcpBridge::UUmgMcpBridge()
     BlueprintCommands = MakeShared<FUmgMcpBlueprintCommands>();
     SequencerCommands = MakeShared<FUmgMcpSequencerCommands>();
     MaterialCommands = MakeShared<FUmgMcpMaterialCommands>();
+    StorybookCommands = MakeShared<FUmgMcpStorybookCommands>();
+    OrchestrationCommands = MakeShared<FUmgMcpOrchestrationCommands>();
 }
 
 UUmgMcpBridge::~UUmgMcpBridge()
@@ -83,6 +86,8 @@ UUmgMcpBridge::~UUmgMcpBridge()
     BlueprintCommands.Reset();
     SequencerCommands.Reset();
     MaterialCommands.Reset();
+    StorybookCommands.Reset();
+    OrchestrationCommands.Reset();
 }
 
 // Initialize subsystem
@@ -424,10 +429,12 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("query_widget_properties") ||
                  CommandType == TEXT("get_layout_data") ||
                  CommandType == TEXT("check_widget_overlap") ||
+                 CommandType == TEXT("lint_umg_asset") ||
                  CommandType == TEXT("create_widget") ||
                  CommandType == TEXT("set_widget_properties") ||
                  CommandType == TEXT("delete_widget") ||
                  CommandType == TEXT("reparent_widget") ||
+                 CommandType == TEXT("move_widget") ||
                  CommandType == TEXT("save_asset") ||
                  CommandType == TEXT("get_widget_schema"))
         {
@@ -463,6 +470,17 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("animation_delete_widget_keys"))
         {
             ResultJson = SequencerCommands->HandleCommand(CommandType, Params);
+        }
+        // Orchestration Commands (Theme / Catalog / Patch)
+        else if (CommandType == TEXT("theme_get") ||
+                 CommandType == TEXT("theme_apply") ||
+                 CommandType == TEXT("theme_resolve_token") ||
+                 CommandType == TEXT("catalog_list") ||
+                 CommandType == TEXT("catalog_describe") ||
+                 CommandType == TEXT("patch_apply") ||
+                 CommandType == TEXT("get_patch_revision"))
+        {
+            ResultJson = OrchestrationCommands->HandleCommand(CommandType, Params);
         }
         // Editor Commands (Actors, Level, etc.)
         else if (CommandType == TEXT("get_actors_in_level") ||
@@ -522,7 +540,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                          // Copy existing fields
                          for (auto& Elem : Params->Values)
                          {
-                             ModifiedParams->SetField(Elem.Key, Elem.Value);
+                             ModifiedParams->SetField(Elem.Key.ToView(), Elem.Value);
                          }
 
                          FString SubAction;
@@ -636,6 +654,13 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         {
             ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
         }
+        // Storybook / Preview Commands
+        else if (CommandType == TEXT("render_widget_preview") ||
+                 CommandType == TEXT("storybook_list_variants") ||
+                 CommandType == TEXT("storybook_render"))
+        {
+            ResultJson = StorybookCommands->HandleCommand(CommandType, Params);
+        }
         else
         {
             ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
@@ -681,7 +706,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
             ResponseJson->SetStringField(TEXT("status"), TEXT("success"));
             for (const auto& Field : ResultJson->Values)
             {
-                const FString& Key = Field.Key;
+                const FString Key(Field.Key.ToView());
                 if (Key != TEXT("success") && Key != TEXT("status"))
                 {
                     ResponseJson->SetField(Key, Field.Value);

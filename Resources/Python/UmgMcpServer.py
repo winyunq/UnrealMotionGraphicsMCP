@@ -35,13 +35,19 @@ from mcp_config import UNREAL_HOST, UNREAL_PORT, SOCKET_TIMEOUT
 from FileManage import UMGAttention
 from Widget import UMGGet
 from Widget import UMGSet
+from Widget import UMGStorybook
+from Theme import UMGTheme
+from Catalog import UmgComponentCatalog
+from Patch import UmgPatchEngine
 from FileManage import UMGFileTransformation
 from Bridge import UMGHTMLParser
+from Bridge.UmgLayoutCompiler import UmgLayoutCompiler, LayoutLint
+from Bridge.UmgLayoutPatch import is_patch_dsl, apply_layout_patch
+from Bridge.UmgAssetLinter import normalize_report, auto_fix_lint_loop, auto_fix_lint_loop, is_auto_applicable_fix
 from Editor import UMGEditor
 from Material import UMGMaterial
 
-
-
+from helpers.mcp_transport import read_until_null_delimiter, summarize_response_for_log
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -96,33 +102,23 @@ class UnrealConnection:
             sys.stderr.write("DEBUG: Async Waiting for response (read 4096 chunks)...\n")
             sys.stderr.flush()
             
-            chunks = []
-            while True:
-                # Read chunk
-                chunk = await reader.read(4096)
-                if not chunk:
-                    break # EOF
-                
-                if b'\x00' in chunk:
-                    chunks.append(chunk[:chunk.find(b'\x00')])
-                    break
-                chunks.append(chunk)
-            
-            response_data = b"".join(chunks)
+            response_data = await read_until_null_delimiter(reader)
             
             sys.stderr.write(f"DEBUG: Async Received {len(response_data)} bytes.\n")
             sys.stderr.flush()
 
             response_str = response_data.decode('utf-8')
-            logger.info(f"[UMGMCP-Message] Received: {response_str}")
+            logger.info(
+                "[UMGMCP-Message] Received (%d bytes): %s",
+                len(response_data),
+                summarize_response_for_log(response_str),
+            )
             
             if not response_str:
                 raise ConnectionError("Empty response from Unreal")
 
             response = json.loads(response_str)
-            
-            # Log complete response for debugging
-            logger.info(f"Complete response from Unreal: {response}")
+            logger.info("Complete response from Unreal: %s", summarize_response_for_log(response))
             
             # Check for error formats
             if response.get("status") == "error":
@@ -499,14 +495,213 @@ async def get_layout_data(resolution_width: int = 1920, resolution_height: int =
     umg_get_client = UMGGet.UMGGet(conn)
     return await umg_get_client.get_layout_data(resolution_width, resolution_height)
 
-@register_tool("check_widget_overlap", "Checks for widget overlap.")
-async def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
+@register_tool("lint_umg_asset", "Runs ESLint-style lint checks on the Active Target UMG asset.")
+async def lint_umg_asset(
+    rules: Optional[List[str]] = None,
+    viewport_w: int = 1920,
+    viewport_h: int = 1080,
+    depth_threshold: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_get_client = UMGGet.UMGGet(conn)
-    return await umg_get_client.check_widget_overlap(widget_names)
+    result = await umg_get_client.lint_umg_asset(
+        rules=rules,
+        viewport_w=viewport_w,
+        viewport_h=viewport_h,
+        depth_threshold=depth_threshold,
+    )
+    return normalize_report(result)
+
+@register_tool("auto_fix_lint", "Runs bounded lint/auto-fix iterations for auto-applicable overlap fixes.")
+async def auto_fix_lint(
+    rules: Optional[List[str]] = None,
+    viewport_w: int = 1920,
+    viewport_h: int = 1080,
+    max_iterations: int = 3,
+) -> Dict[str, Any]:
+    """
+    Lint loop with stall detection. Only auto-applies fixSuggestion marked meta.autoApplicable.
+    """
+    conn = get_unreal_connection()
+    umg_get_client = UMGGet.UMGGet(conn)
+    umg_set_client = UMGSet.UMGSet(conn)
+
+    async def lint_fn():
+        return await umg_get_client.lint_umg_asset(
+            rules=rules,
+            viewport_w=viewport_w,
+            viewport_h=viewport_h,
+        )
+
+    async def apply_fix_fn(params: Dict[str, Any]):
+        widget_name = params.get("widget_name", "")
+        properties = params.get("properties", {})
+        if not widget_name or not properties:
+            return {"success": False, "error": "fixSuggestion params missing widget_name/properties."}
+        return await umg_set_client.set_widget_properties(widget_name, properties)
+
+    result = await auto_fix_lint_loop(
+        lint_fn,
+        apply_fix_fn,
+        max_iterations=max(1, min(max_iterations, 5)),
+    )
+    if "report" in result:
+        result["report"] = normalize_report(result["report"])
+    return result
+
+@register_tool("check_widget_overlap", "Checks for widget overlap.")
+async def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    Legacy wrapper around lint_umg_asset(layout-overlap only).
+    """
+    conn = get_unreal_connection()
+    umg_get_client = UMGGet.UMGGet(conn)
+    result = await umg_get_client.lint_umg_asset(rules=["layout-overlap"])
+    normalized = normalize_report(result)
+    has_overlap = any(
+        issue.get("ruleId") == "layout-overlap"
+        for issue in normalized.get("issues", [])
+    )
+    normalized["has_overlap"] = has_overlap or result.get("has_overlap", False)
+    return normalized
+
+# =============================================================================
+#  Category: Storybook / Visual Preview
+# =============================================================================
+
+@register_tool("render_widget_preview", "Renders an isolated widget preview screenshot.")
+async def render_widget_preview(
+    asset_path: Optional[str] = None,
+    widget_name: Optional[str] = None,
+    viewport_w: int = 400,
+    viewport_h: int = 300,
+    theme: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Renders via C++ TakeWidget + SVirtualWindow off-screen path (no Designer required).
+    Omits widget_name unless explicitly set so the full UserWidget is captured for AI review.
+    """
+    conn = get_unreal_connection()
+    storybook_client = UMGStorybook.UMGStorybook(conn)
+
+    resolved_path = asset_path or context_manager.get_target()
+    # Only pass widget_name when the caller explicitly requests a subtree preview.
+    explicit_widget_name = widget_name if widget_name is not None else None
+
+    params_path = normalize_project_path(resolved_path) if resolved_path else None
+    result = await storybook_client.render_widget_preview(
+        asset_path=params_path,
+        widget_name=explicit_widget_name,
+        viewport_w=viewport_w,
+        viewport_h=viewport_h,
+        theme=theme,
+    )
+
+    if isinstance(result, dict):
+        err = result.get("error") or ""
+        if "no root widget" in str(err).lower():
+            result["hint"] = (
+                "Create a panel root first, e.g. create_widget(widget_type='VerticalBox', new_widget_name='Root')."
+            )
+
+    return result
+
+@register_tool("storybook_list_variants", "Lists storybook widget variants.")
+async def storybook_list_variants(
+    asset_path: Optional[str] = None,
+    parent_widget: Optional[str] = None,
+    catalog_component_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    storybook_client = UMGStorybook.UMGStorybook(conn)
+
+    resolved_path = asset_path or context_manager.get_target()
+    params_path = normalize_project_path(resolved_path) if resolved_path else None
+    return await storybook_client.storybook_list_variants(
+        asset_path=params_path,
+        parent_widget=parent_widget,
+        catalog_component_id=catalog_component_id,
+    )
+
+@register_tool("storybook_render", "Batch-renders storybook widget variant screenshots.")
+async def storybook_render(
+    asset_path: Optional[str] = None,
+    widget_names: Optional[List[str]] = None,
+    viewport_w: int = 400,
+    viewport_h: int = 300,
+    theme: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    storybook_client = UMGStorybook.UMGStorybook(conn)
+
+    resolved_path = asset_path or context_manager.get_target()
+    params_path = normalize_project_path(resolved_path) if resolved_path else None
+    return await storybook_client.storybook_render(
+        asset_path=params_path,
+        widget_names=widget_names,
+        viewport_w=viewport_w,
+        viewport_h=viewport_h,
+        theme=theme,
+    )
+
+# =============================================================================
+#  Category: Theme / Catalog / Patch Orchestration
+# =============================================================================
+
+@register_tool("theme_get", "Read design tokens from theme.json.")
+async def theme_get(theme_path: Optional[str] = None) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    client = UMGTheme.UMGTheme(conn)
+    return await client.theme_get(theme_path)
+
+@register_tool("theme_apply", "Merge a patch into theme.json and reload token cache.")
+async def theme_apply(patch: Dict[str, Any], theme_path: Optional[str] = None) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    client = UMGTheme.UMGTheme(conn)
+    return await client.theme_apply(patch, theme_path)
+
+@register_tool("theme_resolve_token", "Resolve a @token reference against the active theme.")
+async def theme_resolve_token(token: str) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    client = UMGTheme.UMGTheme(conn)
+    return await client.theme_resolve_token(token)
+
+@register_tool("catalog_list", "List reusable WBP components under a content root.")
+async def catalog_list(root: str = "/Game/UI", recursive: bool = True) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    client = UmgComponentCatalog.UmgComponentCatalog(conn)
+    return await client.catalog_list(root=root, recursive=recursive)
+
+@register_tool("catalog_describe", "Describe NamedSlots and Expose-on-Spawn params for a WBP.")
+async def catalog_describe(path: str) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    client = UmgComponentCatalog.UmgComponentCatalog(conn)
+    return await client.catalog_describe(path)
+
+@register_tool("patch_preview", "Preview planned patch ops without applying.")
+async def patch_preview_tool(patch: List[Dict[str, Any]]) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    engine = UmgPatchEngine.UmgPatchEngine(conn)
+    return await engine.patch_preview(patch)
+
+@register_tool("patch_apply", "Apply patch ops atomically inside one undo transaction.")
+async def patch_apply_tool(
+    patch: List[Dict[str, Any]],
+    expected_revision: Optional[int] = None,
+) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    engine = UmgPatchEngine.UmgPatchEngine(conn)
+    return await engine.patch_apply(patch, expected_revision=expected_revision)
 
 # =============================================================================
 #  Category: Action
@@ -547,13 +742,21 @@ async def delete_widget(widget_name: str) -> Dict[str, Any]:
     return await umg_set_client.delete_widget(widget_name)
 
 @register_tool("reparent_widget", "Moves a widget to a new parent.")
-async def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
+async def reparent_widget(
+    widget_name: str,
+    new_parent_name: Optional[str] = None,
+    new_parent_widget: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
-    (Description loaded from prompts.json)
+    Simple parent move via new_parent_name, or widget conversion via new_parent_widget JSON.
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return await umg_set_client.reparent_widget(widget_name, new_parent_name)
+    return await umg_set_client.reparent_widget(
+        widget_name,
+        new_parent_widget=new_parent_widget,
+        new_parent_name=new_parent_name,
+    )
 
 @register_tool("save_asset", "Saves the UMG asset.")
 async def save_asset() -> Dict[str, Any]:
@@ -625,6 +828,79 @@ async def apply_layout(layout_content: str, widget_name: Optional[str] = None) -
 
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
     return await umg_trans_client.apply_json_to_umg(final_path, json_data, target_widget)
+
+@register_tool(
+    "apply_constrained_layout",
+    "Applies unified layout DSL (flex/grid/absolute full tree, or patch:true slot updates). Preferred over raw apply_layout.",
+)
+async def apply_constrained_layout(
+    dsl_json: str,
+    widget_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Compiles unified layout DSL to UMG JSON, runs lint, then applies.
+    Patch mode: {\"patch\": true, \"updates\": [{\"name\": \"Widget\", \"size\": \"fill\", ...}]}
+    """
+    try:
+        dsl_node = json.loads(dsl_json.strip())
+    except json.JSONDecodeError as e:
+        return {"status": "error", "error": f"DSL JSON Parsing Failed: {str(e)}"}
+
+    if not isinstance(dsl_node, dict):
+        return {"status": "error", "error": "dsl_json must be a JSON object (root layout node)."}
+
+    if is_patch_dsl(dsl_node):
+        conn = get_unreal_connection()
+        umg_get_client = UMGGet.UMGGet(conn)
+        umg_set_client = UMGSet.UMGSet(conn)
+        return await apply_layout_patch(
+            dsl_node,
+            get_tree=umg_get_client.get_widget_tree,
+            set_widget_properties=umg_set_client.set_widget_properties,
+        )
+
+    compiled, lint = UmgLayoutCompiler.compile(dsl_node)
+    if not lint.ok:
+        return {
+            "status": "error",
+            "error": "Layout lint failed. Fix errors before applying.",
+            "lint": lint.to_dict(),
+            "compiled_preview": compiled,
+        }
+
+    conn = get_unreal_connection()
+    theme_client = UMGTheme.UMGTheme(conn)
+    theme_resp = await theme_client.theme_get()
+    theme_dict = UMGTheme.UMGTheme.extract_theme_dict(theme_resp)
+    compiled = theme_client.resolve_tokens_in_layout(compiled, theme_dict)
+
+    layout_content = json.dumps(compiled, ensure_ascii=False)
+    result = await apply_layout(layout_content, widget_name)
+
+    applied = result.get("applied") is True or (
+        result.get("success") is True and result.get("applied") is not False
+    )
+    if result.get("status") == "error" or result.get("success") is False or not applied:
+        return {
+            "status": "error",
+            "error": result.get("error") or "Layout apply was not confirmed by editor.",
+            "applied": False,
+            "lint": lint.to_dict(),
+            "compiled_layout": compiled,
+            "apply_result": result,
+        }
+
+    return {
+        "status": "success",
+        "mode": "full",
+        "applied": True,
+        "confirmed_applied": True,
+        "lint": lint.to_dict(),
+        "compiled_layout": compiled,
+        "reparented_widgets": result.get("reparented_widgets", []),
+        "apply_result": result,
+    }
+
 
 @mcp.tool()
 async def apply_json_to_umg(asset_path: str, json_data: dict, widget_name: Optional[str] = None) -> Dict[str, Any]:
