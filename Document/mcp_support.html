@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3. Supported MCPs (C++) - UMG MCP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#030712',
+                            card: '#0b0f19',
+                            border: '#1e293b',
+                            neonBlue: '#00f0ff',
+                            neonPurple: '#d946ef',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #0d1527 0%, #030712 100%);
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-border-hover:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .sidebar-link-active {
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(217, 70, 239, 0.02) 100%);
+            border-left: 3px solid #00f0ff;
+            color: #00f0ff;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="w-80 glass-panel border-r border-slate-800 flex flex-col shrink-0">
+        <!-- Logo / Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-cyan-500 to-fuchsia-500 p-[2px]">
+                    <div class="w-full h-full bg-cyber-bg rounded-[6px] flex items-center justify-center">
+                        <i data-lucide="layout" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-cyber-text tracking-wide text-lg">UMG MCP</h1>
+                    <p class="text-xs text-slate-500">Winyunq Ultimate Intel</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between text-sm">
+            <span class="text-slate-500">Language / 语言</span>
+            <a href="mcp_support_zh.html" class="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                <span>简体中文</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="index.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 transition-all">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span>Quick Start / Lobby</span>
+            </a>
+            <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">CORE TOPICS</div>
+            <a href="model_config.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>1. Configure Model (4 Options)</span>
+            </a>
+            <a href="chat_dialogue.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>2. How to Chat (4 Agent Modes)</span>
+            </a>
+            <a href="mcp_support.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-all font-medium sidebar-link-active">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>3. Supported MCPs (C++)</span>
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-800">
+            <div class="text-xs text-slate-500">
+                <p>© 2026 Winyunq. All rights reserved.</p>
+                <p class="mt-1 flex items-center text-slate-600">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i>
+                    Dual-Loop Secure Protection
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <!-- Top bar -->
+        <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 bg-cyber-bg/30 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="text-slate-500">Official Docs</span>
+                <span class="text-slate-500">/</span>
+                <span class="text-slate-400 text-sm">Supported MCPs (C++)</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <p class="text-xs text-slate-500">Subsystem Commands</p>
+                    <p class="text-xs text-cyan-400 font-semibold">7 C++ Open-Source Command Classes</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="px-10 py-12 max-w-5xl w-full mx-auto space-y-12">
+            <!-- Header -->
+            <div class="space-y-4">
+                <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center">
+                    <i data-lucide="cpu" class="w-8 h-8 text-cyan-400 mr-3"></i>
+                    Chapter 3: Supported MCP Interfaces (C++ Command Index)
+                </h2>
+                <p class="text-slate-400 text-base leading-relaxed">
+                    This guide focuses exclusively on the fully open-source, user-controlled C++ MCP commands (excluding the closed-source <code class="text-cyan-400">fabserver</code> cloud components). Via direct calls through <code class="text-fuchsia-400">UUmgMcpBridge</code> (C++ Bridge Subsystem), the AI can trigger and instantly execute native API tasks within Unreal's Game Thread across <strong>7 core domains</strong>, enabling pin-level blueprint connection, widget spawning, and shader injection.
+                </p>
+            </div>
+
+            <!-- Command Categories -->
+            <div class="space-y-10">
+
+                <!-- Cat 1: Attention -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="eye" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">1. Viewport & Graph Perception Commands (Attention)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpAttentionCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        Provides the AI with "visual focus" and logical positioning in the Unreal Editor's viewport and blueprint graphs. This is a prerequisite for executing any modifications.
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">Command Type</th>
+                                    <th class="py-2 px-3">Description</th>
+                                    <th class="py-2 px-3">Core Params (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_last_edited_umg_asset</td>
+                                    <td class="py-3 px-3">Retrieves the path of the last modified UMG asset.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_recently_edited_umg_assets</td>
+                                    <td class="py-3 px-3">Lists UMG assets that were recently active in the editor.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_target_umg_asset</td>
+                                    <td class="py-3 px-3">Queries the active UMG asset currently locked in the Attention system.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_target_umg_asset</td>
+                                    <td class="py-3 px-3">Locks a specific UMG asset path as the AI's target for editing.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"asset_path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_target_widget</td>
+                                    <td class="py-3 px-3">Queries the active selected widget name.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_target_widget</td>
+                                    <td class="py-3 px-3">Locks onto a specific widget in the current active hierarchy.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_target_graph</td>
+                                    <td class="py-3 px-3">Locks onto a target graph or function. If pointing to Component.Event syntax (e.g. Button.OnClicked), it auto-wires and ensures the existence of the bound event.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"graph_name": "String"} or {"function_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_target_graph</td>
+                                    <td class="py-3 px-3">Retrieves the active graph/function name.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_cursor_node</td>
+                                    <td class="py-3 px-3">Positions the blueprint cursor (Program Counter) strictly on a designated node.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"node_id": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_cursor_node</td>
+                                    <td class="py-3 px-3">Retrieves the current node ID the cursor is focused on.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cat 2: Widget Operations -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="layers" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">2. UMG Widget Hierarchy & Slot Commands (Widget Operations)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpWidgetCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        Manages the underlying SWidget tree hierarchy in Unreal's memory, enabling high-fidelity layout creation and manipulation.
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">Command Type</th>
+                                    <th class="py-2 px-3">Description</th>
+                                    <th class="py-2 px-3">Core Params (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_widget_tree</td>
+                                    <td class="py-3 px-3">Returns the entire widget nesting tree, showing parent-child hierarchy and slot types.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">query_widget_properties</td>
+                                    <td class="py-3 px-3">Uses C++ Reflection to read all exposure fields and active parameters of a widget.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_widget_schema</td>
+                                    <td class="py-3 px-3">Queries struct layouts, default slots, and supported parameters of a widget class.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_class": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">create_widget</td>
+                                    <td class="py-3 px-3">Constructs a new widget of a specific class and hooks it into a parent widget's slot in memory.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String", "widget_class": "String", "parent_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_widget_properties</td>
+                                    <td class="py-3 px-3">Updates reflection parameters batching colors, slots, sizes, alignment, and anchors.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String", "properties": {"Property_Name": "Value"}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">delete_widget</td>
+                                    <td class="py-3 px-3">Physically deletes a widget and recursively destroys its nested children.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">reparent_widget</td>
+                                    <td class="py-3 px-3">Detaches a widget and re-anchors it onto a new designated parent.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String", "new_parent_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">save_asset</td>
+                                    <td class="py-3 px-3">Forces the editor to commit current memory adjustments to the UMG asset file.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_layout_data</td>
+                                    <td class="py-3 px-3">Fetches active size, boundary padding, offsets, and scales under viewport layout.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">check_widget_overlap</td>
+                                    <td class="py-3 px-3">Performs geometric checks to analyze if two widgets collide or overlap in the layout coordinate space.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_a": "String", "widget_b": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cat 3: File Transformation -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="file-code" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">3. UI Serialization & Sync Commands (File Sync)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpFileTransformationCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        Enables high-speed translation between the in-editor active UMG structures and physical JSON layout sheets on disk.
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">Command Type</th>
+                                    <th class="py-2 px-3">Description</th>
+                                    <th class="py-2 px-3">Core Params (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">export_umg_to_json</td>
+                                    <td class="py-3 px-3">Serializes the active layout hierarchy and reflection properties to a file.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"export_path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">apply_json_to_umg</td>
+                                    <td class="py-3 px-3">Parses a local JSON layout description and incremental rebuilds UMG asset parameters in the editor.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"json_path": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cat 4: Sequencer -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="clapperboard" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">4. UI Sequencer & Keyframe Commands (Sequencer)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpSequencerCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        Manages the editor's UI Sequencer tracks at the C++ level. AI can directly insert, modify, or erase keyframes from animation tracks to produce vibrant UI motion.
+                    </p>
+                    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead class="sticky top-0 bg-cyber-card z-10">
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">Command Type</th>
+                                    <th class="py-2 px-3">Description</th>
+                                    <th class="py-2 px-3">Core Params (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_all_animations</td>
+                                    <td class="py-3 px-3">Lists all UI animations defined inside the current asset.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">create_animation</td>
+                                    <td class="py-3 px-3">Instantiates a brand new UWidgetAnimation object in the asset.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">delete_animation</td>
+                                    <td class="py-3 px-3">Deletes the specified animation object.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_property_keys</td>
+                                    <td class="py-3 px-3">Inserts or overwrites keyframe values on a designated widget property animation channel at a precise time step.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widget_name": "String", "property_path": "String", "time": 0.5, "value": 1.0}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">remove_property_track</td>
+                                    <td class="py-3 px-3">Destroys a property animation channel associated with a widget.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widget_name": "String", "property_path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_animation_keyframes</td>
+                                    <td class="py-3 px-3">Fetches the keyframe list and curves of the animation.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_animated_widgets</td>
+                                    <td class="py-3 px-3">Lists all widgets that possess active animation channels in the track.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_animation_full_data</td>
+                                    <td class="py-3 px-3">Extracts an all-in-one comprehensive JSON packet outlining channels, properties, and times.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">animation_append_widget_tracks</td>
+                                    <td class="py-3 px-3">Appends blank property animation tracks to multiple widgets in batch.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widgets": ["String"]}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">animation_delete_widget_keys</td>
+                                    <td class="py-3 px-3">Clears a widget's keyframe data falling within a specified start and end time.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widget_name": "String", "start_time": 0.0, "end_time": 1.0}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cat 5: Blueprint -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="git-fork" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">5. Blueprint Graph & Node Manipulation Commands (Blueprint)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpBlueprintCommands / manage_blueprint_graph</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        This is the **flagship C++ engine capability**. The AI does not just construct layout widgets; it injects node steps directly in the Blueprint Editor, wiring execution flows and data values, and triggers fast recompilation!
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">Command Type</th>
+                                    <th class="py-2 px-3">Sub-Action (subAction / action)</th>
+                                    <th class="py-2 px-3">Description & Intelligent C++ Logic</th>
+                                    <th class="py-2 px-3">Core Params (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400" rowspan="4">manage_blueprint_graph</td>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">create_node / add_node</td>
+                                    <td class="py-3 px-3">Injects a functional node in the graph. If coordinate is omitted, <code class="text-cyan-400">UUmgAttentionSubsystem</code> calculates the cursor offset to avoid overlap. If <code class="text-cyan-400">autoConnectToNodeId</code> is defined, it wires executing flow pins automatically.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "create_node", "nodeType": "String", "x": 100, "y": 200, "autoConnectToNodeId": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">delete_node</td>
+                                    <td class="py-3 px-3">Deletes a node from the graph. If the active cursor is focused on this node, the C++ subsystem relocates and shifts focus onto adjacent node pathways (<code class="text-cyan-400">newCursorNode</code>).</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "delete_node", "nodeId": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">connect_pins</td>
+                                    <td class="py-3 px-3">Wires execution (Exec) pins or data pins between two blueprint nodes.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "connect_pins", "fromNode": "String", "fromPin": "String", "toNode": "String", "toPin": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">add_variable / add_param</td>
+                                    <td class="py-3 px-3">Registers a new local variable or parameters in the blueprint metadata block.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "add_variable", "varName": "String", "varType": "String"}</td>
+                                </tr>
+                                <tr class="border-t border-slate-800">
+                                    <td class="py-3 px-3 font-mono text-cyan-400">compile_blueprint</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                    <td class="py-3 px-3">Triggers C++ physical compilation of the WidgetBlueprint, refreshing editor reflection tables and activating nodes immediately!</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">create_blueprint</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                    <td class="py-3 px-3">Spawns a generic blueprint class asset (e.g. Actor) in files.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"bp_name": "String", "parent_class": "String", "path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">add_component_to_blueprint</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                    <td class="py-3 px-3">Appends root components or functional nodes (like Box, StaticMesh) to standard blueprints.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"bp_path": "String", "component_class": "String", "component_name": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cat 6: Material & HLSL -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="palette" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">6. UI Material & HLSL Shader Injection Commands (Material & HLSL)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpMaterialCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        Tailored for premium motion graphic artists. The AI can parse active material structures and directly inject a localized HLSL shader script (e.g. frosted glass refraction, cyberpunk grid sweeping) inside custom material nodes, establishing correct pin parameters automatically.
+                    </p>
+                    <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5">
+                        <div class="flex items-center space-x-2 text-cyan-400 text-xs font-semibold mb-2">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            <span>C++ Router Matching Principle:</span>
+                        </div>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            Any JSON command payload whose Type field initiates with prefix <code class="text-cyan-400">material_</code> or <code class="text-cyan-400">hlsl_</code> is routed dynamically to the underlying C++ <code class="text-fuchsia-400">FUmgMcpMaterialCommands</code> system for low-level shader generation and property alignment.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Cat 7: Editor World -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="box" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">7. Editor World & Asset Pipeline Commands (Editor World & Assets)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpEditorCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        Enables speedy controls over level actors (static meshes, spotlight actors, camera rigs) and general file scanning pipelines in the Unreal Editor.
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">Command Type</th>
+                                    <th class="py-2 px-3">Description</th>
+                                    <th class="py-2 px-3">Core Params (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_actors_in_level</td>
+                                    <td class="py-3 px-3">Lists all Actor instances currently resting in the active editor world.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">find_actors_by_name</td>
+                                    <td class="py-3 px-3">Finds actors inside the 3D level matching full or partial names.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">spawn_actor</td>
+                                    <td class="py-3 px-3">Spawns meshes, lights, cameras, or custom blueprints into the level view.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_class": "String", "location": {"x":0,"y":0,"z":0}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">delete_actor</td>
+                                    <td class="py-3 px-3">Removes and destroys designated actor instances.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_actor_transform</td>
+                                    <td class="py-3 px-3">Modifies active location, rotation, and scaling vectors of an actor in level.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_name": "String", "location": {"x":0,"y":0,"z":0}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">refresh_asset_registry</td>
+                                    <td class="py-3 px-3">Commands the Asset Registry module to run a scan syncing new in-memory file changes.</td>
+                                    <td class="py-3 px-3 text-slate-600">None</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">list_assets</td>
+                                    <td class="py-3 px-3">Queries valid asset paths under specified directories.</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"folder_path": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Architecture Logic -->
+            <div class="glass-panel rounded-xl p-8 border border-slate-800 space-y-4">
+                <h3 class="text-xl font-bold text-white flex items-center">
+                    <i data-lucide="shield" class="w-5 h-5 text-fuchsia-400 mr-2"></i>
+                    💡 Dual-Loop Connection: Zero-Network Local In-Memory Bridge
+                </h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    When deploying or interacting with UMG MCP, do not conflate external ports with internal routes. The C++ plugin utilizes a strict **Dual-Loop Physical Isolation** architecture:
+                </p>
+                <ul class="list-disc pl-6 text-xs text-slate-400 space-y-2">
+                    <li>
+                        <strong>Built-in Direct Connection Loop (Zero Network Loops)</strong>: When asking the built-in Agent directly inside the Unreal Editor panel and selecting <code class="text-cyan-400">Accept</code>, commands are executed **100% in memory**. The panel communicates via direct C++ pointers with the subsystem, bypassing **any** loopback IP or socket layers. This delivers absolute local execution speeds and zero port leaks.
+                    </li>
+                    <li>
+                        <strong>External Bridge Loop (TCP 55557 Port Listener)</strong>: Only when exposing the editor control to external AI clients (like Claude Desktop or custom script nodes) does the C++ background thread initialize a socket listening on port <code class="text-cyan-400">TCP 55557</code> (configured default). It safely reads JSON packet blocks and feeds them back strictly under main thread locks.
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Architecture View Placeholder -->
+            <div class="space-y-4">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase tracking-wider font-mono">📸 Architecture View Placeholder</h4>
+                <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
+                    <i data-lucide="network" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
+                    <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: UmgMcp C++ Subsystem Dual-Loop Connection Architecture]</p>
+                    <p class="text-xs text-slate-600 mt-1">Provide a system topology rendering, visually showcasing the memory connection (zero loopback network overhead) of Slate Chat UI alongside the TCP 55557 external Python daemon bridging loop.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

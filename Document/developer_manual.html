@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMG MCP Advanced Interaction Manual</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#030712',
+                            card: '#0b0f19',
+                            border: '#1e293b',
+                            neonBlue: '#00f0ff',
+                            neonPurple: '#d946ef',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #0d1527 0%, #030712 100%);
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-border-hover:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .sidebar-link-active {
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(217, 70, 239, 0.02) 100%);
+            border-left: 3px solid #00f0ff;
+            color: #00f0ff;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="w-80 glass-panel border-r border-slate-800 flex flex-col shrink-0">
+        <!-- Logo / Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-cyan-500 to-fuchsia-500 p-[2px]">
+                    <div class="w-full h-full bg-cyber-bg rounded-[6px] flex items-center justify-center">
+                        <i data-lucide="layout" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-cyber-text tracking-wide text-lg">UMG MCP</h1>
+                    <p class="text-xs text-slate-500">Winyunq Ultimate</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between text-sm">
+            <span class="text-slate-500">Language / 语言</span>
+            <a href="developer_manual_zh.html" class="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                <span>中文 (Chinese)</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="developer_manual.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-all font-medium sidebar-link-active">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span>Quick Start / Lobby</span>
+            </a>
+            <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider font-mono">Core Sections</div>
+            <a href="model_config.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>1. Model Configuration</span>
+            </a>
+            <a href="chat_dialogue.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>2. Chat Dialogue (4 Agents)</span>
+            </a>
+            <a href="mcp_support.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>3. Supported MCPs (C++)</span>
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-800">
+            <div class="text-xs text-slate-500">
+                <p>© 2026 Winyunq. All rights reserved.</p>
+                <p class="mt-1 flex items-center text-slate-600">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i>
+                    Dual-Loop High Performance Secure
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <!-- Top bar -->
+        <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 bg-cyber-bg/30 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="px-3 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-semibold uppercase tracking-wider font-mono">
+                    Official Docs
+                </span>
+                <span class="text-slate-500">/</span>
+                <span class="text-slate-400 text-sm">Quick Start</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right font-mono">
+                    <p class="text-xs text-slate-500">Hardware Optimized</p>
+                    <p class="text-xs text-fuchsia-400 font-semibold">i9-13900HX | RTX 4060 | 64GB</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <div class="px-10 py-12 max-w-6xl w-full mx-auto space-y-12">
+            <div class="relative rounded-2xl overflow-hidden glass-panel border border-slate-800 p-10 flex flex-col md:flex-row items-center justify-between">
+                <div class="absolute -top-24 -left-24 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div class="space-y-6 max-w-2xl relative z-10">
+                    <h2 class="text-4xl font-extrabold tracking-tight text-white sm:text-5xl leading-tight">
+                        Empower AI to Design<br>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-teal-400 to-fuchsia-500">
+                            Unreal UMG UI via MCP
+                        </span>
+                    </h2>
+                    <p class="text-slate-400 text-lg leading-relaxed">
+                        Welcome to the UMG MCP Advanced Interaction Manual! Designed specifically for Winyunq's ultimate engineering, this manual strips away the fluff to present exactly the 3 core pillars to get you building immediately.
+                    </p>
+                </div>
+                <div class="mt-8 md:mt-0 flex shrink-0 justify-center items-center relative z-10 w-44 h-44 rounded-full bg-gradient-to-tr from-cyan-500/20 to-fuchsia-500/20 p-[2px]">
+                    <div class="w-full h-full bg-slate-900 rounded-full flex flex-col items-center justify-center">
+                        <i data-lucide="terminal" class="w-10 h-10 text-cyan-400 mb-2"></i>
+                        <span class="text-xs font-mono font-bold text-slate-400 tracking-wider">v1.1.0-Win64</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pillars Cards -->
+            <div class="space-y-6">
+                <h3 class="text-2xl font-bold text-white flex items-center">
+                    <i data-lucide="box" class="w-6 h-6 text-fuchsia-400 mr-2"></i>
+                    Core Guide Sections
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Card 1 -->
+                    <a href="model_config.html" class="glass-panel rounded-xl p-8 block neon-border-hover transition-all group">
+                        <div class="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 group-hover:bg-cyan-500/20 group-hover:border-cyan-500/40 transition-all">
+                            <i data-lucide="sliders" class="w-6 h-6 text-cyan-400"></i>
+                        </div>
+                        <h4 class="text-xl font-bold text-white mb-3 group-hover:text-cyan-400 transition-colors">1. Model Config</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-6">
+                            Configure LLM through four parallel modes: LiteRT-LM (Local), Auth Login (Google), API Key presets, or Local CLI. Understand safe password fields and Editor.ini security.
+                        </p>
+                        <span class="text-xs font-semibold text-cyan-400 flex items-center">
+                            Configure Models <i data-lucide="arrow-right" class="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform"></i>
+                        </span>
+                    </a>
+
+                    <!-- Card 2 -->
+                    <a href="chat_dialogue.html" class="glass-panel rounded-xl p-8 block neon-border-hover transition-all group">
+                        <div class="w-12 h-12 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/20 flex items-center justify-center mb-6 group-hover:bg-fuchsia-500/20 group-hover:border-fuchsia-500/40 transition-all">
+                            <i data-lucide="message-square" class="w-6 h-6 text-fuchsia-400"></i>
+                        </div>
+                        <h4 class="text-xl font-bold text-white mb-3 group-hover:text-fuchsia-400 transition-colors">2. Chat Dialogue</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-6">
+                            Deep dive into the 4 built-in Agent modes (chat, develop, learning, task) inside Unreal C++, and learn how their context, memory, and lifecycles operate dynamically.
+                        </p>
+                        <span class="text-xs font-semibold text-fuchsia-400 flex items-center">
+                            Explore Dialogue <i data-lucide="arrow-right" class="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform"></i>
+                        </span>
+                    </a>
+
+                    <!-- Card 3 -->
+                    <a href="mcp_support.html" class="glass-panel rounded-xl p-8 block neon-border-hover transition-all group">
+                        <div class="w-12 h-12 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mb-6 group-hover:bg-teal-500/20 group-hover:border-teal-500/40 transition-all">
+                            <i data-lucide="cpu" class="w-6 h-6 text-teal-400"></i>
+                        </div>
+                        <h4 class="text-xl font-bold text-white mb-3 group-hover:text-teal-400 transition-colors">3. Supported MCPs</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed mb-6">
+                            View the exhaustive list of the 7 core C++ command classes and dozens of open-source MCP tools: viewport attention, layout manipulation, blueprints, and materials.
+                        </p>
+                        <span class="text-xs font-semibold text-teal-400 flex items-center">
+                            View MCP Tools <i data-lucide="arrow-right" class="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform"></i>
+                        </span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Dual-Loop Architecture Note -->
+            <div class="glass-panel rounded-xl border border-slate-800 p-8 space-y-4 relative overflow-hidden">
+                <div class="absolute -right-16 -bottom-16 w-48 h-48 bg-cyan-500/5 rounded-full blur-2xl"></div>
+                <h3 class="text-lg font-bold text-white flex items-center">
+                    <i data-lucide="shield" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                    💡 Pro Tip: High Performance Dual-Loop Architecture
+                </h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    This plugin features a high-performance <strong>Dual-Loop</strong> design. The built-in Chat UI communicates directly via fast memory-level C++ pointers to Subsystems (Zero latency). The TCP Port (55557) is exposed strictly as a secure loopback bridge for external AI agents like Claude Desktop or Cursor. Rest assured, your internal commands never take unnecessary loops through the network interface!
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

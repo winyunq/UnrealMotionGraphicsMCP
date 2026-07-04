@@ -1,0 +1,2222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="UMG MCP is a Fab Marketplace Unreal Engine plugin that lets AI assistants edit UMG, Blueprint, Sequencer animation, and UI materials through MCP and FabServer.">
+  <meta property="og:title" content="UMG MCP - AI-assisted Unreal UI production">
+  <meta property="og:description" content="A local-first, human-controlled MCP workflow for Unreal Engine UMG, Blueprint, Sequencer, HLSL materials, and FabServer agents.">
+  <meta property="og:type" content="website">
+  <title>UMG MCP | AI-assisted Unreal UI production</title>
+  <link rel="icon" href="../Resources/Icon128.png">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #111315;
+      --muted: #5c6268;
+      --paper: #f7f4ee;
+      --panel: #ffffff;
+      --line: #d8d2c8;
+      --coal: #151719;
+      --coal-2: #24262a;
+      --teal: #087b73;
+      --teal-soft: #d8efea;
+      --rust: #c94f35;
+      --rust-soft: #f6ded6;
+      --gold: #f3bd3e;
+      --blue: #2e5e9e;
+      --violet: #7750a6;
+      --green: #477b45;
+      --shadow: 0 18px 44px rgba(24, 26, 27, .14);
+      --radius: 8px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--paper);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0) 360px),
+        radial-gradient(circle at 12% 8%, rgba(243,189,62,.22), transparent 330px),
+        radial-gradient(circle at 88% 12%, rgba(8,123,115,.18), transparent 380px),
+        var(--paper);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -999px;
+      top: 12px;
+      z-index: 50;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: #fff;
+      border-radius: var(--radius);
+    }
+
+    .skip-link:focus {
+      left: 12px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .site-nav {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto auto;
+      gap: 18px;
+      align-items: center;
+      padding: 14px clamp(18px, 4vw, 52px);
+      border-bottom: 1px solid rgba(17, 19, 21, .1);
+      background: rgba(247, 244, 238, .86);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .brand img {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius);
+      box-shadow: 0 10px 24px rgba(8, 123, 115, .22);
+    }
+
+    .brand span {
+      white-space: nowrap;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .nav-links a {
+      padding: 9px 10px;
+      border-radius: var(--radius);
+    }
+
+    .nav-links a:hover {
+      color: var(--ink);
+      background: rgba(255, 255, 255, .68);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .language-select {
+      min-width: 132px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 9px 34px 9px 11px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 14px;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius);
+      color: var(--ink);
+      background: rgba(255,255,255,.72);
+      font-weight: 780;
+      letter-spacing: 0;
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+
+    .button svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(17, 19, 21, .12);
+    }
+
+    .button.primary {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .button.secondary {
+      border-color: var(--line);
+    }
+
+    .button.fab {
+      background: #f3bd3e;
+      border-color: #9b6d00;
+      color: #18130a;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 88vh;
+      overflow: hidden;
+      color: #fff;
+      background: var(--coal);
+      isolation: isolate;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background:
+        linear-gradient(90deg, rgba(21,23,25,.92) 0%, rgba(21,23,25,.72) 42%, rgba(21,23,25,.26) 100%),
+        linear-gradient(180deg, rgba(21,23,25,.28), rgba(21,23,25,.94));
+    }
+
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      z-index: -3;
+      opacity: .34;
+      background-image:
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+      background-size: 54px 54px;
+      transform: perspective(900px) rotateX(60deg) translateY(-180px) scale(1.25);
+      transform-origin: center top;
+    }
+
+    .hero-scene {
+      position: absolute;
+      right: clamp(-210px, -8vw, -24px);
+      top: clamp(64px, 10vh, 120px);
+      width: min(860px, 68vw);
+      min-width: 620px;
+      z-index: -2;
+      transform: rotate(-2deg);
+      filter: drop-shadow(0 40px 70px rgba(0,0,0,.42));
+    }
+
+    .workbench {
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #202225;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+    }
+
+    .workbench-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 42px;
+      padding: 0 14px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      background: #2b2d31;
+    }
+
+    .traffic {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--rust);
+    }
+
+    .traffic:nth-child(2) {
+      background: var(--gold);
+    }
+
+    .traffic:nth-child(3) {
+      background: #58ad63;
+    }
+
+    .workbench-body {
+      display: grid;
+      grid-template-columns: 170px 1fr 240px;
+      min-height: 520px;
+    }
+
+    .tool-rail,
+    .inspector {
+      padding: 16px;
+      background: #191b1e;
+    }
+
+    .tool-rail {
+      border-right: 1px solid rgba(255,255,255,.1);
+    }
+
+    .inspector {
+      border-left: 1px solid rgba(255,255,255,.1);
+    }
+
+    .mode-tile,
+    .agent-line,
+    .node {
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.06);
+    }
+
+    .mode-tile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 10px;
+      color: rgba(255,255,255,.86);
+      font-size: 13px;
+    }
+
+    .mode-tile img {
+      width: 25px;
+      height: 25px;
+      border-radius: 6px;
+    }
+
+    .canvas {
+      position: relative;
+      padding: 28px;
+      background:
+        radial-gradient(circle at 68% 30%, rgba(243,189,62,.22), transparent 220px),
+        radial-gradient(circle at 18% 70%, rgba(8,123,115,.18), transparent 250px),
+        #25272b;
+    }
+
+    .canvas-panel {
+      height: 100%;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: var(--radius);
+      background: rgba(245, 242, 234, .94);
+      color: var(--ink);
+      overflow: hidden;
+    }
+
+    .mock-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px;
+      border-bottom: 1px solid #ddd4c8;
+      background: #fffaf0;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .mock-stage {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .mock-widget {
+      min-height: 150px;
+      border: 1px solid #d7cabc;
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fff;
+    }
+
+    .mock-widget.dark {
+      background: #1f2524;
+      color: #fff;
+      border-color: #3b504d;
+    }
+
+    .mock-widget strong {
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .fake-lines {
+      display: grid;
+      gap: 8px;
+    }
+
+    .fake-lines span {
+      height: 9px;
+      border-radius: 4px;
+      background: #d8d2c8;
+    }
+
+    .fake-lines span:nth-child(2) {
+      width: 76%;
+      background: #dfece9;
+    }
+
+    .fake-lines span:nth-child(3) {
+      width: 54%;
+      background: #f2dccf;
+    }
+
+    .inspector h3,
+    .tool-rail h3 {
+      margin: 0 0 12px;
+      color: rgba(255,255,255,.62);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .agent-line {
+      margin-bottom: 10px;
+      padding: 10px;
+      font-size: 12px;
+      color: rgba(255,255,255,.8);
+    }
+
+    .agent-line b {
+      display: block;
+      color: #fff;
+      margin-bottom: 5px;
+    }
+
+    .approval {
+      border-color: rgba(243,189,62,.42);
+      background: rgba(243,189,62,.12);
+    }
+
+    .hero-content {
+      display: grid;
+      align-content: center;
+      min-height: 78vh;
+      width: min(720px, calc(100% - 36px));
+      padding: clamp(56px, 11vh, 118px) 0 80px clamp(20px, 5vw, 70px);
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: max-content;
+      max-width: 100%;
+      margin: 0 0 18px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: var(--radius);
+      color: #ffe4a2;
+      background: rgba(0,0,0,.28);
+      font-weight: 760;
+      font-size: 13px;
+    }
+
+    .kicker svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      max-width: 760px;
+      color: #fff;
+      font-size: 74px;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    html[lang="zh-CN"] .hero h1,
+    html[lang="ja"] .hero h1,
+    html[lang="ko"] .hero h1 {
+      max-width: 800px;
+      font-size: 64px;
+      line-height: 1.08;
+    }
+
+    .hero p {
+      max-width: 650px;
+    }
+
+    .hero-lede {
+      margin: 22px 0 0;
+      color: rgba(255,255,255,.84);
+      font-size: 21px;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .hero-note {
+      margin-top: 18px;
+      color: rgba(255,255,255,.66);
+      font-size: 14px;
+    }
+
+    .section {
+      padding: clamp(56px, 8vw, 108px) clamp(18px, 4vw, 58px);
+    }
+
+    .section.alt {
+      background: rgba(255,255,255,.52);
+    }
+
+    .section.dark {
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(8,123,115,.22), rgba(201,79,53,.16)),
+        #151719;
+    }
+
+    .section-header {
+      display: grid;
+      gap: 12px;
+      max-width: 900px;
+      margin: 0 auto 34px;
+      text-align: center;
+    }
+
+    .section-kicker {
+      margin: 0;
+      color: var(--rust);
+      font-weight: 840;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 13px;
+    }
+
+    .dark .section-kicker {
+      color: #ffd37a;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 48px;
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .section-text {
+      margin: 0 auto;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.7;
+    }
+
+    .dark .section-text {
+      color: rgba(255,255,255,.72);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      width: min(1180px, calc(100% - 36px));
+      margin: -44px auto 0;
+      position: relative;
+      z-index: 2;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .stat {
+      min-height: 132px;
+      padding: 22px;
+      background: #fff;
+    }
+
+    .stat strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--ink);
+      font-size: 42px;
+      letter-spacing: 0;
+    }
+
+    .stat span {
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      width: min(1180px, 100%);
+      margin: 0 auto;
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid.four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      background: var(--panel);
+      box-shadow: 0 10px 30px rgba(24, 26, 27, .06);
+    }
+
+    .card h3,
+    .card h4 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .index-card {
+      display: block;
+      min-height: 184px;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .index-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(8, 123, 115, .36);
+      box-shadow: var(--shadow);
+    }
+
+    .index-card span:last-child {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      color: var(--teal);
+      font-weight: 820;
+      font-size: 14px;
+    }
+
+    .icon-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      margin-bottom: 16px;
+      border: 1px solid currentColor;
+      border-radius: var(--radius);
+      color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .icon-box svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .feature-card:nth-child(2n) .icon-box {
+      color: var(--rust);
+      background: var(--rust-soft);
+    }
+
+    .feature-card:nth-child(3n) .icon-box {
+      color: var(--blue);
+      background: #dce8f8;
+    }
+
+    .panel {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-split {
+      display: grid;
+      grid-template-columns: .95fr 1.05fr;
+    }
+
+    .panel-copy {
+      padding: clamp(24px, 4vw, 46px);
+    }
+
+    .panel-copy h3 {
+      margin: 0 0 14px;
+      font-size: 38px;
+      line-height: 1.05;
+    }
+
+    .panel-copy p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .diagram {
+      min-height: 430px;
+      padding: 28px;
+      background:
+        linear-gradient(135deg, rgba(8,123,115,.11), rgba(243,189,62,.14)),
+        #f5f0e7;
+      border-left: 1px solid var(--line);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      align-items: stretch;
+      height: 100%;
+    }
+
+    .flow-node {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      border: 1px solid #c9beb1;
+      border-radius: var(--radius);
+      padding: 16px;
+      background: rgba(255,255,255,.78);
+    }
+
+    .flow-node b {
+      font-size: 17px;
+    }
+
+    .flow-node span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .flow-node code {
+      width: max-content;
+      max-width: 100%;
+      padding: 6px 8px;
+      border-radius: 6px;
+      color: #fff;
+      background: var(--coal);
+      white-space: normal;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 0 auto 20px;
+      width: min(1180px, 100%);
+    }
+
+    .tab-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: var(--radius);
+      padding: 10px 13px;
+      color: rgba(255,255,255,.76);
+      background: rgba(255,255,255,.06);
+      cursor: pointer;
+      font-weight: 760;
+    }
+
+    .tab-button[aria-selected="true"] {
+      color: #111315;
+      background: #f3bd3e;
+      border-color: #f3bd3e;
+    }
+
+    .tab-panel {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.07);
+      overflow: hidden;
+    }
+
+    .fab-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: rgba(255,255,255,.16);
+    }
+
+    .fab-item {
+      min-height: 174px;
+      padding: 24px;
+      background: rgba(21,23,25,.82);
+    }
+
+    .fab-item h3 {
+      margin: 0 0 10px;
+      color: #fff;
+      font-size: 20px;
+    }
+
+    .fab-item p {
+      margin: 0;
+      color: rgba(255,255,255,.68);
+      line-height: 1.65;
+    }
+
+    .agent-map {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .agent-stack {
+      display: grid;
+      gap: 12px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .agent-node {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbf8f2;
+    }
+
+    .agent-node img,
+    .agent-node .agent-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius);
+      object-fit: cover;
+      background: var(--teal-soft);
+    }
+
+    .agent-node .agent-icon svg {
+      width: 24px;
+      height: 24px;
+      color: var(--teal);
+    }
+
+    .agent-node h3 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .agent-node p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.58;
+    }
+
+    .agent-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .agent-step {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .agent-step strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .agent-step span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .edition-card {
+      position: relative;
+      min-height: 360px;
+      padding-top: 26px;
+    }
+
+    .edition-card.pro {
+      border-color: rgba(201, 79, 53, .36);
+      background:
+        linear-gradient(180deg, rgba(246,222,214,.46), rgba(255,255,255,1) 190px),
+        #fff;
+    }
+
+    .edition-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 7px 9px;
+      border-radius: var(--radius);
+      color: #fff;
+      background: var(--teal);
+      font-size: 13px;
+      font-weight: 840;
+    }
+
+    .edition-card.pro .edition-label {
+      background: var(--rust);
+    }
+
+    .edition-card ul {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+      color: var(--muted);
+    }
+
+    .edition-card li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 9px;
+      line-height: 1.55;
+    }
+
+    .edition-card li::before {
+      content: "✓";
+      color: var(--teal);
+      font-weight: 900;
+    }
+
+    .edition-card.pro li::before {
+      color: var(--rust);
+    }
+
+    .toolmode-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      width: min(1180px, 100%);
+      margin: 28px auto 0;
+    }
+
+    .toolmode {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.07);
+      color: rgba(255,255,255,.9);
+    }
+
+    .toolmode img {
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+    }
+
+    .philosophy {
+      display: grid;
+      grid-template-columns: .82fr 1.18fr;
+      gap: 18px;
+      width: min(1180px, 100%);
+      margin: 0 auto;
+    }
+
+    .quote-block {
+      padding: clamp(24px, 4vw, 42px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .quote-block p {
+      margin: 0;
+      font-size: 42px;
+      line-height: 1.05;
+      letter-spacing: 0;
+      font-weight: 860;
+    }
+
+    .quote-block small {
+      display: block;
+      margin-top: 18px;
+      color: rgba(255,255,255,.66);
+      line-height: 1.6;
+    }
+
+    .principles {
+      display: grid;
+      gap: 12px;
+    }
+
+    .principle {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 16px;
+      align-items: start;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .principle strong {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 54px;
+      height: 54px;
+      border-radius: var(--radius);
+      color: #fff;
+      background: var(--teal);
+      font-size: 19px;
+    }
+
+    .principle:nth-child(2) strong {
+      background: var(--rust);
+    }
+
+    .principle:nth-child(3) strong {
+      background: var(--blue);
+    }
+
+    .principle h3 {
+      margin: 0 0 6px;
+    }
+
+    .principle p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.62;
+    }
+
+    .comparison {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.55;
+    }
+
+    th {
+      color: var(--ink);
+      background: #fbf8f2;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    td {
+      color: var(--muted);
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: max-content;
+      max-width: 100%;
+      padding: 6px 8px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      background: var(--teal);
+    }
+
+    .faq {
+      width: min(920px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 10px;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(24,26,27,.05);
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 18px 20px;
+      font-weight: 820;
+      list-style: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details p {
+      margin: 0;
+      padding: 0 20px 20px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .cta {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 24px;
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: clamp(24px, 5vw, 46px);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(135deg, rgba(243,189,62,.16), rgba(8,123,115,.18)),
+        #151719;
+      color: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .cta h2 {
+      margin: 0 0 10px;
+      font-size: 44px;
+      line-height: 1.04;
+    }
+
+    .cta p {
+      margin: 0;
+      max-width: 760px;
+      color: rgba(255,255,255,.72);
+      line-height: 1.65;
+    }
+
+    .footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      padding: 28px clamp(18px, 4vw, 58px);
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      background: #fff;
+      font-size: 14px;
+    }
+
+    .footer a {
+      color: var(--ink);
+      font-weight: 760;
+    }
+
+    @media (max-width: 1060px) {
+      .site-nav {
+        grid-template-columns: 1fr auto;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero-scene {
+        opacity: .48;
+        right: -300px;
+      }
+
+      .hero h1 {
+        font-size: 62px;
+      }
+
+      html[lang="zh-CN"] .hero h1,
+      html[lang="ja"] .hero h1,
+      html[lang="ko"] .hero h1 {
+        font-size: 54px;
+      }
+
+      .section-title {
+        font-size: 40px;
+      }
+
+      .panel-copy h3,
+      .quote-block p,
+      .cta h2 {
+        font-size: 36px;
+      }
+
+      .stats,
+      .grid.four,
+      .grid.three,
+      .toolmode-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .panel-split,
+      .philosophy,
+      .cta,
+      .agent-map {
+        grid-template-columns: 1fr;
+      }
+
+      .diagram {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .site-nav {
+        position: relative;
+        grid-template-columns: 1fr;
+      }
+
+      .nav-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .hero {
+        min-height: 82svh;
+      }
+
+      .hero-scene {
+        top: 120px;
+        right: -430px;
+        opacity: .32;
+        transform: rotate(-4deg) scale(.88);
+      }
+
+      .hero-content {
+        min-height: 70svh;
+        padding: 44px 18px 72px;
+        width: 100%;
+      }
+
+      .hero h1 {
+        font-size: 42px;
+      }
+
+      html[lang="zh-CN"] .hero h1,
+      html[lang="ja"] .hero h1,
+      html[lang="ko"] .hero h1 {
+        font-size: 39px;
+      }
+
+      .hero-lede {
+        font-size: 17px;
+      }
+
+      .section-title,
+      .panel-copy h3,
+      .quote-block p,
+      .cta h2 {
+        font-size: 31px;
+      }
+
+      .stat strong {
+        font-size: 34px;
+      }
+
+      .stats,
+      .grid.four,
+      .grid.three,
+      .grid.two,
+      .toolmode-strip,
+      .fab-grid,
+      .flow,
+      .agent-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .principle {
+        grid-template-columns: 1fr;
+      }
+
+      .footer {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-nav" aria-label="Primary navigation">
+    <a class="brand" href="#hero" aria-label="UMG MCP home">
+      <img src="../Resources/Icon128.png" alt="">
+      <span>UMG MCP</span>
+    </a>
+    <nav class="nav-links" aria-label="Page sections">
+      <a href="#index" data-i18n="nav.index">Index</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#agents" data-i18n="nav.agents">Agents</a>
+      <a href="#mcp" data-i18n="nav.mcp">MCP</a>
+      <a href="#editions" data-i18n="nav.editions">Free / Pro</a>
+      <a href="#fabserver" data-i18n="nav.fabserver">FabServer</a>
+      <a href="#faq" data-i18n="nav.faq">FAQ</a>
+    </nav>
+    <div class="nav-actions">
+      <label>
+        <span class="sr-only" data-i18n="nav.language">Language</span>
+        <select id="language" class="language-select" aria-label="Language">
+          <option value="en">English</option>
+          <option value="zh">简体中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="pt">Português</option>
+        </select>
+      </label>
+      <a class="button primary" href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71">
+        <i data-lucide="shopping-bag" aria-hidden="true"></i>
+        <span data-i18n="nav.buy">Buy on Fab</span>
+      </a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="hero" class="hero">
+      <div class="hero-grid" aria-hidden="true"></div>
+      <div class="hero-scene" aria-hidden="true">
+        <div class="workbench">
+          <div class="workbench-top">
+            <span class="traffic"></span>
+            <span class="traffic"></span>
+            <span class="traffic"></span>
+            <span style="margin-left:10px;color:rgba(255,255,255,.7);font-size:13px">Unreal Editor / UMG MCP</span>
+          </div>
+          <div class="workbench-body">
+            <aside class="tool-rail">
+              <h3>Tool Modes</h3>
+              <div class="mode-tile"><img src="../Resources/Icon/widget.png" alt=""> UMG</div>
+              <div class="mode-tile"><img src="../Resources/Icon/material.png" alt=""> Material</div>
+              <div class="mode-tile"><img src="../Resources/Icon/sequence.png" alt=""> Sequencer</div>
+              <div class="mode-tile"><img src="../Resources/Icon/layout.png" alt=""> Layout</div>
+            </aside>
+            <div class="canvas">
+              <div class="canvas-panel">
+                <div class="mock-toolbar">
+                  <span>RTS HUD Widget</span>
+                  <span style="color:#087b73">Compiled</span>
+                </div>
+                <div class="mock-stage">
+                  <div class="mock-widget">
+                    <strong>Command Panel</strong>
+                    <div class="fake-lines">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                  <div class="mock-widget dark">
+                    <strong>HLSL UI Material</strong>
+                    <div class="fake-lines">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <aside class="inspector">
+              <h3>FabServer</h3>
+              <div class="agent-line"><b>Develop Agent</b>Dynamic tools selected</div>
+              <div class="agent-line"><b>Learning Agent</b>Widget tree cached</div>
+              <div class="agent-line approval"><b>Approval Queue</b>Accept create_widget?</div>
+              <div class="agent-line"><b>Provider</b>LiteRT-LM / API / CLI</div>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-content">
+        <p class="kicker"><i data-lucide="sparkles" aria-hidden="true"></i><span data-i18n="hero.kicker">Fab Marketplace plugin for Unreal Engine creators</span></p>
+        <h1 data-i18n="hero.title">Let AI build Unreal UIs while you stay the director.</h1>
+        <p class="hero-lede" data-i18n="hero.lede">UMG MCP connects AI assistants to Unreal Engine through MCP and FabServer, so they can edit UMG widgets, Blueprint logic, Sequencer animation, and HLSL UI materials under your approval.</p>
+        <div class="hero-actions">
+          <a class="button fab" href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71">
+            <i data-lucide="shopping-cart" aria-hidden="true"></i>
+            <span data-i18n="hero.primaryCta">Get the Fab version</span>
+          </a>
+          <a class="button secondary" href="developer_manual.html">
+            <i data-lucide="book-open" aria-hidden="true"></i>
+            <span data-i18n="hero.docsCta">Read developer manual</span>
+          </a>
+        </div>
+        <p class="hero-note" data-i18n="hero.note">Designed for local-first production: fewer wasted tokens, fewer blind edits, and more useful output per human decision.</p>
+      </div>
+    </section>
+
+    <section class="stats" id="stats" aria-label="Product facts"></section>
+
+    <section class="section alt" id="index">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="productIndex.kicker">Product index</p>
+        <h2 class="section-title" data-i18n="productIndex.title">Find the part of UMG MCP that matches your job.</h2>
+        <p class="section-text" data-i18n="productIndex.text">The plugin is easier to evaluate when it is separated into surfaces, agents, model providers, and editions. Use this index as the map.</p>
+      </div>
+      <div class="grid three" id="productIndexGrid"></div>
+    </section>
+
+    <section class="section" id="for">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="for.kicker">Who it is for</p>
+        <h2 class="section-title" data-i18n="for.title">A practical AI workflow for teams that ship UI.</h2>
+        <p class="section-text" data-i18n="for.text">UMG MCP is not a chatbot pasted beside Unreal. It is a production control layer for people who need repeatable assets, readable changes, and fast iteration inside the editor.</p>
+      </div>
+      <div class="grid three" id="personaGrid"></div>
+    </section>
+
+    <section class="section alt" id="features">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="features.kicker">Core capability</p>
+        <h2 class="section-title" data-i18n="features.title">One plugin, four creative surfaces.</h2>
+        <p class="section-text" data-i18n="features.text">The same AI conversation can move from widget structure to Blueprint behavior, then into animation timing and shader polish without leaving the Unreal project.</p>
+      </div>
+      <div class="grid three" id="featureGrid"></div>
+    </section>
+
+    <section class="section" id="agents">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="agents.kicker">Agent system</p>
+        <h2 class="section-title" data-i18n="agents.title">A specialist agent stack, not one giant prompt.</h2>
+        <p class="section-text" data-i18n="agents.text">FabServer breaks UI production into agents with narrower jobs. That keeps tool choices smaller, context cleaner, and human review easier.</p>
+      </div>
+      <div class="agent-map">
+        <div class="agent-stack" id="agentStack"></div>
+        <div class="panel-copy card">
+          <h3 data-i18n="agents.flowTitle">How a complex UI request is divided</h3>
+          <p data-i18n="agents.flowText">A Master Agent extracts the concept, a Layout Agent expands it into concrete UI regions, and specialized Widget, Material, Animation, and Blueprint agents finish the parts that need their tools. FileManage Agent can quietly resolve target assets when a task is missing a path.</p>
+          <div class="agent-steps" id="agentSteps"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="mcp">
+      <div class="panel">
+        <div class="panel-split">
+          <div class="panel-copy">
+            <p class="section-kicker" data-i18n="mcp.kicker">MCP explained</p>
+            <h3 data-i18n="mcp.title">MCP turns AI intent into structured editor actions.</h3>
+            <p data-i18n="mcp.text1">The Model Context Protocol gives an AI client a typed list of tools. Instead of guessing how Unreal works, the model asks for exact actions such as reading the widget tree, creating a Button, setting an anchor, compiling Blueprint, or applying HLSL.</p>
+            <p data-i18n="mcp.text2">UMG MCP maps those tool calls into native C++ and Python routes for Unreal. The result is more reliable than screen scraping and more reviewable than asking AI to describe manual clicks.</p>
+            <a class="button secondary" href="mcp_support.html">
+              <i data-lucide="list-checks" aria-hidden="true"></i>
+              <span data-i18n="mcp.cta">Open MCP command index</span>
+            </a>
+          </div>
+          <div class="diagram">
+            <div class="flow" id="mcpFlow"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section dark" id="fabserver">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="fab.kicker">FabServer advantage</p>
+        <h2 class="section-title" data-i18n="fab.title">The Fab version adds the production layer around MCP.</h2>
+        <p class="section-text" data-i18n="fab.text">FabServer is the editor-side experience that makes MCP usable by real creators: agents, approvals, provider routing, local model support, task orchestration, context compression, and focused tool modes.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="FabServer feature groups">
+        <button class="tab-button" type="button" role="tab" aria-selected="true" data-tab="agents">
+          <i data-lucide="users" aria-hidden="true"></i><span data-i18n="fab.tabs.agents">Agents</span>
+        </button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="providers">
+          <i data-lucide="route" aria-hidden="true"></i><span data-i18n="fab.tabs.providers">Providers</span>
+        </button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="control">
+          <i data-lucide="shield-check" aria-hidden="true"></i><span data-i18n="fab.tabs.control">Control</span>
+        </button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="context">
+          <i data-lucide="archive" aria-hidden="true"></i><span data-i18n="fab.tabs.context">Context</span>
+        </button>
+      </div>
+      <div class="tab-panel">
+        <div class="fab-grid" id="fabGrid"></div>
+      </div>
+      <div class="toolmode-strip">
+        <div class="toolmode"><img src="../Resources/Icon/widget.png" alt=""><span>UMG ToolMode</span></div>
+        <div class="toolmode"><img src="../Resources/Icon/material.png" alt=""><span>Material ToolMode</span></div>
+        <div class="toolmode"><img src="../Resources/Icon/sequence.png" alt=""><span>Animation ToolMode</span></div>
+        <div class="toolmode"><img src="../Resources/Icon/Agent.png" alt=""><span>Agent Stack</span></div>
+      </div>
+    </section>
+
+    <section class="section alt" id="workflow">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="workflow.kicker">A day in Unreal</p>
+        <h2 class="section-title" data-i18n="workflow.title">From prompt to asset without losing authorship.</h2>
+        <p class="section-text" data-i18n="workflow.text">The plugin is built around a reviewable loop: inspect, propose, approve, execute, save, and keep the context focused for the next step.</p>
+      </div>
+      <div class="grid four" id="workflowGrid"></div>
+    </section>
+
+    <section class="section" id="philosophy">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="philosophy.kicker">Product philosophy</p>
+        <h2 class="section-title" data-i18n="philosophy.title">We optimize AI for human energy efficiency.</h2>
+      </div>
+      <div class="philosophy">
+        <div class="quote-block">
+          <p data-i18n="philosophy.quote">The highest-efficiency engine in production is still the human.</p>
+          <small data-i18n="philosophy.small">UMG MCP is designed to amplify judgment, not bury it under endless automated output.</small>
+        </div>
+        <div class="principles" id="principlesGrid"></div>
+      </div>
+    </section>
+
+    <section class="section alt" id="local">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="local.kicker">Local-first AI</p>
+        <h2 class="section-title" data-i18n="local.title">Small and local models become useful when the tools are precise.</h2>
+        <p class="section-text" data-i18n="local.text">A local model does not need to remember the whole editor. UMG MCP gives it focused tool schemas, active targets, cached prompts, and structured editor feedback.</p>
+      </div>
+      <div class="grid three" id="localGrid"></div>
+    </section>
+
+    <section class="section" id="editions">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="editions.kicker">Free and Pro</p>
+        <h2 class="section-title" data-i18n="editions.title">Open-source by belief, Pro by convenience and local safety.</h2>
+        <p class="section-text" data-i18n="editions.text">Think of it like a Free / Go / Pro product ladder: the open-source edition remains the free protocol foundation, while the Fab edition is the Pro workflow for buyers who want less setup and safer local usage.</p>
+      </div>
+      <div class="grid two" id="editionGrid"></div>
+    </section>
+
+    <section class="section" id="compare">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="compare.kicker">Open source and Fab</p>
+        <h2 class="section-title" data-i18n="compare.title">Choose the path that matches your project.</h2>
+        <p class="section-text" data-i18n="compare.text">The open-source repository is the protocol testbed. The Fab edition packages the polished setup and production-oriented FabServer workflow for buyers who want less configuration and more delivery time.</p>
+      </div>
+      <div class="comparison">
+        <table>
+          <thead id="compareHead"></thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section alt" id="faq">
+      <div class="section-header">
+        <p class="section-kicker" data-i18n="faq.kicker">Questions buyers ask</p>
+        <h2 class="section-title" data-i18n="faq.title">What to know before purchase.</h2>
+      </div>
+      <div class="faq" id="faqList"></div>
+    </section>
+
+    <section class="section">
+      <div class="cta">
+        <div>
+          <h2 data-i18n="cta.title">Bring AI into Unreal where your assets actually live.</h2>
+          <p data-i18n="cta.text">Buy the Fab version for the easiest install path, then connect your preferred AI provider: local LiteRT-LM, Google login, API keys, OpenAI-compatible gateways, ZhipuAI, or Codex CLI.</p>
+        </div>
+        <div class="hero-actions" style="margin:0">
+          <a class="button fab" href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71">
+            <i data-lucide="shopping-bag" aria-hidden="true"></i>
+            <span data-i18n="cta.buy">Buy on Fab</span>
+          </a>
+          <a class="button secondary" href="../Readme.md">
+            <i data-lucide="git-branch" aria-hidden="true"></i>
+            <span data-i18n="cta.github">Open repository notes</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>
+      <strong>UMG MCP</strong>
+      <span data-i18n="footer.copy"> - AI-assisted Unreal Motion Graphics production for humans who want control.</span>
+    </div>
+    <div>
+      <a href="developer_manual.html" data-i18n="footer.manual">Developer manual</a>
+      <span> · </span>
+      <a href="mcp_support.html" data-i18n="footer.commands">MCP commands</a>
+    </div>
+  </footer>
+
+  <script>
+    const packs = {
+      en: {
+        nav: { index: "Index", features: "Features", agents: "Agents", mcp: "MCP", editions: "Free / Pro", fabserver: "FabServer", philosophy: "Philosophy", faq: "FAQ", language: "Language", buy: "Buy on Fab" },
+        hero: {
+          kicker: "Fab Marketplace plugin for Unreal Engine creators",
+          title: "Let AI build Unreal UIs while you stay the director.",
+          lede: "UMG MCP connects AI assistants to Unreal Engine through MCP and FabServer, so they can edit UMG widgets, Blueprint logic, Sequencer animation, and HLSL UI materials under your approval.",
+          primaryCta: "Get the Fab version",
+          docsCta: "Read developer manual",
+          note: "Designed for local-first production: fewer wasted tokens, fewer blind edits, and more useful output per human decision."
+        },
+        stats: [
+          ["4", "Tool surfaces: UMG, Blueprint, Sequencer, Material"],
+          ["8", "Interface languages for global buyers"],
+          ["Gemma4 E4B", "LiteRT-LM local model integrated for efficient UE5-side AI"],
+          ["Human", "Approval-first workflow for production control"]
+        ],
+        productIndex: {
+          kicker: "Product index",
+          title: "Find the part of UMG MCP that matches your job.",
+          text: "The plugin is easier to evaluate when it is separated into surfaces, agents, model providers, and editions. Use this index as the map.",
+          open: "Open section",
+          items: [
+            { href: "#features", title: "Creative surfaces", text: "UMG widgets, Blueprint graph logic, Sequencer animation, HLSL UI materials, and asset paths." },
+            { href: "#agents", title: "Agent system", text: "Master, Layout, Widget, Material, Animation, Blueprint, and FileManage agents divide work by specialty." },
+            { href: "#local", title: "Local AI runtime", text: "LiteRT-LM integrates Gemma4 E4B so AI can run efficiently beside UE5 on your development machine." },
+            { href: "#editions", title: "Free / Pro editions", text: "Open-source Free for protocol learning; Fab Pro for safer local use, convenience, and production workflow." },
+            { href: "#fabserver", title: "FabServer layer", text: "In-editor chat, approvals, provider routing, context handling, task flow, and focused ToolModes." },
+            { href: "#mcp", title: "MCP protocol", text: "Typed tool calls turn model intent into structured Unreal editor actions." }
+          ]
+        },
+        for: { kicker: "Who it is for", title: "A practical AI workflow for teams that ship UI.", text: "UMG MCP is not a chatbot pasted beside Unreal. It is a production control layer for people who need repeatable assets, readable changes, and fast iteration inside the editor." },
+        personas: [
+          ["UI designers", "Generate layout scaffolds, inspect widget trees, and ask for safe edits without hand rebuilding every slot."],
+          ["Gameplay programmers", "Let AI add Blueprint nodes, connect pins, bind events, and compile while you review the intent."],
+          ["Technical artists", "Create UI animation tracks and HLSL material passes with structured parameters instead of loose instructions."]
+        ],
+        features: { kicker: "Core capability", title: "One plugin, four creative surfaces.", text: "The same AI conversation can move from widget structure to Blueprint behavior, then into animation timing and shader polish without leaving the Unreal project." },
+        featureCards: [
+          ["UMG asset editing", "Create, delete, reparent, query, and style widgets through native editor operations. Active target logic keeps the AI focused on the current asset."],
+          ["Blueprint graph control", "Set edit functions, add executable steps, prepare values, connect data pins, manage variables, and compile Widget Blueprint logic."],
+          ["Sequencer animation", "Focus animations and widgets, inspect timelines, append keyframes, write time slices, and delete scoped keys with explicit confirmation."],
+          ["HLSL material workflow", "Treat UI materials as one HLSL program with semantic output wiring, structured parameters, and compile diagnostics."],
+          ["JSON and HTML layout sync", "Export UMG assets to readable files, apply layout definitions, and make binary UI work more version-control friendly."],
+          ["Editor and asset pipeline", "List assets, refresh registries, inspect level actors, and keep AI grounded in real Unreal paths."]
+        ],
+        agents: {
+          kicker: "Agent system",
+          title: "A specialist agent stack, not one giant prompt.",
+          text: "FabServer breaks UI production into agents with narrower jobs. That keeps tool choices smaller, context cleaner, and human review easier.",
+          flowTitle: "How a complex UI request is divided",
+          flowText: "A Master Agent extracts the concept, a Layout Agent expands it into concrete UI regions, and specialized Widget, Material, Animation, and Blueprint agents finish the parts that need their tools. FileManage Agent can quietly resolve target assets when a task is missing a path.",
+          stack: [
+            { icon: "users", name: "Master Agent", text: "Reads the user's creative request, extracts the core concept, and starts task_begin only after the plan is clear." },
+            { icon: "layout-template", name: "Layout Agent", text: "Turns the concept into concrete UI regions, hierarchy, target assets, and widget-level assignments." },
+            { icon: "panel-top", name: "Widget Agents", text: "Create and modify individual widgets, slots, anchors, hierarchy, and readable UMG structure." },
+            { icon: "palette", name: "Material Agents", text: "Produce UI material passes and HLSL effects for specific widget targets." },
+            { icon: "film", name: "Animation Agents", text: "Create Sequencer tracks, time slices, transitions, and keyframe changes for UI motion." },
+            { icon: "git-fork", name: "Blueprint Agents", text: "Bind events, add nodes, connect pins, prepare data, and compile behavior." },
+            { icon: "folder-search", name: "FileManage Agent", text: "Resolves target asset paths in the background when a task needs a concrete Unreal asset." }
+          ],
+          steps: [
+            ["1. Understand", "Master Agent confirms the design goal and splits it into detailed concepts."],
+            ["2. Dispatch", "Layout Agent turns concepts into widget work packages and supporting asset needs."],
+            ["3. Specialize", "Widget, Material, Animation, and Blueprint agents finish their own narrow tasks."]
+          ]
+        },
+        mcp: {
+          kicker: "MCP explained",
+          title: "MCP turns AI intent into structured editor actions.",
+          text1: "The Model Context Protocol gives an AI client a typed list of tools. Instead of guessing how Unreal works, the model asks for exact actions such as reading the widget tree, creating a Button, setting an anchor, compiling Blueprint, or applying HLSL.",
+          text2: "UMG MCP maps those tool calls into native C++ and Python routes for Unreal. The result is more reliable than screen scraping and more reviewable than asking AI to describe manual clicks.",
+          cta: "Open MCP command index"
+        },
+        flow: [
+          ["AI client", "Claude, Gemini, Codex, Cursor, or a local model decides the next tool call.", "JSON-RPC"],
+          ["UMG MCP", "The plugin validates parameters, resolves the active asset, and routes commands.", "C++ / Python"],
+          ["Unreal Editor", "UMG, Blueprint, Sequencer, Material, and assets change only through editor APIs.", "UE main thread"]
+        ],
+        fab: {
+          kicker: "FabServer advantage",
+          title: "The Fab version adds the production layer around MCP.",
+          text: "FabServer is the editor-side experience that makes MCP usable by real creators: agents, approvals, provider routing, local model support, task orchestration, context compression, and focused tool modes.",
+          tabs: { agents: "Agents", providers: "Providers", control: "Control", context: "Context" }
+        },
+        fabGroups: {
+          agents: [
+            ["Chat, Develop, Learning, Task", "Four built-in agent modes match different moments: conversation, focused editing, read-only learning, and task handoff."],
+            ["Agent stack and task routing", "Master, Layout, Widget, Material, Animation, Blueprint, and FileManage agents can divide complex UI production into smaller decisions."],
+            ["Tool schema per agent", "FabServer can narrow the visible tool list to the current agent and active asset, improving reliability and reducing prompt noise."],
+            ["Task begin and task end", "Task mode locks scope, records target context, and returns control after the work is complete."]
+          ],
+          providers: [
+            ["Local LiteRT-LM with Gemma4 E4B", "The Fab workflow integrates a Gemma4 E4B LiteRT-LM model. It is light enough for phone-class devices, so on a UE5 workstation it can run efficiently beside the engine instead of forcing every prompt to a remote model."],
+            ["Google auth and API keys", "Use Google account login, Google API keys, ZhipuAI, or custom OpenAI-compatible endpoints."],
+            ["Codex CLI provider", "Route FabServer chat through an installed Codex CLI command when you want a local command-line AI surface."],
+            ["Multi-retry routing", "Primary provider and retry settings keep production moving when a remote provider hits a rate limit or fails."]
+          ],
+          control: [
+            ["Approval queue", "Mutating tool calls can appear as Accept or Reject cards before Unreal assets are touched."],
+            ["Focus current UMG", "Keep the AI locked to the currently opened UMG file when you want strict asset safety."],
+            ["Follow AI target", "Let the editor follow the file the AI chooses when you are supervising broader generation."],
+            ["Dual-loop architecture", "Internal Chat UI uses direct C++ paths; external clients use the MCP bridge. The routes are separated by purpose."]
+          ],
+          context: [
+            ["Long conversation compression", "Summarize old messages when context grows too large, preserving momentum without flooding the model."],
+            ["Prompt and KV cache", "Default prompts and local inference memory can be cached so local models spend less work repeating setup."],
+            ["Learning agent context", "Read-only tree context is injected only when editor structure changes, saving tokens in repeated analysis."],
+            ["Conversation history", "FabServer stores and normalizes message history so sessions can continue with useful context."]
+          ]
+        },
+        workflow: { kicker: "A day in Unreal", title: "From prompt to asset without losing authorship.", text: "The plugin is built around a reviewable loop: inspect, propose, approve, execute, save, and keep the context focused for the next step." },
+        workflowCards: [
+          ["Inspect", "AI reads the active asset, widget tree, schemas, variables, animations, and material state."],
+          ["Plan", "The agent chooses a small tool call instead of writing a vague instruction for a human to repeat."],
+          ["Approve", "You accept high-impact edits and reject unsafe changes before the editor mutates assets."],
+          ["Commit", "The plugin executes through Unreal APIs, saves the asset, and returns structured feedback."]
+        ],
+        philosophy: {
+          kicker: "Product philosophy",
+          title: "We optimize AI for human energy efficiency.",
+          quote: "The highest-efficiency engine in production is still the human.",
+          small: "UMG MCP is designed to amplify judgment, not bury it under endless automated output."
+        },
+        principles: [
+          ["01", "Less output, more useful output", "The goal is not to make AI produce the most text. The goal is to make every token and tool call move the asset closer to done."],
+          ["02", "Local AI should feel premium", "When tools are precise and context is compressed, a local model can perform focused Unreal work without sending every decision to a giant remote model."],
+          ["03", "Humans keep creative authority", "AI proposes structure, code, animation, and material edits. The creator decides scope, taste, risk, and final acceptance."]
+        ],
+        local: {
+          kicker: "Local-first AI",
+          title: "Gemma4 E4B is small enough for mobile-class hardware, so your PC can run UE5 and AI together.",
+          text: "This is better than merely saying local AI is supported. LiteRT-LM integrates the Gemma4 E4B model, a compact model class that can run on phone-class devices. On a desktop or laptop already running UE5, that leaves practical headroom for an efficient in-editor AI loop."
+        },
+        localCards: [
+          ["Integrated Gemma4 E4B LiteRT-LM", "The Pro workflow is built around a compact local model path rather than assuming a giant remote model is always required."],
+          ["Runs beside Unreal, not instead of it", "Because the model class is efficient enough for mobile-class devices, a UE5 workstation can keep the editor and AI loop active together."],
+          ["Precision replaces brute force", "Focused tool schemas, active targets, prompt cache, and structured editor feedback make a smaller local model more useful."]
+        ],
+        editions: {
+          kicker: "Free and Pro",
+          title: "Open-source by belief, Pro by convenience and local safety.",
+          text: "Think of it like a Free / Go / Pro product ladder: the open-source edition remains the free protocol foundation, while the Fab edition is the Pro workflow for buyers who want less setup and safer local usage.",
+          cards: [
+            {
+              kind: "free",
+              label: "Free",
+              title: "Open-source protocol foundation",
+              text: "For developers who want to study, extend, and contribute to the core MCP workflow.",
+              points: [
+                "Core UMG MCP command ideas remain open",
+                "Best path for protocol learning and contribution",
+                "Manual setup and MCP client configuration",
+                "Great for experimentation and transparency"
+              ]
+            },
+            {
+              kind: "pro",
+              label: "Pro",
+              title: "Fab edition for convenient local-safe production",
+              text: "For creators who want the easiest install path, in-editor workflow, local model support, and safer daily use.",
+              points: [
+                "FabServer in-editor chat, approvals, and task flow",
+                "Integrated LiteRT-LM Gemma4 E4B local AI path",
+                "Provider routing, context compression, and ToolModes",
+                "Designed for less setup and more production time"
+              ]
+            }
+          ]
+        },
+        compare: {
+          kicker: "Free vs Pro",
+          title: "Choose the tier that matches your risk and setup tolerance.",
+          text: "Free exists because the project believes in open source. Pro exists because production users often need a safer, more convenient local workflow.",
+          head: ["Need", "Free open-source edition", "Pro Fab edition"],
+          rows: [
+            ["Protocol learning", "Best for studying MCP mechanics and core command behavior.", "Includes the same roots, packaged for buyers."],
+            ["Setup time", "Manual clone, Python environment, and MCP client configuration.", "Installed through Fab / Unreal launcher flow with product packaging."],
+            ["Local safety", "You assemble your own provider and local setup.", "Integrated local-first workflow with LiteRT-LM Gemma4 E4B and approval controls."],
+            ["Production workflow", "Excellent for experimentation and contribution.", "Adds FabServer UX, agents, provider routing, context compression, and ToolModes."]
+          ]
+        },
+        faq: {
+          kicker: "Questions buyers ask",
+          title: "What to know before purchase.",
+          items: [
+            ["Does this replace Unreal designers?", "No. It removes repetitive editor operations and gives designers faster drafts. The human still owns style, layout quality, and approval."],
+            ["Can I use local AI?", "Yes, and the situation is better than generic local support. The LiteRT-LM path integrates a Gemma4 E4B model that is small enough for phone-class devices, so a normal UE5 development computer can run the engine and an efficient local AI loop at the same time."],
+            ["What does MCP add?", "MCP gives the AI a structured tool contract. It can call exact Unreal operations instead of guessing through screenshots or text instructions."],
+            ["What makes FabServer special?", "FabServer adds the in-editor Chat UI, agents, provider routing, approval queue, context handling, and the buyer-oriented workflow around raw MCP tools."],
+            ["Is the open-source project still useful?", "Yes. It remains the core protocol testbed and a place for developers to understand and contribute to the underlying workflow."]
+          ]
+        },
+        cta: { title: "Bring AI into Unreal where your assets actually live.", text: "Use Free to learn the open MCP foundation, or buy Pro on Fab for the convenient local-safe workflow: FabServer, agents, approvals, context compression, and LiteRT-LM Gemma4 E4B.", buy: "Buy on Fab", github: "Open repository notes" },
+        footer: { copy: " - AI-assisted Unreal Motion Graphics production for humans who want control.", manual: "Developer manual", commands: "MCP commands" }
+      },
+      zh: {
+        nav: { index: "索引", features: "功能", agents: "Agent", mcp: "MCP", editions: "Free / Pro", fabserver: "FabServer", philosophy: "理念", faq: "常见问题", language: "语言", buy: "在 Fab 购买" },
+        hero: {
+          kicker: "面向 Unreal Engine 创作者的 Fab 商店插件",
+          title: "让 AI 制作虚幻 UI，而你负责导演。",
+          lede: "UMG MCP 通过 MCP 与 FabServer 把 AI 助手接入 Unreal Engine，让它在你的确认下编辑 UMG 控件、蓝图逻辑、Sequencer 动画和 HLSL UI 材质。",
+          primaryCta: "获取 Fab 版本",
+          docsCta: "阅读开发手册",
+          note: "为本地优先生产而设计：更少浪费的 token、更少盲改，以及每一次人工决策带来更多有效产出。"
+        },
+        stats: [["4", "UMG、蓝图、Sequencer、材质四个创作面"], ["8", "面向全球购买者的界面语言"], ["Gemma4 E4B", "集成 LiteRT-LM 本地模型，高效伴随 UE5 运行"], ["人类", "以确认机制为中心的生产控制流"]],
+        productIndex: {
+          kicker: "产品索引",
+          title: "按你的工作场景找到 UMG MCP 的对应能力。",
+          text: "消费者更容易理解一个复杂插件，如果它被拆成创作表面、Agent、模型 Provider 和版本档位。这里就是整页地图。",
+          open: "查看章节",
+          items: [
+            { href: "#features", title: "创作表面", text: "UMG 控件、蓝图图表、Sequencer 动画、HLSL UI 材质和真实资产路径。" },
+            { href: "#agents", title: "Agent 系统", text: "Master、Layout、Widget、Material、Animation、Blueprint、FileManage 多 Agent 分工。" },
+            { href: "#local", title: "本地 AI 运行时", text: "LiteRT-LM 集成 Gemma4 E4B，让 AI 可以在 UE5 开发电脑上高效伴随运行。" },
+            { href: "#editions", title: "Free / Pro 档位", text: "开源 Free 用于协议学习；Fab Pro 用于更安全、更便捷的本地生产体验。" },
+            { href: "#fabserver", title: "FabServer 层", text: "编辑器内聊天、审批、Provider 路由、上下文处理、任务流和聚焦 ToolMode。" },
+            { href: "#mcp", title: "MCP 协议", text: "带类型的工具调用，把模型意图变成结构化 Unreal 编辑器动作。" }
+          ]
+        },
+        for: { kicker: "适合谁", title: "给真正要交付 UI 的团队使用。", text: "UMG MCP 不是贴在 Unreal 旁边的聊天框，而是一个生产控制层，服务于需要可复现资产、可读改动和快速迭代的人。" },
+        personas: [["UI 设计师", "生成布局骨架、查看控件树，并在不手动重建每个 Slot 的情况下要求安全修改。"], ["玩法程序", "让 AI 添加蓝图节点、连接引脚、绑定事件并编译，你负责审查意图。"], ["技术美术", "用结构化参数创建 UI 动画轨道和 HLSL 材质效果，不再依赖松散描述。"]],
+        features: { kicker: "核心能力", title: "一个插件，四个创作表面。", text: "同一次 AI 对话可以从控件结构进入蓝图行为，再进入动画时间线与 Shader 打磨，无需离开 Unreal 项目。" },
+        featureCards: [["UMG 资产编辑", "通过原生编辑器操作创建、删除、重挂、查询和调整控件。Active Target 让 AI 聚焦当前资产。"], ["蓝图图表控制", "设置编辑函数、添加执行步骤、准备数值、连接数据引脚、管理变量并编译 Widget Blueprint。"], ["Sequencer 动画", "聚焦动画和控件，检查时间线，追加关键帧，写入时间切片，并通过显式确认删除关键帧。"], ["HLSL 材质流程", "把 UI 材质视作一个 HLSL 程序，带语义输出连线、结构化参数和编译诊断。"], ["JSON 与 HTML 布局同步", "将 UMG 导出为可读文件，应用布局定义，让二进制 UI 更适合版本管理。"], ["编辑器与资产管线", "列出资产、刷新注册表、查看关卡 Actor，让 AI 始终基于真实 Unreal 路径工作。"]],
+        mcp: { kicker: "MCP 是什么", title: "MCP 把 AI 意图变成结构化编辑器动作。", text1: "Model Context Protocol 给 AI 客户端一组带类型的工具。模型不再猜 Unreal 怎么操作，而是请求明确动作，例如读取控件树、创建按钮、设置锚点、编译蓝图或应用 HLSL。", text2: "UMG MCP 将这些工具调用映射到 Unreal 的 C++ 与 Python 路由中。它比屏幕抓取更可靠，也比让 AI 描述手动点击更容易审查。", cta: "打开 MCP 命令索引" },
+        agents: {
+          kicker: "Agent 系统",
+          title: "不是一个巨大 Prompt，而是一组专业 Agent。",
+          text: "FabServer 把 UI 生产拆给更窄职责的 Agent。工具选择更少、上下文更干净，人类也更容易审查。",
+          flowTitle: "一个复杂 UI 请求如何被拆分",
+          flowText: "Master Agent 提取概念，Layout Agent 把概念扩展成具体 UI 区域，Widget、Material、Animation、Blueprint 等专业 Agent 完成各自需要的工具任务。缺少目标路径时，FileManage Agent 可以后台静默补齐资产路径。",
+          stack: [
+            { icon: "users", name: "Master Agent", text: "理解用户创作请求，提取核心概念，在计划清楚后通过 task_begin 开始任务。" },
+            { icon: "layout-template", name: "Layout Agent", text: "把概念拆成具体 UI 区域、层级、目标资产和控件级任务。" },
+            { icon: "panel-top", name: "Widget Agents", text: "创建与修改具体控件、Slot、锚点、层级和可读 UMG 结构。" },
+            { icon: "palette", name: "Material Agents", text: "为指定控件目标生成 UI 材质通道与 HLSL 特效。" },
+            { icon: "film", name: "Animation Agents", text: "创建 Sequencer 轨道、时间切片、过渡和关键帧改动。" },
+            { icon: "git-fork", name: "Blueprint Agents", text: "绑定事件、添加节点、连接引脚、准备数据并编译行为逻辑。" },
+            { icon: "folder-search", name: "FileManage Agent", text: "当任务需要具体 Unreal 资产路径时，在后台解析和补齐目标资产。" }
+          ],
+          steps: [
+            ["1. 理解", "Master Agent 确认设计目标，并把需求拆成详细概念。"],
+            ["2. 派发", "Layout Agent 将概念转成控件任务包和所需资产。"],
+            ["3. 专业执行", "Widget、Material、Animation、Blueprint 等 Agent 完成各自窄任务。"]
+          ]
+        },
+        flow: [["AI 客户端", "Claude、Gemini、Codex、Cursor 或本地模型决定下一次工具调用。", "JSON-RPC"], ["UMG MCP", "插件校验参数，解析当前资产，并路由命令。", "C++ / Python"], ["Unreal Editor", "UMG、蓝图、Sequencer、材质和资产只通过编辑器 API 改动。", "UE 主线程"]],
+        fab: { kicker: "FabServer 优势", title: "Fab 版本在 MCP 外增加生产层。", text: "FabServer 是让 MCP 真正可被创作者使用的编辑器体验：Agent、审批、Provider 路由、本地模型、任务编排、上下文压缩和聚焦 ToolMode。", tabs: { agents: "Agent", providers: "Provider", control: "控制", context: "上下文" } },
+        fabGroups: {
+          agents: [["Chat、Develop、Learning、Task", "四种内置 Agent 模式分别覆盖对话、聚焦编辑、只读学习和任务移交。"], ["Agent 栈与任务路由", "Master、Layout、Widget、Material、Animation、Blueprint、FileManage 等 Agent 可把复杂 UI 拆成更小决策。"], ["按 Agent 构建工具 Schema", "FabServer 可以按当前 Agent 和活跃资产收窄工具列表，提高可靠性并减少提示噪音。"], ["Task begin / task end", "Task 模式锁定范围，记录目标上下文，并在完成后把控制权交还给用户。"]],
+          providers: [["集成 Gemma4 E4B 的本地 LiteRT-LM", "Fab 工作流集成 Gemma4 E4B LiteRT-LM 模型。这个模型轻到可以在手机级设备运行，因此在运行 UE5 的开发电脑上，也可以高效地让本地 AI 伴随编辑器工作。"], ["Google 授权和 API Key", "可使用 Google 账号登录、Google API Key、智谱 AI 或自定义 OpenAI 兼容端点。"], ["Codex CLI Provider", "当你希望使用本地命令行 AI 表面时，可将 FabServer 对话路由到已安装的 Codex CLI。"], ["多重重试路由", "主 Provider 与重试设置可在远端限流或失败时保持生产继续。"]],
+          control: [["审批队列", "会修改资产的工具调用可先显示为 Accept / Reject 卡片。"], ["聚焦当前 UMG", "当你需要严格资产安全时，将 AI 锁定在当前打开的 UMG 文件。"], ["跟随 AI 目标", "当你监督更大范围生成时，让编辑器跟随 AI 选择的文件。"], ["双回路架构", "内部 Chat UI 走直接 C++ 路径；外部客户端走 MCP Bridge。两条路径按用途隔离。"]],
+          context: [["长对话压缩", "当上下文过长时压缩旧消息，在不淹没模型的情况下保持连续性。"], ["Prompt 与 KV Cache", "默认 Prompt 和本地推理记忆可缓存，让本地模型少重复初始化工作。"], ["Learning Agent 上下文", "只在编辑器结构变化时注入只读树上下文，节省重复分析的 token。"], ["对话历史", "FabServer 存储并归一化消息历史，让会话可带着有效上下文继续。"]]
+        },
+        workflow: { kicker: "Unreal 中的一天", title: "从提示词到资产，同时不失去作者权。", text: "插件围绕可审查循环构建：检查、提议、确认、执行、保存，并为下一步保持上下文聚焦。" },
+        workflowCards: [["检查", "AI 读取活跃资产、控件树、Schema、变量、动画和材质状态。"], ["计划", "Agent 选择小型工具调用，而不是写一段模糊的手动操作说明。"], ["确认", "高影响改动在资产被修改前由你接受或拒绝。"], ["提交", "插件通过 Unreal API 执行、保存资产，并返回结构化反馈。"]],
+        philosophy: { kicker: "产品理念", title: "我们优化的是 AI 对人的能效。", quote: "生产中能效最高的引擎，依然是人。", small: "UMG MCP 用来放大判断力，而不是用无穷无尽的自动产出淹没判断力。" },
+        principles: [["01", "更少输出，更有效输出", "目标不是让 AI 生成最多文字，而是让每个 token、每次工具调用都让资产更接近完成。"], ["02", "本地 AI 也应该有高级体验", "当工具足够精确、上下文足够压缩，本地模型也能做聚焦的 Unreal 工作。"], ["03", "人类保留创作主权", "AI 提出结构、代码、动画和材质修改；创作者决定范围、审美、风险和最终确认。"]],
+        local: { kicker: "本地优先 AI", title: "Gemma4 E4B 轻到能跑在手机级设备上，因此你的电脑可以同时运行 UE5 和 AI。", text: "这比简单说“支持本地 AI”更进一步。LiteRT-LM 路线集成 Gemma4 E4B，这类紧凑模型可以在手机级设备上运行；在已经运行 UE5 的台式机或笔记本上，就有现实余量维持一个高效的编辑器内 AI 循环。" },
+        localCards: [["集成 Gemma4 E4B LiteRT-LM", "Pro 工作流围绕紧凑本地模型路径设计，而不是默认必须依赖巨大远程模型。"], ["伴随 Unreal 运行，而不是替代 Unreal", "模型级别轻到可以面向手机级设备，因此 UE5 开发电脑可以同时保持编辑器与 AI 循环活跃。"], ["用精确工具替代暴力大模型", "聚焦工具 Schema、活跃目标、Prompt 缓存和结构化编辑器反馈，让更小的本地模型也变得实用。"]],
+        editions: {
+          kicker: "Free 和 Pro",
+          title: "因为信奉开源，所以 Free 存在；因为需要本地安全与便捷，所以 Pro 存在。",
+          text: "可以把它理解成类似 GPT 的 Free / Go / Pro 产品梯度：开源版是免费的协议基础，Fab 版是面向购买者的 Pro 工作流，重点提供更少配置、更安全的本地使用和更完整的生产体验。",
+          cards: [
+            {
+              kind: "free",
+              label: "Free",
+              title: "开源协议基础版",
+              text: "适合想学习、扩展、贡献核心 MCP 工作流的开发者。",
+              points: [
+                "核心 UMG MCP 命令思想保持开源",
+                "适合协议学习、研究和贡献",
+                "需要手动配置 Python 与 MCP 客户端",
+                "适合实验、透明和二次开发"
+              ]
+            },
+            {
+              kind: "pro",
+              label: "Pro",
+              title: "Fab 版：便捷且本地安全的生产体验",
+              text: "适合希望减少配置、直接在编辑器内安全使用本地 AI 与 Agent 工作流的创作者。",
+              points: [
+                "FabServer 编辑器内聊天、审批和任务流",
+                "集成 LiteRT-LM Gemma4 E4B 本地 AI 路线",
+                "Provider 路由、上下文压缩和 ToolMode",
+                "目标是更少配置，更多生产时间"
+              ]
+            }
+          ]
+        },
+        compare: { kicker: "Free vs Pro", title: "根据你的风险与配置容忍度选择档位。", text: "Free 存在是因为我们相信开源；Pro 存在是因为生产用户通常需要更安全、更便捷的本地工作流。", head: ["需求", "Free 开源版", "Pro Fab 版"], rows: [["学习协议", "最适合理解 MCP 机制和核心命令行为。", "保留同样根基，但为购买者包装好入口。"], ["配置时间", "需要手动 clone、Python 环境和 MCP 客户端配置。", "通过 Fab / Unreal Launcher 流程进行产品化安装。"], ["本地安全", "你需要自行组装 Provider 和本地运行方式。", "集成本地优先 LiteRT-LM Gemma4 E4B 与审批控制。"], ["生产工作流", "适合实验和贡献。", "增加 FabServer UX、Agent、Provider 路由、上下文压缩和 ToolMode。"]] },
+        faq: { kicker: "购买者常问", title: "购买前需要知道什么。", items: [["它会替代 Unreal 设计师吗？", "不会。它减少重复编辑器操作，帮助设计师更快获得草稿。风格、布局质量和确认权仍在人的手里。"], ["可以用本地 AI 吗？", "可以，而且不是泛泛的“支持本地”。LiteRT-LM 路线集成 Gemma4 E4B，这个模型轻到可以在手机级设备上运行，因此普通 UE5 开发电脑可以同时运行引擎和一个高效的本地 AI 循环。"], ["MCP 带来什么？", "MCP 给 AI 一个结构化工具契约。它可以调用明确 Unreal 操作，而不是靠截图或文字说明猜测。"], ["FabServer 特别在哪里？", "FabServer 提供编辑器内 Chat UI、Agent、Provider 路由、审批队列、上下文处理，以及围绕原始 MCP 工具的购买者工作流。"], ["开源项目还有价值吗？", "有。Free 开源版仍然是核心协议基础和贡献入口；Pro Fab 版主要提供更便捷、更本地安全的生产体验。"]] },
+        cta: { title: "把 AI 带到你的 Unreal 资产真正所在的地方。", text: "用 Free 学习开放 MCP 基础；购买 Fab Pro 获得更便捷且本地安全的工作流：FabServer、Agent、审批、上下文压缩和 LiteRT-LM Gemma4 E4B。", buy: "在 Fab 购买", github: "打开仓库说明" },
+        footer: { copy: " - 面向需要掌控权的人类创作者的 AI 辅助 Unreal Motion Graphics 生产。", manual: "开发手册", commands: "MCP 命令" }
+      }
+    };
+
+    const fallback = packs.en;
+    const languageNames = { ja: "日本語", ko: "한국어", es: "Español", fr: "Français", de: "Deutsch", pt: "Português" };
+
+    function cloneFromEnglish(lang, overrides) {
+      const merged = JSON.parse(JSON.stringify(fallback));
+      Object.assign(merged.nav, overrides.nav);
+      Object.assign(merged.hero, overrides.hero);
+      Object.assign(merged.for, overrides.for);
+      Object.assign(merged.features, overrides.features);
+      Object.assign(merged.mcp, overrides.mcp);
+      Object.assign(merged.fab, overrides.fab);
+      Object.assign(merged.workflow, overrides.workflow);
+      Object.assign(merged.philosophy, overrides.philosophy);
+      Object.assign(merged.local, overrides.local);
+      Object.assign(merged.compare, overrides.compare);
+      Object.assign(merged.faq, overrides.faq);
+      Object.assign(merged.cta, overrides.cta);
+      Object.assign(merged.footer, overrides.footer);
+      merged.stats = overrides.stats;
+      merged.personas = overrides.personas;
+      merged.featureCards = overrides.featureCards;
+      merged.flow = overrides.flow;
+      merged.workflowCards = overrides.workflowCards;
+      merged.principles = overrides.principles;
+      merged.localCards = overrides.localCards;
+      merged.compare.head = overrides.compare.head;
+      merged.compare.rows = overrides.compare.rows;
+      merged.faq.items = overrides.faq.items;
+      merged.fab.tabs = overrides.fab.tabs;
+      merged.fabGroups = overrides.fabGroups;
+      packs[lang] = merged;
+    }
+
+    cloneFromEnglish("ja", {
+      nav: { features: "機能", mcp: "MCP", fabserver: "FabServer", philosophy: "思想", faq: "FAQ", language: "言語", buy: "Fabで購入" },
+      hero: { kicker: "Unreal Engine制作者向けFab Marketplaceプラグイン", title: "AIにUnreal UIを作らせ、あなたはディレクターであり続ける。", lede: "UMG MCPはMCPとFabServerでAIアシスタントをUnreal Engineに接続し、承認のもとでUMG、Blueprint、Sequencer、HLSL UIマテリアルを編集させます。", primaryCta: "Fab版を入手", docsCta: "開発者マニュアル", note: "ローカル優先の制作向け。無駄なトークンと盲目的な編集を減らし、人間の判断ごとの有効出力を増やします。" },
+      stats: [["4", "UMG、Blueprint、Sequencer、Materialの制作面"], ["8", "世界の購入者向け表示言語"], ["Local", "LiteRT-LM、API、Google認証、CLIルート"], ["Human", "承認を中心にした制作制御"]],
+      for: { kicker: "対象ユーザー", title: "UIを出荷するチームのための実用AIワークフロー。", text: "UMG MCPはUnrealの横に置くチャットボットではなく、再現可能なアセット、読みやすい変更、エディタ内の高速反復を必要とする人のための制作制御レイヤーです。" },
+      personas: [["UIデザイナー", "レイアウトの土台を生成し、Widget Treeを確認し、各Slotを手作業で作り直さず安全な編集を依頼できます。"], ["ゲームプレイプログラマー", "AIにBlueprintノード追加、ピン接続、イベントバインド、コンパイルを任せ、意図を確認できます。"], ["テクニカルアーティスト", "曖昧な指示ではなく構造化パラメータでUIアニメーションとHLSL素材を作成できます。"]],
+      features: { kicker: "中核機能", title: "1つのプラグインで4つの制作面。", text: "同じAI会話からWidget構造、Blueprint挙動、アニメーションタイミング、Shader調整まで移れます。" },
+      featureCards: [["UMGアセット編集", "ネイティブ操作でWidgetの作成、削除、親変更、照会、調整を実行。Active TargetがAIを現在のアセットに集中させます。"], ["Blueprint制御", "編集関数、実行ステップ、値準備、データピン接続、変数管理、Widget Blueprintコンパイルに対応。"], ["Sequencerアニメーション", "アニメーションとWidgetをフォーカスし、タイムライン確認、キー追加、時間スライス書き込み、確認付き削除を行います。"], ["HLSLマテリアル", "UI Materialを単一HLSLプログラムとして扱い、意味的な出力配線、構造化パラメータ、診断を提供。"], ["JSON/HTMLレイアウト同期", "UMGを読みやすいファイルにエクスポートし、レイアウト定義を適用します。"], ["エディタとアセット管線", "アセット一覧、Registry更新、Level Actor照会でAIを実パスに接地します。"]],
+      mcp: { kicker: "MCPとは", title: "MCPはAIの意図を構造化されたエディタ操作にします。", text1: "Model Context ProtocolはAIクライアントに型付きツール一覧を与えます。AIはUnrealを推測せず、Widget Tree取得、Button作成、Anchor設定、Blueprintコンパイル、HLSL適用などを正確に要求します。", text2: "UMG MCPはその呼び出しをUnrealのC++/Pythonルートへ写像します。画面解析より信頼でき、手作業クリックの説明よりレビューしやすい方法です。", cta: "MCPコマンド一覧を開く" },
+      flow: [["AIクライアント", "Claude、Gemini、Codex、Cursor、またはローカルモデルが次のTool Callを決めます。", "JSON-RPC"], ["UMG MCP", "パラメータを検証し、アクティブアセットを解決してルーティングします。", "C++ / Python"], ["Unreal Editor", "UMG、Blueprint、Sequencer、Material、AssetをエディタAPI経由で変更します。", "UE Main Thread"]],
+      fab: { kicker: "FabServerの利点", title: "Fab版はMCPの周囲に制作レイヤーを追加します。", text: "FabServerはMCPを実制作で使える体験にします。Agent、承認、Providerルーティング、ローカルモデル、タスク編成、コンテキスト圧縮、ToolModeが含まれます。", tabs: { agents: "Agent", providers: "Provider", control: "制御", context: "Context" } },
+      fabGroups: fallback.fabGroups,
+      workflow: { kicker: "Unrealでの一日", title: "作者性を失わず、プロンプトからアセットへ。", text: "検査、提案、承認、実行、保存、次の一手への集中というレビュー可能なループで構成されています。" },
+      workflowCards: [["検査", "AIがアクティブアセット、Widget Tree、Schema、変数、Animation、Material状態を読みます。"], ["計画", "曖昧な手順説明ではなく小さなTool Callを選びます。"], ["承認", "重要な変更はアセット変更前に承認または拒否できます。"], ["反映", "Unreal APIで実行し、保存し、構造化された結果を返します。"]],
+      philosophy: { kicker: "思想", title: "AIを人間のエネルギー効率のために最適化します。", quote: "制作で最も効率の高いエンジンは、今も人間です。", small: "UMG MCPは判断を増幅するためのもので、自動出力で判断を埋めるためのものではありません。" },
+      principles: [["01", "少ない出力で有効な出力", "目標はAIに最も多く書かせることではなく、各トークンとTool Callを完成へ近づけることです。"], ["02", "ローカルAIにも高品質な体験", "ツールが精密でコンテキストが圧縮されれば、ローカルモデルでも集中したUnreal作業ができます。"], ["03", "人間が創作権を保つ", "AIは構造、コード、アニメーション、素材編集を提案し、人間が範囲、味、リスク、承認を決めます。"]],
+      local: { kicker: "ローカル優先AI", title: "ツールが精密なら、小型・ローカルモデルは役に立ちます。", text: "ローカルモデルがエディタ全体を覚える必要はありません。UMG MCPが集中ツール、Active Target、キャッシュ、構造化フィードバックを提供します。" },
+      localCards: [["LiteRT-LMモデル", "メモリ予算に応じたGemma系モデルメタデータを用意。"], ["コンテキスト制御", "LocalModelContextLengthとLocalModelPrefillChunkSizeを調整できます。"], ["盲目的なスクリーンショット不要", "Widget、Blueprint、Animation、Material、Assetの構造化データを直接読みます。"]],
+      compare: { kicker: "Open SourceとFab", title: "プロジェクトに合う道を選べます。", text: "Open Sourceはプロトコル試験場です。Fab版は設定を減らし制作に集中したい購入者向けに、洗練されたインストールとFabServerワークフローを提供します。", head: ["要件", "Open Source", "Fab Marketplace版"], rows: [["プロトコル学習", "MCP機構とコアコマンド理解に最適。", "同じ思想を購入者向け導線で提供。"], ["設定時間", "Clone、Python、MCP設定が必要。", "Fab / Unreal Launcher経由の製品導入。"], ["制作ワークフロー", "実験と貢献に適します。", "FabServer UX、Provider、圧縮、サポート重視。"], ["商用安心感", "自分で検証と保守。", "制作ユーザーと継続改善を重視。"]] },
+      faq: { kicker: "購入前の質問", title: "購入前に知っておくこと。", items: [["Unrealデザイナーを置き換えますか？", "いいえ。反復作業を減らし、早いドラフトを作ります。品質と承認は人間が持ちます。"], ["ローカルAIを使えますか？", "はい。LiteRT-LMとCLIルートに対応しています。"], ["MCPの価値は？", "AIに構造化ツール契約を与え、正確なUnreal操作を呼べます。"], ["FabServerの違いは？", "Chat UI、Agent、Provider、承認、コンテキスト処理を提供します。"], ["Open Sourceは有用ですか？", "はい。コアプロトコルの試験場です。"]] },
+      cta: { title: "AIをUnrealアセットの現場へ。", text: "Fab版を購入し、ローカルLiteRT-LM、Googleログイン、APIキー、OpenAI互換、ZhipuAI、Codex CLIを接続できます。", buy: "Fabで購入", github: "リポジトリノート" },
+      footer: { copy: " - 制御を求める人間のためのAI支援Unreal Motion Graphics制作。", manual: "開発者マニュアル", commands: "MCPコマンド" }
+    });
+
+    cloneFromEnglish("ko", {
+      nav: { features: "기능", mcp: "MCP", fabserver: "FabServer", philosophy: "철학", faq: "FAQ", language: "언어", buy: "Fab에서 구매" },
+      hero: { kicker: "Unreal Engine 제작자를 위한 Fab Marketplace 플러그인", title: "AI가 Unreal UI를 만들고, 당신은 감독으로 남습니다.", lede: "UMG MCP는 MCP와 FabServer로 AI 어시스턴트를 Unreal Engine에 연결해, 승인 아래 UMG 위젯, Blueprint 로직, Sequencer 애니메이션, HLSL UI 머티리얼을 편집합니다.", primaryCta: "Fab 버전 받기", docsCta: "개발자 매뉴얼", note: "로컬 우선 제작을 위해 설계되었습니다. 낭비 토큰과 맹목적 편집을 줄이고, 인간 판단당 유효 출력을 높입니다." },
+      stats: [["4", "UMG, Blueprint, Sequencer, Material 작업면"], ["8", "글로벌 구매자를 위한 언어"], ["Local", "LiteRT-LM, API, Google 인증, CLI 경로"], ["Human", "승인 중심 제작 제어"]],
+      for: { kicker: "대상", title: "UI를 실제로 납품하는 팀을 위한 실용 AI 워크플로.", text: "UMG MCP는 Unreal 옆의 단순 챗봇이 아니라 반복 가능한 에셋, 읽기 쉬운 변경, 빠른 에디터 반복을 위한 제작 제어 레이어입니다." },
+      personas: [["UI 디자이너", "레이아웃 뼈대를 만들고 위젯 트리를 확인하며 Slot을 전부 수작업으로 다시 만들지 않습니다."], ["게임플레이 프로그래머", "AI가 Blueprint 노드 추가, 핀 연결, 이벤트 바인딩, 컴파일을 수행하고 당신은 의도를 검토합니다."], ["테크니컬 아티스트", "느슨한 지시 대신 구조화 파라미터로 UI 애니메이션과 HLSL 머티리얼을 만듭니다."]],
+      features: { kicker: "핵심 기능", title: "하나의 플러그인, 네 개의 제작 표면.", text: "같은 AI 대화가 위젯 구조에서 Blueprint 동작, 애니메이션 타이밍, 셰이더 마감으로 이어집니다." },
+      featureCards: [["UMG 에셋 편집", "네이티브 에디터 작업으로 위젯 생성, 삭제, 부모 변경, 조회, 조정. Active Target이 현재 에셋에 집중시킵니다."], ["Blueprint 그래프 제어", "편집 함수, 실행 단계, 값 준비, 데이터 핀 연결, 변수 관리, Widget Blueprint 컴파일."], ["Sequencer 애니메이션", "애니메이션/위젯 포커스, 타임라인 확인, 키프레임 추가, 시간 슬라이스 작성, 명시적 삭제."], ["HLSL 머티리얼", "UI 머티리얼을 단일 HLSL 프로그램으로 다루고 의미 기반 출력 연결과 진단을 제공합니다."], ["JSON/HTML 레이아웃 동기화", "UMG를 읽기 쉬운 파일로 내보내고 레이아웃 정의를 적용합니다."], ["에디터와 에셋 파이프라인", "에셋 목록, Registry 갱신, Level Actor 조회로 AI를 실제 경로에 묶습니다."]],
+      mcp: { kicker: "MCP 설명", title: "MCP는 AI 의도를 구조화된 에디터 동작으로 바꿉니다.", text1: "Model Context Protocol은 AI 클라이언트에 타입이 있는 도구 목록을 제공합니다. AI는 Unreal을 추측하지 않고 위젯 트리 읽기, 버튼 생성, 앵커 설정, Blueprint 컴파일, HLSL 적용을 호출합니다.", text2: "UMG MCP는 호출을 Unreal C++/Python 경로로 매핑합니다. 화면 분석보다 안정적이고 수동 클릭 설명보다 검토하기 쉽습니다.", cta: "MCP 명령 색인 열기" },
+      flow: [["AI 클라이언트", "Claude, Gemini, Codex, Cursor 또는 로컬 모델이 다음 도구 호출을 결정합니다.", "JSON-RPC"], ["UMG MCP", "파라미터를 검증하고 활성 에셋을 해석해 명령을 라우팅합니다.", "C++ / Python"], ["Unreal Editor", "UMG, Blueprint, Sequencer, Material, Asset이 에디터 API를 통해 변경됩니다.", "UE Main Thread"]],
+      fab: { kicker: "FabServer 장점", title: "Fab 버전은 MCP 주변에 제작 레이어를 더합니다.", text: "FabServer는 Agent, 승인, Provider 라우팅, 로컬 모델, 작업 오케스트레이션, 컨텍스트 압축, ToolMode로 MCP를 실제 제작에 맞춥니다.", tabs: { agents: "Agent", providers: "Provider", control: "제어", context: "컨텍스트" } },
+      fabGroups: fallback.fabGroups,
+      workflow: { kicker: "Unreal 작업 흐름", title: "저작권을 잃지 않고 프롬프트에서 에셋까지.", text: "검사, 제안, 승인, 실행, 저장, 다음 단계 집중이라는 검토 가능한 루프입니다." },
+      workflowCards: [["검사", "AI가 활성 에셋, 위젯 트리, Schema, 변수, 애니메이션, 머티리얼 상태를 읽습니다."], ["계획", "모호한 수동 지시 대신 작은 도구 호출을 선택합니다."], ["승인", "중요 변경은 에셋 수정 전 승인 또는 거절합니다."], ["반영", "Unreal API로 실행하고 저장하며 구조화 피드백을 반환합니다."]],
+      philosophy: { kicker: "제품 철학", title: "우리는 AI를 인간 에너지 효율에 맞게 최적화합니다.", quote: "제작에서 가장 효율적인 엔진은 여전히 인간입니다.", small: "UMG MCP는 판단을 증폭하기 위한 것이지 자동 출력으로 판단을 덮기 위한 것이 아닙니다." },
+      principles: [["01", "적은 출력, 더 유용한 출력", "목표는 AI가 가장 많이 쓰게 하는 것이 아니라 각 토큰과 도구 호출이 에셋 완성에 기여하게 하는 것입니다."], ["02", "로컬 AI도 프리미엄이어야 합니다", "도구가 정확하고 컨텍스트가 압축되면 로컬 모델도 집중된 Unreal 작업을 수행합니다."], ["03", "인간이 창작 권한을 유지합니다", "AI는 구조, 코드, 애니메이션, 머티리얼 변경을 제안하고 인간이 범위와 승인 여부를 결정합니다."]],
+      local: { kicker: "로컬 우선 AI", title: "도구가 정확하면 작고 로컬인 모델도 유용합니다.", text: "로컬 모델이 전체 에디터를 기억할 필요가 없습니다. UMG MCP가 집중 도구, 활성 대상, 캐시, 구조화 피드백을 제공합니다." },
+      localCards: [["LiteRT-LM 모델", "다양한 RAM 예산에 맞는 Gemma 계열 모델 메타데이터."], ["컨텍스트 길이 제어", "LocalModelContextLength와 LocalModelPrefillChunkSize 조정 가능."], ["맹목적 스크린샷 불필요", "구조화된 위젯, Blueprint, 애니메이션, 머티리얼, 에셋 데이터를 직접 읽습니다."]],
+      compare: { kicker: "오픈소스와 Fab", title: "프로젝트에 맞는 경로를 선택하세요.", text: "오픈소스 저장소는 프로토콜 테스트베드입니다. Fab 에디션은 적은 설정과 더 많은 납품 시간을 원하는 구매자를 위한 패키지입니다.", head: ["필요", "오픈소스 저장소", "Fab Marketplace 에디션"], rows: [["프로토콜 학습", "MCP 메커니즘과 핵심 명령 이해에 적합.", "같은 철학을 구매자 설치 경로와 함께 제공."], ["설정 시간", "Clone, Python, MCP 클라이언트 설정 필요.", "Fab / Unreal Launcher 흐름으로 설치."], ["제작 워크플로", "실험과 기여에 적합.", "FabServer UX, Provider, 컨텍스트 압축, 지원 중심."], ["상업적 신뢰", "직접 검증 및 유지.", "제작 사용자와 지속 개선을 중시."]] },
+      faq: { kicker: "구매 전 질문", title: "구매 전에 알아둘 것.", items: [["Unreal 디자이너를 대체하나요?", "아니요. 반복 작업을 줄이고 빠른 초안을 만듭니다. 품질과 승인은 인간에게 있습니다."], ["로컬 AI를 쓸 수 있나요?", "네. LiteRT-LM과 로컬 CLI 경로를 제공합니다."], ["MCP의 장점은?", "AI에게 구조화 도구 계약을 제공하여 정확한 Unreal 작업을 호출하게 합니다."], ["FabServer는 무엇이 다른가요?", "Chat UI, Agent, Provider, 승인 큐, 컨텍스트 처리를 제공합니다."], ["오픈소스도 유용한가요?", "네. 핵심 프로토콜 테스트베드입니다."]] },
+      cta: { title: "AI를 Unreal 에셋이 실제로 있는 곳으로 가져오세요.", text: "Fab 버전을 구매하고 로컬 LiteRT-LM, Google 로그인, API 키, OpenAI 호환 게이트웨이, ZhipuAI, Codex CLI를 연결하세요.", buy: "Fab에서 구매", github: "저장소 노트" },
+      footer: { copy: " - 제어권을 원하는 인간을 위한 AI 지원 Unreal Motion Graphics 제작.", manual: "개발자 매뉴얼", commands: "MCP 명령" }
+    });
+
+    ["es", "fr", "de", "pt"].forEach((lang) => {
+      const simple = {
+        es: {
+          nav: ["Funciones", "MCP", "FabServer", "Filosofía", "FAQ", "Idioma", "Comprar en Fab"],
+          hero: ["Plugin de Fab Marketplace para creadores de Unreal Engine", "Deja que la IA construya UI de Unreal mientras tú diriges.", "UMG MCP conecta asistentes de IA a Unreal Engine mediante MCP y FabServer para editar UMG, Blueprint, Sequencer y materiales HLSL con tu aprobación.", "Obtener versión Fab", "Manual técnico", "Pensado para producción local: menos tokens desperdiciados, menos ediciones ciegas y más resultado útil por decisión humana."],
+          for: ["Para quién", "Un flujo práctico para equipos que entregan UI.", "UMG MCP es una capa de control de producción para activos repetibles, cambios legibles e iteración rápida dentro del editor."],
+          philosophy: ["Filosofía", "Optimizamos la IA para la eficiencia humana.", "El motor más eficiente en producción sigue siendo el humano.", "UMG MCP amplifica el criterio; no lo entierra bajo salida automática."],
+          cta: ["Lleva la IA al lugar donde viven tus activos de Unreal.", "Compra la versión Fab y conecta LiteRT-LM local, Google, API keys, endpoints compatibles, ZhipuAI o Codex CLI.", "Comprar en Fab", "Notas del repositorio"]
+        },
+        fr: {
+          nav: ["Fonctions", "MCP", "FabServer", "Philosophie", "FAQ", "Langue", "Acheter sur Fab"],
+          hero: ["Plugin Fab Marketplace pour créateurs Unreal Engine", "Laissez l'IA créer vos UI Unreal pendant que vous gardez la direction.", "UMG MCP connecte les assistants IA à Unreal Engine via MCP et FabServer pour modifier UMG, Blueprint, Sequencer et matériaux HLSL sous votre contrôle.", "Obtenir la version Fab", "Manuel développeur", "Conçu pour la production locale: moins de tokens gaspillés, moins d'éditions aveugles, plus de résultat utile par décision humaine."],
+          for: ["Pour qui", "Un flux de travail pratique pour les équipes qui livrent des UI.", "UMG MCP est une couche de contrôle de production pour des assets reproductibles, des changements lisibles et une itération rapide dans l'éditeur."],
+          philosophy: ["Philosophie", "Nous optimisons l'IA pour l'efficacité humaine.", "Le moteur le plus efficace en production reste l'humain.", "UMG MCP amplifie le jugement au lieu de le noyer sous l'automatisation."],
+          cta: ["Amenez l'IA là où vivent vos assets Unreal.", "Achetez la version Fab et connectez LiteRT-LM local, Google, clés API, endpoints compatibles, ZhipuAI ou Codex CLI.", "Acheter sur Fab", "Notes du dépôt"]
+        },
+        de: {
+          nav: ["Funktionen", "MCP", "FabServer", "Philosophie", "FAQ", "Sprache", "Auf Fab kaufen"],
+          hero: ["Fab Marketplace Plugin für Unreal Engine Creator", "Lass KI Unreal-UIs bauen, während du Regie führst.", "UMG MCP verbindet KI-Assistenten per MCP und FabServer mit Unreal Engine, damit sie UMG, Blueprint, Sequencer und HLSL-Materialien unter deiner Freigabe bearbeiten.", "Fab-Version holen", "Entwicklerhandbuch", "Für lokale Produktion: weniger verschwendete Tokens, weniger blinde Änderungen, mehr Nutzen pro menschlicher Entscheidung."],
+          for: ["Für wen", "Ein praktischer Workflow für Teams, die UI liefern.", "UMG MCP ist eine Produktionskontrollschicht für reproduzierbare Assets, lesbare Änderungen und schnelle Iteration im Editor."],
+          philosophy: ["Philosophie", "Wir optimieren KI für menschliche Energieeffizienz.", "Der effizienteste Motor in der Produktion ist weiterhin der Mensch.", "UMG MCP verstärkt Urteilskraft statt sie unter Automatisierung zu begraben."],
+          cta: ["Bring KI dorthin, wo deine Unreal-Assets leben.", "Kaufe die Fab-Version und verbinde lokales LiteRT-LM, Google, API Keys, kompatible Endpoints, ZhipuAI oder Codex CLI.", "Auf Fab kaufen", "Repository-Notizen"]
+        },
+        pt: {
+          nav: ["Recursos", "MCP", "FabServer", "Filosofia", "FAQ", "Idioma", "Comprar no Fab"],
+          hero: ["Plugin do Fab Marketplace para criadores Unreal Engine", "Deixe a IA criar UIs Unreal enquanto você continua dirigindo.", "UMG MCP conecta assistentes de IA ao Unreal Engine via MCP e FabServer para editar UMG, Blueprint, Sequencer e materiais HLSL sob sua aprovação.", "Obter versão Fab", "Manual técnico", "Criado para produção local: menos tokens desperdiçados, menos edições cegas e mais resultado útil por decisão humana."],
+          for: ["Para quem", "Um fluxo prático para equipes que entregam UI.", "UMG MCP é uma camada de controle de produção para assets repetíveis, mudanças legíveis e iteração rápida dentro do editor."],
+          philosophy: ["Filosofia", "Otimizamos IA para a eficiência humana.", "O motor mais eficiente na produção ainda é o humano.", "UMG MCP amplia o julgamento em vez de enterrá-lo sob automação."],
+          cta: ["Leve a IA para onde seus assets Unreal realmente vivem.", "Compre a versão Fab e conecte LiteRT-LM local, Google, API keys, endpoints compatíveis, ZhipuAI ou Codex CLI.", "Comprar no Fab", "Notas do repositório"]
+        }
+      }[lang];
+
+      cloneFromEnglish(lang, {
+        nav: { features: simple.nav[0], mcp: simple.nav[1], fabserver: simple.nav[2], philosophy: simple.nav[3], faq: simple.nav[4], language: simple.nav[5], buy: simple.nav[6] },
+        hero: { kicker: simple.hero[0], title: simple.hero[1], lede: simple.hero[2], primaryCta: simple.hero[3], docsCta: simple.hero[4], note: simple.hero[5] },
+        stats: fallback.stats,
+        for: { kicker: simple.for[0], title: simple.for[1], text: simple.for[2] },
+        personas: fallback.personas,
+        features: fallback.features,
+        featureCards: fallback.featureCards,
+        mcp: fallback.mcp,
+        flow: fallback.flow,
+        fab: fallback.fab,
+        fabGroups: fallback.fabGroups,
+        workflow: fallback.workflow,
+        workflowCards: fallback.workflowCards,
+        philosophy: { kicker: simple.philosophy[0], title: simple.philosophy[1], quote: simple.philosophy[2], small: simple.philosophy[3] },
+        principles: fallback.principles,
+        local: fallback.local,
+        localCards: fallback.localCards,
+        compare: fallback.compare,
+        faq: fallback.faq,
+        cta: { title: simple.cta[0], text: simple.cta[1], buy: simple.cta[2], github: simple.cta[3] },
+        footer: fallback.footer
+      });
+    });
+
+    const iconCycle = ["layout-dashboard", "workflow", "film", "palette", "file-json", "folder-tree", "shield-check", "brain-circuit"];
+    const tabButtons = Array.from(document.querySelectorAll(".tab-button"));
+    let currentTab = "agents";
+
+    function getPack(lang) {
+      return packs[lang] || fallback;
+    }
+
+    function t(path, pack) {
+      return path.split(".").reduce((acc, key) => acc && acc[key], pack) || path;
+    }
+
+    function setText(selector, text) {
+      const el = document.querySelector(selector);
+      if (el) el.textContent = text;
+    }
+
+    function renderCards(targetId, items, className = "card", icon = true) {
+      const target = document.getElementById(targetId);
+      target.innerHTML = items.map((item, index) => `
+        <article class="${className}">
+          ${icon ? `<span class="icon-box"><i data-lucide="${iconCycle[index % iconCycle.length]}" aria-hidden="true"></i></span>` : ""}
+          <h3>${item[0]}</h3>
+          <p>${item[1]}</p>
+        </article>
+      `).join("");
+    }
+
+    function renderProductIndex(pack) {
+      document.getElementById("productIndexGrid").innerHTML = pack.productIndex.items.map((item, index) => `
+        <a class="card index-card" href="${item.href}">
+          <span class="icon-box"><i data-lucide="${iconCycle[index % iconCycle.length]}" aria-hidden="true"></i></span>
+          <h3>${item.title}</h3>
+          <p>${item.text}</p>
+          <span>${pack.productIndex.open} <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+        </a>
+      `).join("");
+    }
+
+    function renderAgentSystem(pack) {
+      document.getElementById("agentStack").innerHTML = pack.agents.stack.map((item, index) => `
+        <article class="agent-node">
+          ${index === 0 ? `<img src="../Resources/Icon/Agent.png" alt="">` : `<span class="agent-icon"><i data-lucide="${item.icon}" aria-hidden="true"></i></span>`}
+          <div><h3>${item.name}</h3><p>${item.text}</p></div>
+        </article>
+      `).join("");
+      document.getElementById("agentSteps").innerHTML = pack.agents.steps.map((item) => `
+        <div class="agent-step"><strong>${item[0]}</strong><span>${item[1]}</span></div>
+      `).join("");
+    }
+
+    function renderEditions(pack) {
+      document.getElementById("editionGrid").innerHTML = pack.editions.cards.map((item) => `
+        <article class="card edition-card ${item.kind}">
+          <span class="edition-label">${item.label}</span>
+          <h3>${item.title}</h3>
+          <p>${item.text}</p>
+          <ul>${item.points.map((point) => `<li>${point}</li>`).join("")}</ul>
+        </article>
+      `).join("");
+    }
+
+    function renderStats(pack) {
+      document.getElementById("stats").innerHTML = pack.stats.map((item) => `
+        <div class="stat"><strong>${item[0]}</strong><span>${item[1]}</span></div>
+      `).join("");
+    }
+
+    function renderFlow(pack) {
+      document.getElementById("mcpFlow").innerHTML = pack.flow.map((item) => `
+        <div class="flow-node">
+          <b>${item[0]}</b>
+          <span>${item[1]}</span>
+          <code>${item[2]}</code>
+        </div>
+      `).join("");
+    }
+
+    function renderFab(pack) {
+      const group = pack.fabGroups[currentTab] || pack.fabGroups.agents;
+      document.getElementById("fabGrid").innerHTML = group.map((item) => `
+        <article class="fab-item"><h3>${item[0]}</h3><p>${item[1]}</p></article>
+      `).join("");
+      tabButtons.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.tab === currentTab)));
+    }
+
+    function renderPrinciples(pack) {
+      document.getElementById("principlesGrid").innerHTML = pack.principles.map((item) => `
+        <article class="principle">
+          <strong>${item[0]}</strong>
+          <div><h3>${item[1]}</h3><p>${item[2]}</p></div>
+        </article>
+      `).join("");
+    }
+
+    function renderComparison(pack) {
+      document.getElementById("compareHead").innerHTML = `<tr>${pack.compare.head.map((h) => `<th>${h}</th>`).join("")}</tr>`;
+      document.getElementById("compareBody").innerHTML = pack.compare.rows.map((row) => `
+        <tr>${row.map((cell, index) => `<td>${index === 0 ? `<span class="badge">${cell}</span>` : cell}</td>`).join("")}</tr>
+      `).join("");
+    }
+
+    function renderFaq(pack) {
+      document.getElementById("faqList").innerHTML = pack.faq.items.map((item, index) => `
+        <details ${index === 0 ? "open" : ""}>
+          <summary>${item[0]}</summary>
+          <p>${item[1]}</p>
+        </details>
+      `).join("");
+    }
+
+    function applyLanguage(lang) {
+      const pack = getPack(lang);
+      document.documentElement.lang = lang === "zh" ? "zh-CN" : lang;
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        el.textContent = t(el.dataset.i18n, pack);
+      });
+      renderStats(pack);
+      renderProductIndex(pack);
+      renderCards("personaGrid", pack.personas, "card", true);
+      renderCards("featureGrid", pack.featureCards, "card feature-card", true);
+      renderAgentSystem(pack);
+      renderFlow(pack);
+      renderFab(pack);
+      renderCards("workflowGrid", pack.workflowCards, "card", true);
+      renderPrinciples(pack);
+      renderCards("localGrid", pack.localCards, "card", true);
+      renderEditions(pack);
+      renderComparison(pack);
+      renderFaq(pack);
+      document.title = lang === "zh" ? "UMG MCP | AI 辅助 Unreal UI 生产" : `UMG MCP | ${languageNames[lang] || "AI-assisted Unreal UI production"}`;
+      if (window.lucide) window.lucide.createIcons();
+      const url = new URL(window.location.href);
+      url.searchParams.set("lang", lang);
+      window.history.replaceState({}, "", url);
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        currentTab = button.dataset.tab;
+        applyLanguage(document.getElementById("language").value);
+      });
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const browserLang = (navigator.language || "en").slice(0, 2).toLowerCase();
+    const initialLang = params.get("lang") || (packs[browserLang] ? browserLang : "en");
+    document.getElementById("language").value = packs[initialLang] ? initialLang : "en";
+    document.getElementById("language").addEventListener("change", (event) => applyLanguage(event.target.value));
+    applyLanguage(document.getElementById("language").value);
+  </script>
+</body>
+</html>

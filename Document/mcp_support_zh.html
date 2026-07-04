@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3. 支持哪些 MCP (C++) - UMG MCP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#030712',
+                            card: '#0b0f19',
+                            border: '#1e293b',
+                            neonBlue: '#00f0ff',
+                            neonPurple: '#d946ef',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #0d1527 0%, #030712 100%);
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-border-hover:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .sidebar-link-active {
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(217, 70, 239, 0.02) 100%);
+            border-left: 3px solid #00f0ff;
+            color: #00f0ff;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex">
+
+    <!-- 侧边栏 Sidebar -->
+    <aside class="w-80 glass-panel border-r border-slate-800 flex flex-col shrink-0">
+        <!-- Logo / Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-cyan-500 to-fuchsia-500 p-[2px]">
+                    <div class="w-full h-full bg-cyber-bg rounded-[6px] flex items-center justify-center">
+                        <i data-lucide="layout" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-cyber-text tracking-wide text-lg">UMG MCP</h1>
+                    <p class="text-xs text-slate-500">Winyunq 终极智造</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between text-sm">
+            <span class="text-slate-500">语言 / Language</span>
+            <a href="mcp_support.html" class="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                <span>English</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="index_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 transition-all">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span>快速开始 / 导航厅</span>
+            </a>
+            <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">核心主题</div>
+            <a href="model_config_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>1. 怎么配置模型 (四选一)</span>
+            </a>
+            <a href="chat_dialogue_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>2. 怎么对话 (4种Agent)</span>
+            </a>
+            <a href="mcp_support_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-all font-medium sidebar-link-active">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>3. 支持哪些 MCP (C++)</span>
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-800">
+            <div class="text-xs text-slate-500">
+                <p>© 2026 Winyunq. 保留所有权利。</p>
+                <p class="mt-1 flex items-center text-slate-600">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i>
+                    双回路极速直连安全保护
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <!-- Top bar -->
+        <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 bg-cyber-bg/30 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="text-slate-500">Official Docs</span>
+                <span class="text-slate-500">/</span>
+                <span class="text-slate-400 text-sm">支持哪些 MCP (C++)</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <p class="text-xs text-slate-500">底层指令系统</p>
+                    <p class="text-xs text-cyan-400 font-semibold">7 大 C++ 开源 Command 类</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="px-10 py-12 max-w-5xl w-full mx-auto space-y-12">
+            <!-- Header -->
+            <div class="space-y-4">
+                <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center">
+                    <i data-lucide="cpu" class="w-8 h-8 text-cyan-400 mr-3"></i>
+                    第三章：支持哪些 MCP 接口（开源部分 C++ 指令汇总）
+                </h2>
+                <p class="text-slate-400 text-base leading-relaxed">
+                    本指南聚焦于除了闭源 <code class="text-cyan-400">fabserver</code> 云端通信以外，完全开源、受您掌控的 C++ 底层 MCP 指令。通过 <code class="text-fuchsia-400">UUmgMcpBridge</code> (C++ 桥接器 Subsystem) 直连，AI 可以直接发起并在虚幻引擎主线程中秒级执行下列 <strong>7 大领域</strong> 的数十种原生 C++ API，实现引脚级的蓝图连线、控件构造及材质注入。
+                </p>
+            </div>
+
+            <!-- 核心命令分类大厅 -->
+            <div class="space-y-10">
+
+                <!-- 分类 1: Attention 感知指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="eye" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">1. Viewport & Graph 感知指令 (Attention)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpAttentionCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        实现 AI 对虚幻编辑器视口和蓝图编辑状态的“视觉感知”与焦点锁定，是执行后续修改动作的前置条件。
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">指令名称 (CommandType)</th>
+                                    <th class="py-2 px-3">功能描述</th>
+                                    <th class="py-2 px-3">核心参数 (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_last_edited_umg_asset</td>
+                                    <td class="py-3 px-3">获取最后一次被修改编辑的 UMG 资产路径</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_recently_edited_umg_assets</td>
+                                    <td class="py-3 px-3">列表返回近期在编辑器中活跃的 UMG 资产集</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_target_umg_asset</td>
+                                    <td class="py-3 px-3">查询当前被 Attention 系统锁定的目标 UMG 资产</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_target_umg_asset</td>
+                                    <td class="py-3 px-3">强制将指定 UMG 资产锁定为当前 AI 操纵目标</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"asset_path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_target_widget</td>
+                                    <td class="py-3 px-3">查询当前选中的目标控件名称</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_target_widget</td>
+                                    <td class="py-3 px-3">设置当前 AI 聚焦的 UMG 控件</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_target_graph</td>
+                                    <td class="py-3 px-3">设置当前编辑的目标蓝图图表或函数，若目标为 Component.Event（如 Button.OnClicked）将调用 C++ 自动生成对应的绑定事件</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"graph_name": "String"} 或 {"function_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_target_graph</td>
+                                    <td class="py-3 px-3">获取当前操作的蓝图图表名称</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_cursor_node</td>
+                                    <td class="py-3 px-3">将当前逻辑编辑焦点定位在图表中指定节点</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"node_id": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_cursor_node</td>
+                                    <td class="py-3 px-3">获取当前逻辑光标指向的节点 ID</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 分类 2: Widget 控件操作指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="layers" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">2. UMG 控件架构指令 (Widget Operations)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpWidgetCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        直接操纵虚幻 UMG 编辑器底层的 SWidget 控件树，进行高精度的层级增删改查。
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">指令名称 (CommandType)</th>
+                                    <th class="py-2 px-3">功能描述</th>
+                                    <th class="py-2 px-3">核心参数 (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_widget_tree</td>
+                                    <td class="py-3 px-3">获取完整 UMG 控件树层级结构，包括父子嵌套及槽类型</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">query_widget_properties</td>
+                                    <td class="py-3 px-3">利用 C++ 反射（Reflection）查询指定控件的所有可编辑属性值</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_widget_schema</td>
+                                    <td class="py-3 px-3">获取指定控件的基类结构和支持的布局元数据</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_class": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">create_widget</td>
+                                    <td class="py-3 px-3">在指定父控件和 Slot（插槽）下，物理创建一个全新的控件对象</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String", "widget_class": "String", "parent_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_widget_properties</td>
+                                    <td class="py-3 px-3">批量或单独更新指定控件的反射属性值（支持 Slot、颜色、锚点等）</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String", "properties": {"Property_Name": "Value"}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">delete_widget</td>
+                                    <td class="py-3 px-3">物理销毁一个控件以及它下面的所有子层级树</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">reparent_widget</td>
+                                    <td class="py-3 px-3">重新调整控件在控件树中的嵌套层级（换亲）</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_name": "String", "new_parent_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">save_asset</td>
+                                    <td class="py-3 px-3">强制命令虚幻编辑器将当前的 UMG 物理资产保存落盘</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_layout_data</td>
+                                    <td class="py-3 px-3">读取当前编辑器视口下的物理尺寸、外边距及偏移布局数据</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">check_widget_overlap</td>
+                                    <td class="py-3 px-3">根据布局槽的物理参数，分析指定的两个控件在视口中是否碰撞或重叠</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"widget_a": "String", "widget_b": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 分类 3: File 物理文件转换指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="file-code" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">3. UI 物理文件序列化指令 (File Transformation)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpFileTransformationCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        提供将 UMG 控件物理状态与磁盘通用 JSON 文件进行高阶转换的序列化引擎。
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">指令名称 (CommandType)</th>
+                                    <th class="py-2 px-3">功能描述</th>
+                                    <th class="py-2 px-3">核心参数 (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">export_umg_to_json</td>
+                                    <td class="py-3 px-3">将当前 UMG 控件的全部树关系与反射属性完整序列化并物理输出为标准 JSON 格式</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"export_path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">apply_json_to_umg</td>
+                                    <td class="py-3 px-3">读取外部 JSON 布局描述文件，利用增量反序列化技术，在编辑器中物理重建或修改 UMG 资产</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"json_path": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 分类 4: Sequencer 动效轨道指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="clapperboard" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">4. UI Sequencer 动效与关键帧指令 (Sequencer)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpSequencerCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        直接在 C++ 层面操纵 UI 的 Sequencer (动画轨道)，向控件中精准植入、编辑或清理关键帧，实现灵动特效。
+                    </p>
+                    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead class="sticky top-0 bg-cyber-card z-10">
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">指令名称 (CommandType)</th>
+                                    <th class="py-2 px-3">功能描述</th>
+                                    <th class="py-2 px-3">核心参数 (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_all_animations</td>
+                                    <td class="py-3 px-3">拉取当前 UMG 资产内所有的 UI 动效名列表</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">create_animation</td>
+                                    <td class="py-3 px-3">物理创建一个全新的 UWidgetAnimation 动画对象</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">delete_animation</td>
+                                    <td class="py-3 px-3">删除指定的 UWidgetAnimation 动画对象</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_property_keys</td>
+                                    <td class="py-3 px-3">在特定的时间切片上，为控件的某个动画属性强行写入或覆写关键帧数据值</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widget_name": "String", "property_path": "String", "time": 0.5, "value": 1.0}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">remove_property_track</td>
+                                    <td class="py-3 px-3">物理移除指定控件在某个动画下的特定属性渲染轨道</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widget_name": "String", "property_path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_animation_keyframes</td>
+                                    <td class="py-3 px-3">返回动画的全部关键帧时间轴排布数据</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_animated_widgets</td>
+                                    <td class="py-3 px-3">查询当前动画绑定控制了哪些控件节点</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_animation_full_data</td>
+                                    <td class="py-3 px-3">一键打包返回动画下的所有轨道、通道及关键帧的超完整 JSON 结构</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">animation_append_widget_tracks</td>
+                                    <td class="py-3 px-3">批量为多个控件追加空的动效轨道</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widgets": ["String"]}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">animation_delete_widget_keys</td>
+                                    <td class="py-3 px-3">清理特定时间段内某个控件在动画中的所有关键帧</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"animation_name": "String", "widget_name": "String", "start_time": 0.0, "end_time": 1.0}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 分类 5: Blueprint 蓝图低阶图表连线与编译指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="git-fork" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">5. 蓝图低阶图表连线与高阶逻辑指令 (Blueprint Graph & Action)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpBlueprintCommands / manage_blueprint_graph</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        这是本插件<strong>最强悍的黄金级 C++ 能力</strong>。AI 通过它不仅能生成控件，还能在蓝图图表中生成逻辑节点，控制光标在节点间自动流转并自动引脚连线（Execution Pin / Variable Pin Wiring），且支持快捷编译！
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">指令名称 (CommandType)</th>
+                                    <th class="py-2 px-3">子动作 (subAction / action)</th>
+                                    <th class="py-2 px-3">功能与 C++ 智能逻辑描述</th>
+                                    <th class="py-2 px-3">核心参数 (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400" rowspan="4">manage_blueprint_graph</td>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">create_node / add_node</td>
+                                    <td class="py-3 px-3">在蓝图图表中注入一个节点。若未指定坐标将调用 <code class="text-cyan-400">UUmgAttentionSubsystem</code> 自动计算非重叠偏置；若指定 <code class="text-cyan-400">autoConnectToNodeId</code>，将自动拉出引脚与目标节点进行顺畅连线。</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "create_node", "nodeType": "String", "x": 100, "y": 200, "autoConnectToNodeId": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">delete_node</td>
+                                    <td class="py-3 px-3">从图表中物理擦除一个节点。若删除的正是光标所在节点，C++ 系统会自动寻找前驱或后继节点，重设光标焦点（<code class="text-cyan-400">newCursorNode</code>）。</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "delete_node", "nodeId": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">connect_pins</td>
+                                    <td class="py-3 px-3">在图表中进行引脚级（Pin-to-Pin）硬连线，支持执行流连线与参数值连线。</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "connect_pins", "fromNode": "String", "fromPin": "String", "toNode": "String", "toPin": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-fuchsia-400">add_variable / add_param</td>
+                                    <td class="py-3 px-3">在蓝图中动态声明并注册一个新变量或输入输出参数。</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"action": "add_variable", "varName": "String", "varType": "String"}</td>
+                                </tr>
+                                <tr class="border-t border-slate-800">
+                                    <td class="py-3 px-3 font-mono text-cyan-400">compile_blueprint</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                    <td class="py-3 px-3">物理编译当前的 WidgetBlueprint，实时刷新编辑器反射缓存，令前述连线与变量当场生效！</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">create_blueprint</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                    <td class="py-3 px-3">物理创建普通的 Actor 蓝图类资产</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"bp_name": "String", "parent_class": "String", "path": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">add_component_to_blueprint</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                    <td class="py-3 px-3">为通用蓝图注入根组件或子组件（如 Box/StaticMesh 等）</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"bp_path": "String", "component_class": "String", "component_name": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 分类 6: Material & HLSL 注入指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="palette" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">6. UI 材质与 HLSL 着色器指令 (Material & HLSL)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpMaterialCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        这是专为 UE 高级动效开发者设计的着色器工具集。AI 能够解析现有 UI 材质的结构树，或者在指定材质节点中直接注入一段定制的 HLSL 局部渲染算法（例如霓虹扫描、毛玻璃折射算法），物理自动生成节点并连入主输出引脚。
+                    </p>
+                    <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5">
+                        <div class="flex items-center space-x-2 text-cyan-400 text-xs font-semibold mb-2">
+                            <i data-lucide="info" class="w-4 h-4"></i>
+                            <span>C++ 匹配规则特性：</span>
+                        </div>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            所有在 C++ 派发器中以 <code class="text-cyan-400">material_</code> 开头或以 <code class="text-cyan-400">hlsl_</code> 开头的 JSON 指令，都会自动被路由至底层的 <code class="text-fuchsia-400">FUmgMcpMaterialCommands</code> 进行高级解析与编译。支持如材质参数修改、节点连接、着色器片段自动对齐等高阶特效开发需求。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 分类 7: Editor 世界与资产管理指令 -->
+                <div class="glass-panel rounded-xl border border-slate-800 p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center space-x-3">
+                            <i data-lucide="box" class="w-6 h-6 text-cyan-400"></i>
+                            <h3 class="text-lg font-bold text-white">7. 关卡世界与通用资产管理指令 (Editor World & Assets)</h3>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">FUmgMcpEditorCommands</span>
+                    </div>
+                    <p class="text-sm text-slate-400">
+                        用于对关卡（Level）中的静态网格体、灯光及相机等 3D 元素进行快捷操纵，并提供全局资产扫描和状态检索。
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-400 border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-500">
+                                    <th class="py-2 px-3">指令名称 (CommandType)</th>
+                                    <th class="py-2 px-3">功能描述</th>
+                                    <th class="py-2 px-3">核心参数 (JSON)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/40">
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">get_actors_in_level</td>
+                                    <td class="py-3 px-3">列表返回当前关卡世界中的全部 Actor 及其类型</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">find_actors_by_name</td>
+                                    <td class="py-3 px-3">通过模糊匹配名称，在关卡中查找特定实例</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">spawn_actor</td>
+                                    <td class="py-3 px-3">在关卡世界的指定位置生成一个标准网格体、灯光、相机或自定义类</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_class": "String", "location": {"x":0,"y":0,"z":0}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">delete_actor</td>
+                                    <td class="py-3 px-3">从 3D 视口中删除指定的 Actor</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_name": "String"}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">set_actor_transform</td>
+                                    <td class="py-3 px-3">更新 Actor 的三维平移、旋转与缩放参数</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"actor_name": "String", "location": {"x":0,"y":0,"z":0}}</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">refresh_asset_registry</td>
+                                    <td class="py-3 px-3">强制命令编辑器资产注册表进行全量或局部同步扫描，确保新生成资产被 AI 发现</td>
+                                    <td class="py-3 px-3 text-slate-600">无</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-3 font-mono text-cyan-400">list_assets</td>
+                                    <td class="py-3 px-3">查询指定路径或通配符下的所有可用资产目录</td>
+                                    <td class="py-3 px-3 font-mono text-slate-500">{"folder_path": "String"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 双回路无代理设计理念 -->
+            <div class="glass-panel rounded-xl p-8 border border-slate-800 space-y-4">
+                <h3 class="text-xl font-bold text-white flex items-center">
+                    <i data-lucide="shield" class="w-5 h-5 text-fuchsia-400 mr-2"></i>
+                    💡 真正的“双回路”无网络代理内存直连
+                </h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    在开发或查阅文档时，切勿混淆概念。UMG MCP 插件在系统架构上拥有精密的 <strong>双回路物理隔离</strong> 设计：
+                </p>
+                <ul class="list-disc pl-6 text-xs text-slate-400 space-y-2">
+                    <li>
+                        <strong>内置直接直连回路（零网络）</strong>：当您直接在编辑器右侧的 UMG MCP 对话面板中向 Agent 提问并点击 <code class="text-cyan-400">Accept</code> 审批时，前述指令是 <strong>100% 内存级直连</strong> 执行的。它直接调用 C++ 底层指针派发，<strong>绝对不通过</strong> 任何网络端口或回环 IP，不存在网络代理延时，具有极致的绝对安全与性能！
+                    </li>
+                    <li>
+                        <strong>外部桥接回路（TCP 55557 监听）</strong>：仅当您需要用外部的 AI 工具（例如 Claude Desktop 或您自己的外部 Python 代理进程）来接管虚幻时，插件的底层后台才会在子线程启动一个轻量级套接字监听端口（默认 <code class="text-cyan-400">TCP 55557</code>）。它仅供外部 AI 读写 JSON 指令进行虚幻引擎的同步遥控。两者物理隔离，安全无虞。
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 提示与总结 -->
+            <div class="space-y-4">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase tracking-wider font-mono">📸 物理架构视图占位</h4>
+                <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
+                    <i data-lucide="network" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
+                    <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: UmgMcp C++ Subsystem Dual-Loop Connection Architecture]</p>
+                    <p class="text-xs text-slate-600 mt-1">这里可绘制一张架构拓扑图，展示内部 Slate/Subsystem 内存直连（零网络环回）与外部 Python TCP 55557 遥控的物理隔离双回路机制。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
