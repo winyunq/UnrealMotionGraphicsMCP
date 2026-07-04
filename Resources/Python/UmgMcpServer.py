@@ -50,6 +50,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("UmgMcpServer")
 
+DEBUG_SOCKET = os.environ.get("UMG_MCP_DEBUG_SOCKET", "").lower() in ("1", "true", "yes")
+
+
+def debug_socket(message: str) -> None:
+    if not DEBUG_SOCKET:
+        return
+    sys.stderr.write(message)
+    sys.stderr.flush()
+
 class UnrealConnection:
     """Manages the async socket connection to the UmgMcp plugin running inside Unreal Engine."""
     def __init__(self):
@@ -79,26 +88,21 @@ class UnrealConnection:
             command_json = json.dumps(command_obj)
             logger.info(f"[UMGMCP-Message] Sending: {command_json.strip()[:200]}... (truncated)")
             
-            # DEBUG-SOCKET:
-            sys.stderr.write(f"DEBUG: Async Sending {len(command_json)} bytes...\n")
-            sys.stderr.flush()
+            debug_socket(f"DEBUG: Async Sending {len(command_json)} bytes...\n")
 
             # Write data + null byte
             writer.write(command_json.encode('utf-8') + b'\0')
             await writer.drain()
             
-            # DEBUG-SOCKET:
-            sys.stderr.write("DEBUG: Async Drain completed.\n")
-            sys.stderr.flush()
+            debug_socket("DEBUG: Async Drain completed.\n")
 
             # Force Flush / Shutdown Write to signal end of stream
             if writer.can_write_eof():
                 writer.write_eof()
-                sys.stderr.write("DEBUG: Async write_eof() called.\n")
+                debug_socket("DEBUG: Async write_eof() called.\n")
             
             # Read response
-            sys.stderr.write("DEBUG: Async Waiting for response (read 4096 chunks)...\n")
-            sys.stderr.flush()
+            debug_socket("DEBUG: Async Waiting for response (read 4096 chunks)...\n")
             
             chunks = []
             while True:
@@ -114,8 +118,7 @@ class UnrealConnection:
             
             response_data = b"".join(chunks)
             
-            sys.stderr.write(f"DEBUG: Async Received {len(response_data)} bytes.\n")
-            sys.stderr.flush()
+            debug_socket(f"DEBUG: Async Received {len(response_data)} bytes.\n")
 
             response_str = response_data.decode('utf-8')
             logger.info(f"[UMGMCP-Message] Received: {response_str}")
@@ -154,10 +157,11 @@ class UnrealConnection:
                 try:
                     writer.close()
                     await writer.wait_closed()
-                    sys.stderr.write("DEBUG: Async Socket closed.\n")
+                    debug_socket("DEBUG: Async Socket closed.\n")
                 except:
                     pass
-            sys.stderr.flush()
+            if DEBUG_SOCKET:
+                sys.stderr.flush()
 
 class ContextManager:
     """Manages the 'attention' context for the AI."""
@@ -517,7 +521,7 @@ async def check_widget_overlap(widget_names: Optional[List[str]] = None) -> Dict
 # =============================================================================
 
 @register_tool("create_widget", "Creates a new widget.")
-async def create_widget(parent_name: str, widget_type: str, new_widget_name: str) -> Dict[str, Any]:
+async def create_widget(widget_type: str, new_widget_name: str, parent_name: str = "") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -716,7 +720,6 @@ async def compile_blueprint(blueprint_name: str = None) -> Dict[str, Any]:
     return await conn.send_command("compile_blueprint", {"blueprint_name": blueprint_name})
 
 
-@register_tool("add_step", "Adds an Executable Node to the current Program Counter.")
 @register_tool("add_step", "Adds an Executable Node to the current Program Counter.")
 async def add_step(name: str, args: List[Any] = None, comment: str = None, input_wires: Dict[str, Any] = None) -> Dict[str, Any]:
     """

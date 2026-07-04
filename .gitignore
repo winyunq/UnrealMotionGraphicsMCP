@@ -34,6 +34,7 @@ DerivedDataCache/
 __pycache__/
 *.pyc
 *.pyo
+Resources/Python/APITest/Artifacts/*.jsonl
 
 # Gemini Temporary Files
 Gemini_*

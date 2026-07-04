@@ -617,6 +617,14 @@ namespace
         return true;
     }
 
+    static bool IsReservedHlslInputName(const FString& Name)
+    {
+        const FString Clean = Name.TrimStartAndEnd();
+        return Clean.IsEmpty() ||
+            Clean.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("NAME_None"), ESearchCase::IgnoreCase);
+    }
+
     static bool HasMaterialTypeOptions(const TSharedPtr<FJsonObject>& Params)
     {
         return Params.IsValid() &&
@@ -1001,6 +1009,8 @@ namespace
 
         CustomNode->Desc = TEXT("HLSL_Core");
         CustomNode->OutputType = CMOT_Float4;
+        CustomNode->Inputs.Empty();
+        CustomNode->AdditionalOutputs.Empty();
         if (CustomNode->Code.IsEmpty())
         {
             CustomNode->Code = DefaultBootstrapHlsl;
@@ -1057,6 +1067,10 @@ namespace
         {
             TSharedPtr<FJsonObject> ParamObj = MakeShareable(new FJsonObject);
             const FString Name = Input.InputName.ToString();
+            if (IsReservedHlslInputName(Name))
+            {
+                continue;
+            }
             ParamObj->SetStringField(TEXT("name"), Name);
 
             UMaterialExpression* SourceExpr = Input.Input.Expression;
@@ -1704,6 +1718,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         {
             FHlslParamDraft Draft;
             Draft.Name = Input.InputName.ToString();
+            if (IsReservedHlslInputName(Draft.Name))
+            {
+                continue;
+            }
             Draft.Kind = DetectParamKind(Input.Input.Expression);
             WorkingParams.Add(Draft);
         }
@@ -1762,6 +1780,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         FinalInputNames.Reserve(WorkingParams.Num());
         for (const FHlslParamDraft& Param : WorkingParams)
         {
+            if (IsReservedHlslInputName(Param.Name))
+            {
+                continue;
+            }
             FinalInputNames.Add(Param.Name);
         }
 
@@ -1776,6 +1798,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         // Re-wire parameters to Custom inputs
         for (const FHlslParamDraft& Param : WorkingParams)
         {
+            if (IsReservedHlslInputName(Param.Name))
+            {
+                continue;
+            }
             FString Kind = Param.Kind.IsEmpty() || Param.Kind.Equals(UnknownParamKind, ESearchCase::IgnoreCase) ? DefaultParamKind : Param.Kind;
             FString ParamHandle = Subsystem->DefineVariable(Param.Name, Kind);
             if (IsErrorStatus(ParamHandle))
@@ -1892,6 +1918,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
                 for (const FCustomInput& Input : CustomNode->Inputs)
                 {
                     const FString InputName = Input.InputName.ToString();
+                    if (IsReservedHlslInputName(InputName))
+                    {
+                        continue;
+                    }
                     if (InputName.Equals(RequestedName, ESearchCase::IgnoreCase))
                     {
                         ParameterMatches.Add(InputName);
@@ -1976,6 +2006,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
             for (const FCustomInput& Input : CustomNode->Inputs)
             {
                 const FString InputName = Input.InputName.ToString();
+                if (IsReservedHlslInputName(InputName))
+                {
+                    continue;
+                }
                 UMaterialExpression* SourceExpr = Input.Input.Expression;
                 const bool bDeleteThis = ParameterNamesToDelete.ContainsByPredicate([&InputName](const FString& Candidate)
                 {
@@ -2139,6 +2173,10 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         for (const FCustomInput& Input : CustomNode->Inputs)
         {
             const FString InputName = Input.InputName.ToString();
+            if (IsReservedHlslInputName(InputName))
+            {
+                continue;
+            }
             UMaterialExpression* SourceExpr = Input.Input.Expression;
             const bool bDeleteThis = NamesToDelete.ContainsByPredicate([&InputName](const FString& Candidate)
             {

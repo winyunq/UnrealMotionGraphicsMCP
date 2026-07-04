@@ -1,0 +1,4 @@
+interface:
+  display_name: "UMG MCP Authoring"
+  short_description: "Build UE5.8 UMG interfaces through MCP workflows."
+  default_prompt: "Use $umg-mcp-authoring to build and validate a UE5.8 UMG interface through MCP."
