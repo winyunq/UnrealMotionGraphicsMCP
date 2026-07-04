@@ -721,7 +721,7 @@ async def compile_blueprint(blueprint_name: str = None) -> Dict[str, Any]:
 
 
 @register_tool("add_step", "Adds an Executable Node to the current Program Counter.")
-async def add_step(name: str, args: List[Any] = None, comment: str = None, input_wires: Dict[str, Any] = None) -> Dict[str, Any]:
+async def add_step(name: str, args: List[Any] = None, comment: str = None, input_wires: Dict[str, Any] = None, member_class: str = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -739,6 +739,9 @@ async def add_step(name: str, args: List[Any] = None, comment: str = None, input
          
     if input_wires:
         payload["inputWires"] = input_wires
+
+    if member_class:
+        payload["memberClass"] = member_class
 
     # We reuse 'manage_blueprint_graph' for all graph ops
     return await conn.send_command("manage_blueprint_graph", payload)

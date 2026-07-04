@@ -15,6 +15,8 @@
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
 #include "EdGraph/EdGraphSchema.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Widget.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 
@@ -264,6 +266,44 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::CreateNodeInstance(UEdGr
     auto SetupNode = [&](UEdGraphNode* Node) {
         if (!Node) return;
         int32 ArgIndex = 0;
+
+        auto IsObjectLikePin = [](const UEdGraphPin* InPin)
+        {
+            if (!InPin) return false;
+            const FName Category = InPin->PinType.PinCategory;
+            return Category == UEdGraphSchema_K2::PC_Object ||
+                   Category == UEdGraphSchema_K2::PC_Class ||
+                   Category == UEdGraphSchema_K2::PC_Interface ||
+                   Category == UEdGraphSchema_K2::PC_SoftObject ||
+                   Category == UEdGraphSchema_K2::PC_SoftClass;
+        };
+
+        auto TryWireSelfMember = [&](const FString& MemberName, UEdGraphPin* TargetPin, int32 LayoutIndex)
+        {
+            if (!TargetGraph || !TargetPin || MemberName.IsEmpty())
+            {
+                return false;
+            }
+
+            FGraphNodeCreator<UK2Node_VariableGet> VarCreator(*TargetGraph);
+            UK2Node_VariableGet* GetNode = VarCreator.CreateNode(false);
+            GetNode->VariableReference.SetSelfMember(FName(*MemberName));
+
+            GetNode->NodePosX = Node->NodePosX - 250;
+            GetNode->NodePosY = Node->NodePosY + (LayoutIndex * 50);
+
+            VarCreator.Finalize();
+
+            UEdGraphPin* OutPin = GetNode->GetValuePin();
+            if (OutPin && TargetGraph->GetSchema()->CanCreateConnection(OutPin, TargetPin).Response != CONNECT_RESPONSE_DISALLOW)
+            {
+                TargetGraph->GetSchema()->TryCreateConnection(OutPin, TargetPin);
+                return true;
+            }
+
+            TargetGraph->RemoveNode(GetNode);
+            return false;
+        };
         
         for (UEdGraphPin* Pin : Node->Pins)
         {
@@ -342,30 +382,45 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::CreateNodeInstance(UEdGr
                      {
                           if (FindFProperty<FProperty>(TargetBlueprint->SkeletonGeneratedClass, *ArgVal))
                           {
-                               FGraphNodeCreator<UK2Node_VariableGet> VarCreator(*TargetGraph);
-                               UK2Node_VariableGet* GetNode = VarCreator.CreateNode(false);
-                               GetNode->VariableReference.SetSelfMember(FName(*ArgVal));
-                               
-                               // CONSUMPTION LAYOUT
-                               GetNode->NodePosX = Node->NodePosX - 250;
-                               GetNode->NodePosY = Node->NodePosY + (Pin->SourceIndex * 50); 
-                               
-                               VarCreator.Finalize();
-                               
-                               UEdGraphPin* OutPin = GetNode->GetValuePin();
-                               if (OutPin)
-                               {
-                                   Node->GetSchema()->TryCreateConnection(OutPin, Pin);
-                                   bWired = true;
-                               }
+                               bWired = TryWireSelfMember(ArgVal, Pin, Pin->SourceIndex);
                           }
                      }
 
                      // -----------------------------------------------------------
-                     // 3. Fallback: Set Default Value (Literal)
+                     // 3. Try Smart Wiring (Widget Tree Variable)
+                     // -----------------------------------------------------------
+                     if (!bWired && TargetBlueprint)
+                     {
+                         UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(TargetBlueprint);
+                         UWidget* FoundWidget = (WidgetBP && WidgetBP->WidgetTree) ? WidgetBP->WidgetTree->FindWidget(FName(*ArgVal)) : nullptr;
+                         if (FoundWidget)
+                         {
+                             if (!FoundWidget->bIsVariable || !WidgetBP->WidgetVariableNameToGuidMap.Contains(FoundWidget->GetFName()))
+                             {
+                                 FoundWidget->Modify();
+                                 WidgetBP->Modify();
+                                 FoundWidget->bIsVariable = true;
+                                 if (!WidgetBP->WidgetVariableNameToGuidMap.Contains(FoundWidget->GetFName()))
+                                 {
+                                     WidgetBP->WidgetVariableNameToGuidMap.Add(FoundWidget->GetFName(), FGuid::NewGuid());
+                                 }
+                                 FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+                             }
+
+                             bWired = TryWireSelfMember(ArgVal, Pin, Pin->SourceIndex);
+                         }
+                     }
+
+                     // -----------------------------------------------------------
+                     // 4. Fallback: Set Default Value (Literal)
                      // -----------------------------------------------------------
                      if (!bWired && Pin->DefaultValue != ArgVal)
                      {
+                         if (IsObjectLikePin(Pin))
+                         {
+                             UE_LOG(LogUmgBlueprint, Warning, TEXT("AddNode: unresolved object-like input '%s'='%s'. Refusing to write a string literal default."), *Pin->PinName.ToString(), *ArgVal);
+                             continue;
+                         }
                          Pin->GetSchema()->TrySetDefaultValue(*Pin, ArgVal);
                      }
                 }
@@ -418,9 +473,23 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::CreateNodeInstance(UEdGr
          
          // Try to find the function in various places
          UFunction* FoundFunc = nullptr;
+
+         // Priority 0: Explicit member class, e.g. /Script/UMG.WidgetSwitcher.
+         if (!MemberClass.IsEmpty())
+         {
+             UClass* ExplicitClass = FindObject<UClass>(nullptr, *MemberClass);
+             if (!ExplicitClass)
+             {
+                 ExplicitClass = LoadObject<UClass>(nullptr, *MemberClass);
+             }
+             if (ExplicitClass)
+             {
+                 FoundFunc = ExplicitClass->FindFunctionByName(*MemberName);
+             }
+         }
          
          // Priority 1: Self (Widget Class)
-         if (TargetBlueprint && TargetBlueprint->GeneratedClass)
+         if (!FoundFunc && TargetBlueprint && TargetBlueprint->GeneratedClass)
          {
              FoundFunc = TargetBlueprint->GeneratedClass->FindFunctionByName(*MemberName);
          }

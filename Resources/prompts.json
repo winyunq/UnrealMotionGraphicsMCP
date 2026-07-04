@@ -267,7 +267,7 @@
         },
         {
             "name": "add_step",
-            "description": "Adds an Executable Node (e.g. 'PrintString', 'Branch', 'CallFunction') to the **current Program Counter** (PC) and then PC will refresh to the Executable Node. if the node isn't Executable,you should use `prepare_value`",
+            "description": "Adds an Executable Node (e.g. 'PrintString', 'Branch', 'CallFunction') to the **current Program Counter** (PC), then PC refreshes to that node. For component member functions, pass `member_class` such as `/Script/UMG.WidgetSwitcher`. If the node is not executable, use `prepare_value`.",
             "enabled": true,
             "category": "Blueprint"
         },
