@@ -267,39 +267,25 @@ flowchart LR
 - 写入仅做并集/覆盖，不做隐式删除；如需删除，请使用 `animation_delete_widget_keys` 并显式传入 `confirm_delete=true`。
 - 所有动画指令都会返回有价值的计数/时间线信息，便于 AI 复述与复现。
 
-## UMG 材质 (Material) API 实现状态 (New: 五大核心能力)
+## UMG 材质 (Material) API 实现状态
 
-| 分类             | API 名称                       |   状态   | 描述                                                                   |
-| ---------------- | ------------------------------ | :------: | ---------------------------------------------------------------------- |
-| **P0: 上下文**   | `material_set_target`          |    ✅     | **锚点**：指定当前编辑的材质资产（支持自动创建/重定向）。              |
-| **P1: 输入定义** | `material_define_variable`     |    ✅     | 定义外部接口参数（定义而非连线）。支持 Scalar, Vector, Texture。       |
-| **P2: 符号放置** | `material_add_node`            |    ✅     | **拖拽符号**：将 UE5 库中的符号放置到图表并分配实例句柄（Handle）。    |
-|                  | `material_get_graph`           |    ✅     | 查询图表中的所有节点句柄及其状态。                                     |
-| **P3: 连接拓扑** | `material_connect_nodes`       |    ✅     | **自然连接**：建立节点间的逻辑映射（A -> B），模拟功能性嵌套。         |
-|                  | `material_connect_pins`        |    ✅     | **外科连线**：在复杂拓扑下手动连接特定的输入引脚。                     |
-| **P4: 符号检索** | `material_search_library`      | 🚧 计划中 | 快速检索 UE5 材质表达式库中的符号（Symbol）。                          |
-| **P5: 细节注入** | `material_set_hlsl_node_io`    |    ✅     | **战术细节**：编写 Custom 节点的 HLSL 代码并实时同步 IO 引脚。         |
-|                  | `material_set_node_properties` |    ✅     | **属性编辑**：设置常规节点（如 Constant, TextureSample）的内部属性值。 |
-| **生命周期**     | `material_compile_asset`       |    ✅     | 提交更改并分析 HLSL 报错。                                             |
-|                  | `material_delete`              |    ✅     | 根据唯一句柄删除实例。                                                 |
-| **维护**         | `material_get_pins`            |    ✅     | 内省特定节点句柄的引脚。                                               |
-
-## UMG HLSL MCP API 实现状态（新增：面向 UMG 的文本编辑闭环）
-
-| 命令              | 状态  | 描述                                                                                     |
-| ----------------- | :---: | ---------------------------------------------------------------------------------------- |
-| `hlsl_set_target` |   ✅   | 锁定/创建 HLSL 目标材质。校验 UI 材质域 + 单 Custom 节点拓扑；不匹配时可先返回覆写确认。 |
-| `hlsl_get`        |   ✅   | 读取当前 HLSL 代码和结构化输入参数信息。                                                 |
-| `hlsl_set`        |   ✅   | 对 HLSL 与/或参数做增量更新。删除必须显式标记（`delete: true`），避免误删。              |
-| `hlsl_compile`    |   ✅   | 编译当前 HLSL 目标并返回精简诊断信息，便于 AI 后处理。                                   |
+| 命令              | 状态  | 描述                                                                                         |
+| ----------------- | :---: | -------------------------------------------------------------------------------------------- |
+| `hlsl_set_target` |   ✅   | 锁定/创建 HLSL 目标材质。新材质默认 UI；非 UMG 材质可携带类型字段。                          |
+| `hlsl_get`        |   ✅   | 读取当前 HLSL 代码、结构化参数和语义输出契约。                                                |
+| `hlsl_set`        |   ✅   | 对 HLSL、参数、额外输出做并集式写入：覆盖已有项，追加缺失项。                                 |
+| `hlsl_delete`     |   ✅   | 显式删除 HLSL 参数或输出，必须传入 `confirm_delete=true`；名称歧义时再补 `kind`。             |
+| `hlsl_compile`    |   ✅   | 编译当前 HLSL 目标并返回精简诊断信息，便于 AI 后处理。                                        |
 
 ### HLSL 协议约定（UMG 垂直优化）
 
 - 材质被视作单一 HLSL 程序。
 - 后端约定 HLSL 返回 `float4`。
-- 输出自动连线固定为：`.rgb -> FinalColor`，`.a -> Opacity`。
+- 输出自动连线改为语义契约：UI/Post Process/Light Function/Unlit 使用 `EmissiveColor`；Lit Surface 使用 `BaseColor`；alpha 只在需要时接到 `Opacity` 或 `OpacityMask`。
+- 额外输出使用 UE 5.8 Custom 节点 `AdditionalOutputs`，因此一个 HLSL 块可以同时驱动 `Roughness`、`Metallic`、`Normal`、`WorldPositionOffset` 等材质根输出。
 - 输入参数以结构化描述返回（如 `name`、`kind`、`source_handle`），便于 AI 学习与复用。
-- `hlsl_set` 采用“易写难删”策略：写入简单，删除必须显式声明。
+- `hlsl_set` 只做并集覆盖和追加；删除必须使用 `hlsl_delete(confirm_delete=true)`。
+- 低阶 `material_*` 图编辑工具作为兼容层保留，但 Material ToolMode 默认只暴露 HLSL 闭环。
 
 ## UMG 样式与主题 (Style & Theming) API 实现状态 (New)
 

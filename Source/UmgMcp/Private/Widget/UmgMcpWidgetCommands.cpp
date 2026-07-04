@@ -1,5 +1,6 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Widget/UmgMcpWidgetCommands.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "Widget/UmgGetSubsystem.h"
 #include "Widget/UmgSetSubsystem.h"
@@ -75,7 +76,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 Response->SetBoolField(TEXT("success"), true);
                 for (const auto& Field : QueriedProperties->Values)
                 {
-                    Response->SetField(Field.Key, Field.Value);
+                    Response->SetField(UmgMcpJsonCompat::KeyToString(Field.Key), Field.Value);
                 }
             }
             else
@@ -104,7 +105,7 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
                 Response->SetBoolField(TEXT("success"), true);
                 for (const auto& Field : SchemaJson->Values)
                 {
-                    Response->SetField(Field.Key, Field.Value);
+                    Response->SetField(UmgMcpJsonCompat::KeyToString(Field.Key), Field.Value);
                 }
             }
             else

@@ -10,7 +10,7 @@
 /**
  * @brief       UMGMCP 材质操控子系统
  * 
- * 本子系统作为 MCP 5 Pillars 战略的核心状态机和 API 提供者，
+ * 本子系统作为 Material MCP 的核心状态机和 API 提供者，
  * 负责管理当前编辑上下文 (Target Material) 并提供节点操作、连接和属性设置的原子操作。
  */
 UCLASS()

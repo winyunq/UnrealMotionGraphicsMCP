@@ -1,5 +1,6 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "FileManage/UmgFileTransformation.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "UmgMcp.h"
 #include "PropertyNameMappings.h"
 #include "FileManage/UmgAttentionSubsystem.h"
@@ -76,7 +77,7 @@ TSharedPtr<FJsonObject> UUmgFileTransformation::NormalizeJsonKeysToPascalCase(co
     
     for (const auto& Pair : SourceJson->Values)
     {
-        FString OriginalKey = Pair.Key;
+        FString OriginalKey = UmgMcpJsonCompat::KeyToString(Pair.Key);
         FString NormalizedKey;
         
         // Handle dotted keys (e.g. "slot.position")
@@ -625,7 +626,8 @@ static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& Widge
         TSharedPtr<FJsonObject> SourceProps = *PropertiesJsonObjPtr;
         for (auto& Pair : SourceProps->Values)
         {
-            if (Pair.Key == TEXT("Slot"))
+            const FString PropertyName = UmgMcpJsonCompat::KeyToString(Pair.Key);
+            if (PropertyName == TEXT("Slot"))
             {
                 const TSharedPtr<FJsonObject>* SlotObjPtr;
                 if (Pair.Value->TryGetObject(SlotObjPtr))
@@ -635,7 +637,7 @@ static void ApplyPropertiesToExistingWidget(const TSharedPtr<FJsonObject>& Widge
             }
             else
             {
-                WidgetProps->SetField(Pair.Key, Pair.Value);
+                WidgetProps->SetField(PropertyName, Pair.Value);
             }
         }
     }
@@ -810,7 +812,8 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
         TSharedPtr<FJsonObject> SourceProps = *PropertiesJsonObjPtr;
         for (auto& Pair : SourceProps->Values)
         {
-            if (Pair.Key == TEXT("Slot"))
+            const FString PropertyName = UmgMcpJsonCompat::KeyToString(Pair.Key);
+            if (PropertyName == TEXT("Slot"))
             {
                 const TSharedPtr<FJsonObject>* SlotObjPtr;
                 if (Pair.Value->TryGetObject(SlotObjPtr))
@@ -820,7 +823,7 @@ static UWidget* CreateWidgetFromJson(const TSharedPtr<FJsonObject>& WidgetJson, 
             }
             else
             {
-                WidgetProps->SetField(Pair.Key, Pair.Value);
+                WidgetProps->SetField(PropertyName, Pair.Value);
             }
         }
     }

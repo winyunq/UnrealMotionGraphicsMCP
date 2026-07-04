@@ -1,0 +1,4 @@
+interface:
+  display_name: "UMG Material MCP"
+  short_description: "Author UE5.8 materials through UMG MCP HLSL tools."
+  default_prompt: "Use this skill when editing Unreal materials through the UMG MCP HLSL protocol."
