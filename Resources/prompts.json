@@ -261,7 +261,7 @@
         },
         {
             "name": "compile_blueprint",
-            "description": "Compiles the ** Active Target** Blueprint. if you want Compiles else Blueprint, you can provide the path",
+            "description": "Compiles the Active Target Blueprint. Provide a blueprint path/name only when compiling a non-target Blueprint.",
             "enabled": true,
             "category": "Blueprint"
         },
@@ -284,8 +284,32 @@
             "category": "Blueprint"
         },
         {
+            "name": "add_variable",
+            "description": "Adds or updates a Blueprint member variable on the Active Target. This is a union-style write and should not remove existing variables.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "get_variables",
+            "description": "Lists Blueprint member variables on the Active Target.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "delete_variable",
+            "description": "Compatibility delete command retained in the backend. Hidden from default MCP until Blueprint deletion uses confirm_delete=true.",
+            "enabled": false,
+            "category": "Blueprint"
+        },
+        {
+            "name": "delete_node",
+            "description": "Compatibility delete command retained in the backend. Hidden from default MCP until Blueprint deletion uses confirm_delete=true.",
+            "enabled": false,
+            "category": "Blueprint"
+        },
+        {
             "name": "get_function_nodes",
-            "description": "Lists all nodes (steps) in the **Active Function/Graph**. Returns IDs, Names, Properties, and Connections. \n**Use Case**: Call this to find 'If' node IDs, then use `set_cursor_node` to jump to a specific branch (e.g., False pin).",
+            "description": "Transitional node-level read for the Active Function/Graph. Returns compact node IDs, names, classes, and exec flags; it is not the final high-density bluecode read format.",
             "enabled": true,
             "category": "Blueprint"
         },

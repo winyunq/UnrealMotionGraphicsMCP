@@ -43,6 +43,8 @@ For the five-system login demo and concrete script workflow, read [login-demo.md
    - Use `set_edit_function("WidgetName.EventName")` for component event scope.
    - Use `add_step` for simple executable calls such as `PrintString`.
    - Use `get_function_nodes` only as a minimal sanity check; it is still node-shaped and not the desired long-term semantic Blueprint read protocol.
+   - Do not use `delete_node` or `delete_variable` from the compatibility backend; default Blueprint MCP hides them until deletion is hardened with `confirm_delete=true`.
+   - For bluecode design work, read `Document/BlueprintBluecodeProtocol.md` and treat it as a draft target, not an implemented tool set.
 
 7. Validate with read operations.
    - Use `get_widget_tree` after structure writes.
@@ -63,7 +65,8 @@ Useful reference directions:
 ## Validation Commands
 
 ```powershell
-python -m py_compile Resources\Python\UmgMcpServer.py Resources\Python\APITest\Login_Demo_Five_Systems.py Resources\Python\APITest\Animation_Protocol_Static_Check.py Resources\Python\APITest\Sequencer_RenderTransform_Check.py
+python -m py_compile Resources\Python\UmgMcpServer.py Resources\Python\APITest\Login_Demo_Five_Systems.py Resources\Python\APITest\Blueprint_Protocol_Static_Check.py Resources\Python\APITest\Animation_Protocol_Static_Check.py Resources\Python\APITest\Sequencer_RenderTransform_Check.py
+python Resources\Python\APITest\Blueprint_Protocol_Static_Check.py
 python Resources\Python\APITest\Animation_Protocol_Static_Check.py
 python Resources\Python\APITest\Material_Protocol_Static_Check.py
 python Resources\Python\APITest\Sequencer_RenderTransform_Check.py

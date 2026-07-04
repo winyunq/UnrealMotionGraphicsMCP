@@ -231,22 +231,29 @@ This project has been developed with significant assistance from **Gemini, an AI
 |                             | `apply_layout`                   |   ✅    | Apply bulk layout definition (HTML/JSON).                                                        |
 
 
-## UMG Blueprint API Status (New)
+## UMG Blueprint API Status (Transitional)
 
-| Category                    | API Name                  | Status | Description                                                                                      |
-| --------------------------- | ------------------------- | :----: | ------------------------------------------------------------------------------------------------ |
-| **Context & Attention**     | `set_edit_function`       |   ✅    | Set the current edit context (Function/Event). Supports auto-creating Custom Events.             |
-|                             | `set_cursor_node`         |   ✅    | Explicitly set the "Cursor" node (Program Counter).                                              |
-| **Sensing & Querying**      | `get_function_nodes`      |   ✅    | Get nodes in **Current Context Scope** (Filtered to connected graph to avoid global noise).      |
-|                             | `get_variables`           |   ✅    | Get list of member variables.                                                                    |
-|                             | `search_function_library` |   ✅    | Search callable libraries (C++/BP). Supports Fuzzy Search.                                       |
-| **Actions & Modifications** | `add_step(name)`          |   ✅    | **Core**: Add executable node by Name (e.g. "PrintString"). Auto-Wiring & Auto-Layout supported. |
-|                             | `prepare_value(name)`     |   ✅    | Add Data Node by Name (e.g. "MakeLiteralString", "GetVariable").                                 |
-|                             | `connect_data_to_pin`     |   ✅    | Connect pins precisely (Supports `NodeID:PinName` format).                                       |
-|                             | `add_variable`            |   ✅    | Add new member variable.                                                                         |
-|                             | `delete_variable`         |   ✅    | Delete member variable.                                                                          |
-|                             | `delete_node`             |   ✅    | Delete specific node.                                                                            |
-|                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                       |
+Blueprint MCP is still node-shaped. It is usable for simple event wiring, but it is not the final high-density `bluecode` protocol described in [Document/BlueprintBluecodeProtocol.md](Document/BlueprintBluecodeProtocol.md).
+
+| Category                    | API Name                  | Status | Description                                                                                         |
+| --------------------------- | ------------------------- | :----: | --------------------------------------------------------------------------------------------------- |
+| **Context & Attention**     | `set_edit_function`       |   ✅    | Set the current edit context (Function/Event). Supports auto-creating Custom Events.                |
+|                             | `set_cursor_node`         | Partial | Low-level cursor escape hatch for branches or repair flows. Prefer `set_edit_function` + append.    |
+| **Sensing & Querying**      | `get_function_nodes`      | Partial | Transitional node readback: IDs, node names/classes, and exec flags only.                           |
+|                             | `get_variables`           |   ✅    | Get list of member variables.                                                                       |
+|                             | `search_function_library` |   ✅    | Search callable libraries (C++/BP). Supports fuzzy search.                                          |
+| **Union Writes**            | `add_step(name)`          |   ✅    | Add executable node by name (e.g. "PrintString"). Auto-wiring and auto-layout supported.            |
+|                             | `prepare_value(name)`     |   ✅    | Add data node by name (e.g. "MakeLiteralString", "GetVariable").                                   |
+|                             | `connect_data_to_pin`     |   ✅    | Connect pins precisely (supports `NodeID:PinName` format).                                          |
+|                             | `add_variable`            |   ✅    | Add or update a member variable; do not remove unspecified variables.                               |
+|                             | `compile_blueprint`       |   ✅    | Compile and apply changes.                                                                          |
+| **Hidden Compatibility**    | `delete_variable`         | Hidden | Backend compatibility only; hidden from default MCP until deletion requires `confirm_delete=true`.   |
+|                             | `delete_node`             | Hidden | Backend compatibility only; hidden from default MCP until deletion requires `confirm_delete=true`.   |
+
+Notes:
+- Current Blueprint reads are not yet semantically dense enough to answer "read any information" well.
+- `bluecode` should introduce code-like read/write, append-only merge semantics, explicit `bluecode_delete(confirm_delete=true)`, and compact compile diagnostics.
+- Until then, use Blueprint MCP only for narrow event wiring and verify with `compile_blueprint` plus focused readback.
 
 ## UMG Sequencer API Status
 

@@ -230,22 +230,29 @@ flowchart LR
 |                    | `apply_layout`                   |   ✅   | 应用整盘的 HTML/JSON 布局代码。                                                                 |
 
 
-## UMG 蓝图 (Blueprint) API 实现状态 (New)
+## UMG 蓝图 (Blueprint) API 实现状态（过渡期）
 
-| 分类               | API 名称                  | 状态  | 描述                                                           |
-| ------------------ | ------------------------- | :---: | -------------------------------------------------------------- |
-| **上下文与注意力** | `set_edit_function`       |   ✅   | 设置当前编辑上下文（函数/事件）。支持自动创建自定义事件。      |
-|                    | `set_cursor_node`         |   ✅   | 显式设置"光标"节点（程序计数器）。                             |
-| **感知与查询**     | `get_function_nodes`      |   ✅   | 获取**当前上下文作用域**内的节点（过滤掉无关节点以减少噪音）。 |
-|                    | `get_variables`           |   ✅   | 获取成员变量列表。                                             |
-|                    | `search_function_library` |   ✅   | 搜索可调用的库 (C++/BP)。支持模糊搜索。                        |
-| **动作与修改**     | `add_step(name)`          |   ✅   | **核心**：根据名称添加可执行节点。支持自动连线与布局。         |
-|                    | `prepare_value(name)`     |   ✅   | 添加数据节点（例如 GetVariable）。                             |
-|                    | `connect_data_to_pin`     |   ✅   | 精确连接引脚（支持 `NodeID:PinName` 格式）。                   |
-|                    | `add_variable`            |   ✅   | 添加新的成员变量。                                             |
-|                    | `delete_variable`         |   ✅   | 删除成员变量。                                                 |
-|                    | `delete_node`             |   ✅   | 删除特定节点。                                                 |
-|                    | `compile_blueprint`       |   ✅   | 编译并应用更改。                                               |
+Blueprint MCP 目前仍是节点级协议。它可用于简单事件连线，但还不是 [Document/BlueprintBluecodeProtocol.md](Document/BlueprintBluecodeProtocol.md) 中描述的高密度 `bluecode` 协议。
+
+| 分类               | API 名称                  | 状态  | 描述                                                                       |
+| ------------------ | ------------------------- | :---: | -------------------------------------------------------------------------- |
+| **上下文与注意力** | `set_edit_function`       |   ✅   | 设置当前编辑上下文（函数/事件）。支持自动创建自定义事件。                  |
+|                    | `set_cursor_node`         | 部分  | 低层级光标逃生口，用于分支或修复流程。优先使用 `set_edit_function` + 追加。 |
+| **感知与查询**     | `get_function_nodes`      | 部分  | 过渡期节点读回：只返回 ID、节点名/类名和是否执行节点。                     |
+|                    | `get_variables`           |   ✅   | 获取成员变量列表。                                                         |
+|                    | `search_function_library` |   ✅   | 搜索可调用的库 (C++/BP)。支持模糊搜索。                                    |
+| **并集写入**       | `add_step(name)`          |   ✅   | 根据名称添加可执行节点。支持自动连线与布局。                               |
+|                    | `prepare_value(name)`     |   ✅   | 添加数据节点（例如 GetVariable）。                                         |
+|                    | `connect_data_to_pin`     |   ✅   | 精确连接引脚（支持 `NodeID:PinName` 格式）。                               |
+|                    | `add_variable`            |   ✅   | 添加或更新成员变量；不会删除未提及变量。                                   |
+|                    | `compile_blueprint`       |   ✅   | 编译并应用更改。                                                           |
+| **隐藏兼容命令**   | `delete_variable`         | 隐藏  | 仅后端兼容；默认 MCP 隐藏，直到删除改为必须 `confirm_delete=true`。         |
+|                    | `delete_node`             | 隐藏  | 仅后端兼容；默认 MCP 隐藏，直到删除改为必须 `confirm_delete=true`。         |
+
+说明：
+- 当前蓝图读操作还不具备足够高的信息密度，不能视作“读任意信息”的最终协议。
+- `bluecode` 应提供代码式读写、只追加/覆盖的合并语义、显式 `bluecode_delete(confirm_delete=true)` 和紧凑编译诊断。
+- 在此之前，Blueprint MCP 只建议用于窄范围事件连线，并用 `compile_blueprint` 和聚焦读回验证。
 
 ## UMG 动画 (Sequencer) API 实现状态
 
