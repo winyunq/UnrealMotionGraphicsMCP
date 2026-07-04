@@ -450,6 +450,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("set_widget_scope") ||
                  CommandType == TEXT("widget_target") ||
                  CommandType == TEXT("set_property_keys") ||
+                 CommandType == TEXT("set_animation_data") ||
                  CommandType == TEXT("remove_property_track") ||
                  CommandType == TEXT("remove_keys") ||
                  CommandType == TEXT("get_animation_keyframes") ||

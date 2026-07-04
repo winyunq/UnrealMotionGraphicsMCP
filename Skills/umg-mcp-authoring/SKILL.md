@@ -34,7 +34,8 @@ For the five-system login demo and concrete script workflow, read [login-demo.md
 5. Animate widgets through Sequencer.
    - Create or select an animation with `create_animation` and `set_animation_scope`.
    - Focus the animated widget with `set_target_widget` or `set_widget_scope`.
-   - Use `set_property_keys` for union-style key writes.
+   - Use `animation_append_widget_tracks` for widget-oriented union key writes.
+   - Use `animation_append_time_slice` when authoring a single moment across one or more widgets.
    - Read back with `animation_overview` or `animation_time_properties`; do not trust write responses alone.
 
 6. Wire Blueprint only at the current semantic level.

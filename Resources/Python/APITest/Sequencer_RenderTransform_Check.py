@@ -89,10 +89,18 @@ async def run_check() -> None:
                 "create_widget",
                 "set_animation_scope",
                 "set_target_widget",
-                "set_property_keys",
+                "set_widget_scope",
+                "animation_append_widget_tracks",
+                "animation_append_time_slice",
                 "animation_overview",
+                "animation_widget_properties",
                 "animation_time_properties",
+                "get_all_animations",
                 "animation_delete_widget_keys",
+                "get_animation_keyframes",
+                "get_animated_widgets",
+                "get_animation_full_data",
+                "get_widget_animation_data",
             ):
                 require(required_tool in tool_names, f"MCP tool missing: {required_tool}", sorted(tool_names))
 
@@ -122,6 +130,7 @@ async def run_check() -> None:
             await call_tool(session, "create_animation", {"animation_name": animation_name}, attempts=6)
             await call_tool(session, "set_animation_scope", {"animation_name": animation_name}, attempts=6)
             await call_tool(session, "set_target_widget", {"widget_name": widget_name}, attempts=6)
+            await call_tool(session, "set_widget_scope", {"widget_name": widget_name}, attempts=6)
 
             opacity_keys = [
                 {"time": 0.0, "value": 0.0},
@@ -134,13 +143,61 @@ async def run_check() -> None:
                 {"time": 1.0, "value": 1.0},
             ]
 
-            opacity = await call_tool(session, "set_property_keys", {"property_name": "RenderOpacity", "keys": opacity_keys}, attempts=6)
-            scale_x = await call_tool(session, "set_property_keys", {"property_name": "RenderTransform.Scale.X", "keys": scale_keys}, attempts=6)
-            scale_y = await call_tool(session, "set_property_keys", {"property_name": "RenderTransform.Scale.Y", "keys": scale_keys}, attempts=6)
+            append_tracks = await call_tool(
+                session,
+                "animation_append_widget_tracks",
+                {
+                    "widget_name": widget_name,
+                    "animation_name": animation_name,
+                    "tracks": [
+                        {"property": "RenderOpacity", "keys": opacity_keys},
+                        {"property": "RenderTransform.Scale.X", "keys": scale_keys},
+                        {"property": "RenderTransform.Scale.Y", "keys": scale_keys},
+                        {
+                            "property": "RenderTransform.Translation",
+                            "keys": [
+                                {"time": 0.0, "value": {"x": 0.0, "y": 16.0}},
+                                {"time": 0.5, "value": {"x": 0.0, "y": 0.0}},
+                            ],
+                        },
+                    ],
+                },
+                attempts=6,
+            )
+            require(append_tracks.get("track_count") == 4, "append_widget_tracks should apply four tracks", append_tracks)
+            track_types = {track.get("property"): track.get("track_type") for track in append_tracks.get("tracks", [])}
+            require(track_types.get("RenderOpacity") == "float", "RenderOpacity should use a float track", append_tracks)
+            require(track_types.get("RenderTransform.Scale.X") == "2d_transform", "Scale.X should use UMG 2D transform track", append_tracks)
+            require(track_types.get("RenderTransform.Scale.Y") == "2d_transform", "Scale.Y should use UMG 2D transform track", append_tracks)
+            require(track_types.get("RenderTransform.Translation") == "2d_transform", "Translation should use UMG 2D transform track", append_tracks)
 
-            require(opacity.get("track_type") == "float", "RenderOpacity should use a float track", opacity)
-            require(scale_x.get("track_type") == "2d_transform", "Scale.X should use UMG 2D transform track", scale_x)
-            require(scale_y.get("track_type") == "2d_transform", "Scale.Y should use UMG 2D transform track", scale_y)
+            time_append = await call_tool(
+                session,
+                "animation_append_time_slice",
+                {
+                    "time": 0.75,
+                    "animation_name": animation_name,
+                    "widgets": [
+                        {
+                            "widget_name": widget_name,
+                            "properties": {
+                                "RenderOpacity": 0.85,
+                                "RenderTransform.Angle": 6.0,
+                            },
+                        }
+                    ],
+                },
+                attempts=6,
+            )
+            require(time_append.get("keys_total") == 2, "append_time_slice should apply two keys", time_append)
+
+            animations = await call_tool(session, "get_all_animations", {}, attempts=6)
+            animation_names = {item.get("name") for item in animations.get("animations", [])}
+            require(animation_name in animation_names, "created animation missing from get_all_animations", animations)
+
+            widgets = await call_tool(session, "get_animated_widgets", {"animation_name": animation_name}, attempts=6)
+            animated_widget_names = {item.get("widget_name") for item in widgets.get("widgets", [])}
+            require(widget_name in animated_widget_names, "animated widget missing from get_animated_widgets", widgets)
 
             overview = await call_tool(
                 session,
@@ -149,7 +206,7 @@ async def run_check() -> None:
                 attempts=6,
             )
             changed = changed_property_map(overview)
-            for prop in ("RenderOpacity", "RenderTransform.Scale.X", "RenderTransform.Scale.Y"):
+            for prop in ("RenderOpacity", "RenderTransform.Scale.X", "RenderTransform.Scale.Y", "RenderTransform.Angle"):
                 require(prop in changed, f"{prop} missing from animation overview", overview)
             require(changed["RenderTransform.Scale.X"].get("track_type") == "2d_transform", "Scale.X overview track type mismatch", overview)
             require(changed["RenderTransform.Scale.Y"].get("track_type") == "2d_transform", "Scale.Y overview track type mismatch", overview)
@@ -158,6 +215,28 @@ async def run_check() -> None:
             keyframe_props = {track.get("property_name") for track in keyframes.get("tracks", [])}
             require("RenderTransform.Scale.X" in keyframe_props, "Scale.X missing from keyframe read", keyframes)
             require("RenderTransform.Scale.Y" in keyframe_props, "Scale.Y missing from keyframe read", keyframes)
+            require("RenderTransform.Translation.X" in keyframe_props, "Translation.X missing from keyframe read", keyframes)
+            require("RenderTransform.Angle" in keyframe_props, "Angle missing from keyframe read", keyframes)
+
+            full_data = await call_tool(session, "get_animation_full_data", {"animation_name": animation_name}, attempts=6)
+            full_data_props = {track.get("property_name") for track in full_data.get("tracks", [])}
+            require("RenderOpacity" in full_data_props, "RenderOpacity missing from full animation read", full_data)
+
+            widget_timeline = await call_tool(
+                session,
+                "animation_widget_properties",
+                {"animation_name": animation_name, "widget_name": widget_name},
+                attempts=6,
+            )
+            require(widget_timeline.get("change_count", 0) >= 1, "widget timeline read returned no changes", widget_timeline)
+
+            widget_data = await call_tool(
+                session,
+                "get_widget_animation_data",
+                {"animation_name": animation_name, "widget_name": widget_name},
+                attempts=6,
+            )
+            require(widget_data.get("change_count", 0) >= 1, "focused widget animation data returned no changes", widget_data)
 
             time_slice = await call_tool(
                 session,
@@ -188,6 +267,7 @@ async def run_check() -> None:
                 "animation": animation_name,
                 "mcp_tool_count": len(tool_names),
                 "overview_track_count": overview.get("track_count"),
+                "widget_timeline_changes": widget_timeline.get("change_count"),
                 "time_slice_values": values,
                 "delete_result": delete,
             }, indent=2, ensure_ascii=False))

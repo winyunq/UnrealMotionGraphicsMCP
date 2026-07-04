@@ -411,39 +411,55 @@ async def build_animation(session: ClientSession, trace: TraceRecorder, animatio
         session,
         trace,
         "sequencer",
-        "set_property_keys",
+        "animation_append_widget_tracks",
         {
-            "property_name": "RenderOpacity",
-            "keys": [{"time": 0.0, "value": 0.0}, {"time": 0.45, "value": 1.0}, {"time": 1.2, "value": 1.0}],
+            "widget_name": "LoginCard",
+            "animation_name": animation_name,
+            "tracks": [
+                {
+                    "property": "RenderOpacity",
+                    "keys": [
+                        {"time": 0.0, "value": 0.0},
+                        {"time": 0.45, "value": 1.0},
+                        {"time": 1.2, "value": 1.0},
+                    ],
+                },
+                {
+                    "property": "RenderTransform.Scale.X",
+                    "keys": [
+                        {"time": 0.0, "value": 0.92},
+                        {"time": 0.45, "value": 1.025},
+                        {"time": 0.8, "value": 1.0},
+                    ],
+                },
+                {
+                    "property": "RenderTransform.Scale.Y",
+                    "keys": [
+                        {"time": 0.0, "value": 0.92},
+                        {"time": 0.45, "value": 1.025},
+                        {"time": 0.8, "value": 1.0},
+                    ],
+                },
+            ],
         },
         attempts=6,
     )
-    for prop in ("RenderTransform.Scale.X", "RenderTransform.Scale.Y"):
-        await call_tool(
-            session,
-            trace,
-            "sequencer",
-            "set_property_keys",
-            {
-                "property_name": prop,
-                "keys": [
-                    {"time": 0.0, "value": 0.92},
-                    {"time": 0.45, "value": 1.025},
-                    {"time": 0.8, "value": 1.0},
-                ],
-            },
-            attempts=6,
-        )
 
     await call_tool(session, trace, "sequencer", "set_target_widget", {"widget_name": "ScannerAccent"}, attempts=6)
     await call_tool(
         session,
         trace,
         "sequencer",
-        "set_property_keys",
+        "animation_append_widget_tracks",
         {
-            "property_name": "RenderTransform.Angle",
-            "keys": [{"time": 0.0, "value": -8.0}, {"time": 1.2, "value": 8.0}],
+            "widget_name": "ScannerAccent",
+            "animation_name": animation_name,
+            "tracks": [
+                {
+                    "property": "RenderTransform.Angle",
+                    "keys": [{"time": 0.0, "value": -8.0}, {"time": 1.2, "value": 8.0}],
+                }
+            ],
         },
         attempts=6,
     )
@@ -526,7 +542,7 @@ async def run_demo(args: argparse.Namespace) -> None:
                         "hlsl_compile",
                         "create_animation",
                         "set_animation_scope",
-                        "set_property_keys",
+                        "animation_append_widget_tracks",
                         "animation_overview",
                         "set_edit_function",
                         "add_step",
