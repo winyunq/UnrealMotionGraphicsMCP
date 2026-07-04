@@ -54,6 +54,10 @@ class UnrealConnection:
     """Manages the async socket connection to the UmgMcp plugin running inside Unreal Engine."""
     def __init__(self):
         logger.info(f"Unreal Motion Graphics UI Designer Mode Context Process Launching... Connecting to UmgMcp plugin at {UNREAL_HOST}:{UNREAL_PORT}...")
+
+    def disconnect(self) -> None:
+        """Short-lived socket connections are closed per command."""
+        return None
     
     async def send_command(self, command: str, params: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """Send a command to Unreal Engine and get the response (Async Short-Lived)."""
@@ -1321,5 +1325,5 @@ if __name__ == "__main__":
 
     except Exception as e:
         logger.error(f"A critical error occurred while starting the UmgMcp Server: {e}")
-        # If we failed, print an error code that the parent process might see.
-        print("MCP_SERVER_START_FAILED")
+        sys.stderr.write("MCP_SERVER_START_FAILED\n")
+        sys.stderr.flush()

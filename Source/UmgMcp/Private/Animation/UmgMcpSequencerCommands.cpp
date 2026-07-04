@@ -16,12 +16,15 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 
 // Sequencer Includes
+#include "Animation/MovieScene2DTransformSection.h"
+#include "Animation/MovieScene2DTransformTrack.h"
 #include "Tracks/MovieSceneFloatTrack.h"
 #include "Sections/MovieSceneFloatSection.h"
 #include "Channels/MovieSceneFloatChannel.h"
 #include "Channels/MovieSceneDoubleChannel.h"
 #include "Channels/MovieSceneChannelProxy.h"
 // Additional Sequencer Includes
+#include "Tracks/MovieScenePropertyTrack.h"
 #include "Tracks/MovieSceneColorTrack.h"
 #include "Sections/MovieSceneColorSection.h"
 #include "Tracks/MovieSceneVectorTrack.h"
@@ -30,6 +33,232 @@
 
 // Define a log category for Sequencer commands
 DEFINE_LOG_CATEGORY_STATIC(LogUmgSequencer, Log, All);
+
+namespace
+{
+    FName GetPropertyLeafName(const FString& PropertyPath)
+    {
+        FString Left;
+        FString Right;
+        if (PropertyPath.Split(TEXT("."), &Left, &Right, ESearchCase::CaseSensitive, ESearchDir::FromEnd) && !Right.IsEmpty())
+        {
+            return FName(*Right);
+        }
+        return FName(*PropertyPath);
+    }
+
+    FString GetPropertyTrackPath(const UMovieScenePropertyTrack* Track)
+    {
+        if (!Track) return FString();
+
+        const FString PropertyPath = Track->GetPropertyPath().ToString();
+        if (!PropertyPath.IsEmpty())
+        {
+            return PropertyPath;
+        }
+        return Track->GetPropertyName().ToString();
+    }
+
+    enum class ERenderTransformComponent
+    {
+        None,
+        TranslationX,
+        TranslationY,
+        Angle,
+        ScaleX,
+        ScaleY,
+        ShearX,
+        ShearY
+    };
+
+    bool TryParseRenderTransformComponent(const FString& PropertyPath, ERenderTransformComponent& OutComponent)
+    {
+        OutComponent = ERenderTransformComponent::None;
+
+        FString Normalized = PropertyPath;
+        Normalized.ReplaceInline(TEXT("\\"), TEXT("."));
+        Normalized.ReplaceInline(TEXT(" "), TEXT(""));
+
+        if (!Normalized.StartsWith(TEXT("RenderTransform."), ESearchCase::IgnoreCase))
+        {
+            return false;
+        }
+
+        const FString SubPath = Normalized.RightChop(16);
+        if (SubPath.Equals(TEXT("Translation.X"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::TranslationX; return true; }
+        if (SubPath.Equals(TEXT("Translation.Y"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::TranslationY; return true; }
+        if (SubPath.Equals(TEXT("Angle"), ESearchCase::IgnoreCase) || SubPath.Equals(TEXT("Rotation"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::Angle; return true; }
+        if (SubPath.Equals(TEXT("Scale.X"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::ScaleX; return true; }
+        if (SubPath.Equals(TEXT("Scale.Y"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::ScaleY; return true; }
+        if (SubPath.Equals(TEXT("Shear.X"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::ShearX; return true; }
+        if (SubPath.Equals(TEXT("Shear.Y"), ESearchCase::IgnoreCase)) { OutComponent = ERenderTransformComponent::ShearY; return true; }
+
+        return false;
+    }
+
+    bool TryParseRenderTransformVectorProperty(const FString& PropertyPath, ERenderTransformComponent& OutX, ERenderTransformComponent& OutY)
+    {
+        OutX = ERenderTransformComponent::None;
+        OutY = ERenderTransformComponent::None;
+
+        FString Normalized = PropertyPath;
+        Normalized.ReplaceInline(TEXT("\\"), TEXT("."));
+        Normalized.ReplaceInline(TEXT(" "), TEXT(""));
+
+        if (!Normalized.StartsWith(TEXT("RenderTransform."), ESearchCase::IgnoreCase))
+        {
+            return false;
+        }
+
+        const FString SubPath = Normalized.RightChop(16);
+        if (SubPath.Equals(TEXT("Translation"), ESearchCase::IgnoreCase)) { OutX = ERenderTransformComponent::TranslationX; OutY = ERenderTransformComponent::TranslationY; return true; }
+        if (SubPath.Equals(TEXT("Scale"), ESearchCase::IgnoreCase)) { OutX = ERenderTransformComponent::ScaleX; OutY = ERenderTransformComponent::ScaleY; return true; }
+        if (SubPath.Equals(TEXT("Shear"), ESearchCase::IgnoreCase)) { OutX = ERenderTransformComponent::ShearX; OutY = ERenderTransformComponent::ShearY; return true; }
+
+        return false;
+    }
+
+    EMovieScene2DTransformChannel ToTransformMask(ERenderTransformComponent Component)
+    {
+        switch (Component)
+        {
+        case ERenderTransformComponent::TranslationX: return EMovieScene2DTransformChannel::TranslationX;
+        case ERenderTransformComponent::TranslationY: return EMovieScene2DTransformChannel::TranslationY;
+        case ERenderTransformComponent::Angle: return EMovieScene2DTransformChannel::Rotation;
+        case ERenderTransformComponent::ScaleX: return EMovieScene2DTransformChannel::ScaleX;
+        case ERenderTransformComponent::ScaleY: return EMovieScene2DTransformChannel::ScaleY;
+        case ERenderTransformComponent::ShearX: return EMovieScene2DTransformChannel::ShearX;
+        case ERenderTransformComponent::ShearY: return EMovieScene2DTransformChannel::ShearY;
+        default: return EMovieScene2DTransformChannel::None;
+        }
+    }
+
+    FString ToTransformPropertyName(ERenderTransformComponent Component)
+    {
+        switch (Component)
+        {
+        case ERenderTransformComponent::TranslationX: return TEXT("RenderTransform.Translation.X");
+        case ERenderTransformComponent::TranslationY: return TEXT("RenderTransform.Translation.Y");
+        case ERenderTransformComponent::Angle: return TEXT("RenderTransform.Angle");
+        case ERenderTransformComponent::ScaleX: return TEXT("RenderTransform.Scale.X");
+        case ERenderTransformComponent::ScaleY: return TEXT("RenderTransform.Scale.Y");
+        case ERenderTransformComponent::ShearX: return TEXT("RenderTransform.Shear.X");
+        case ERenderTransformComponent::ShearY: return TEXT("RenderTransform.Shear.Y");
+        default: return TEXT("RenderTransform");
+        }
+    }
+
+    FMovieSceneFloatChannel* GetTransformChannel(UMovieScene2DTransformSection* Section, ERenderTransformComponent Component)
+    {
+        if (!Section) return nullptr;
+
+        switch (Component)
+        {
+        case ERenderTransformComponent::TranslationX: return &Section->Translation[0];
+        case ERenderTransformComponent::TranslationY: return &Section->Translation[1];
+        case ERenderTransformComponent::Angle: return &Section->Rotation;
+        case ERenderTransformComponent::ScaleX: return &Section->Scale[0];
+        case ERenderTransformComponent::ScaleY: return &Section->Scale[1];
+        case ERenderTransformComponent::ShearX: return &Section->Shear[0];
+        case ERenderTransformComponent::ShearY: return &Section->Shear[1];
+        default: return nullptr;
+        }
+    }
+
+    const FMovieSceneFloatChannel* GetTransformChannel(const UMovieScene2DTransformSection* Section, ERenderTransformComponent Component)
+    {
+        if (!Section) return nullptr;
+
+        switch (Component)
+        {
+        case ERenderTransformComponent::TranslationX: return &Section->Translation[0];
+        case ERenderTransformComponent::TranslationY: return &Section->Translation[1];
+        case ERenderTransformComponent::Angle: return &Section->Rotation;
+        case ERenderTransformComponent::ScaleX: return &Section->Scale[0];
+        case ERenderTransformComponent::ScaleY: return &Section->Scale[1];
+        case ERenderTransformComponent::ShearX: return &Section->Shear[0];
+        case ERenderTransformComponent::ShearY: return &Section->Shear[1];
+        default: return nullptr;
+        }
+    }
+
+    void ExpandTransformMask(UMovieScene2DTransformSection* Section, EMovieScene2DTransformChannel ChannelsToAdd)
+    {
+        if (!Section || ChannelsToAdd == EMovieScene2DTransformChannel::None) return;
+
+        const EMovieScene2DTransformChannel CurrentChannels = Section->GetMask().GetChannels();
+        Section->SetMask(FMovieScene2DTransformMask(CurrentChannels | ChannelsToAdd));
+    }
+
+    void ReduceTransformMask(UMovieScene2DTransformSection* Section, EMovieScene2DTransformChannel ChannelsToRemove)
+    {
+        if (!Section || ChannelsToRemove == EMovieScene2DTransformChannel::None) return;
+
+        const EMovieScene2DTransformChannel CurrentChannels = Section->GetMask().GetChannels();
+        Section->SetMask(FMovieScene2DTransformMask(CurrentChannels & ~ChannelsToRemove));
+    }
+
+    bool DoesPropertyFilterMatch(const FString& TrackPropertyPath, const FString& PropertyFilter)
+    {
+        if (PropertyFilter.IsEmpty())
+        {
+            return true;
+        }
+
+        return TrackPropertyPath.Equals(PropertyFilter, ESearchCase::IgnoreCase);
+    }
+
+    bool DoesPropertyTrackMatch(const UMovieScenePropertyTrack* Track, const FString& PropertyName)
+    {
+        if (!Track || PropertyName.IsEmpty())
+        {
+            return false;
+        }
+
+        const FString TrackPropertyPath = GetPropertyTrackPath(Track);
+        if (TrackPropertyPath.Equals(PropertyName, ESearchCase::IgnoreCase))
+        {
+            return true;
+        }
+
+        const FName RequestedLeafName = GetPropertyLeafName(PropertyName);
+        return Track->GetPropertyName() == RequestedLeafName;
+    }
+
+    TArray<UMovieSceneTrack*> FindMatchingPropertyTracks(
+        UMovieScene* MovieScene,
+        TSubclassOf<UMovieSceneTrack> TrackClass,
+        const FGuid& ObjectGuid,
+        const FString& PropertyName)
+    {
+        TArray<UMovieSceneTrack*> Matches;
+        if (!MovieScene || !ObjectGuid.IsValid() || PropertyName.IsEmpty())
+        {
+            return Matches;
+        }
+
+        for (UMovieSceneTrack* Track : MovieScene->FindTracks(TrackClass, ObjectGuid))
+        {
+            const UMovieScenePropertyTrack* PropertyTrack = Cast<UMovieScenePropertyTrack>(Track);
+            if (DoesPropertyTrackMatch(PropertyTrack, PropertyName))
+            {
+                Matches.Add(Track);
+            }
+        }
+        return Matches;
+    }
+
+    bool DoesTransformFilterMatch(ERenderTransformComponent Component, const FString& PropertyFilter)
+    {
+        if (PropertyFilter.IsEmpty())
+        {
+            return true;
+        }
+
+        return PropertyFilter.Equals(TEXT("RenderTransform"), ESearchCase::IgnoreCase)
+            || PropertyFilter.Equals(ToTransformPropertyName(Component), ESearchCase::IgnoreCase);
+    }
+}
 
 FUmgMcpSequencerCommands::FUmgMcpSequencerCommands()
 {
@@ -254,57 +483,166 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationKeyframes(const TS
     UMovieScene* MovieScene = TargetAnimation->GetMovieScene();
     if (!MovieScene) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("MovieScene is null"));
 
+    const FFrameRate TickResolution = MovieScene->GetTickResolution();
     TArray<TSharedPtr<FJsonValue>> TracksArray;
 
-    // Iterate over bindings to find widgets, then tracks
     for (const FWidgetAnimationBinding& Binding : TargetAnimation->AnimationBindings)
     {
-        FGuid ObjectGuid = Binding.AnimationGuid;
-        FString WidgetName = Binding.WidgetName.ToString();
+        const FGuid ObjectGuid = Binding.AnimationGuid;
+        const FString WidgetName = Binding.WidgetName.ToString();
 
-        // Find tracks for this object
-        for (const UMovieSceneTrack* Track : MovieScene->GetTracks())
-        {
-             // Check if this track is bound to this object
-             // Note: MovieScene tracks are bound to GUIDs. We need to check if this track relates to our ObjectGuid.
-             // However, GetTracks() returns all tracks. We need to filter.
-             // Actually, usually we ask the MovieScene for tracks bound to a GUID.
-        }
-        
-        // Correct approach: Iterate all bindings, then ask MovieScene for tracks for that binding
         for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieSceneFloatTrack::StaticClass(), ObjectGuid))
         {
-             if (const UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track))
-             {
-                 TSharedPtr<FJsonObject> TrackObj = MakeShared<FJsonObject>();
-                 TrackObj->SetStringField(TEXT("widget_name"), WidgetName);
-                 TrackObj->SetStringField(TEXT("property_name"), FloatTrack->GetPropertyName().ToString());
+            const UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track);
+            if (!FloatTrack) continue;
 
-                 TArray<TSharedPtr<FJsonValue>> KeysArray;
-                 
-                 // Assuming section 0 for simplicity
-                 if (FloatTrack->GetAllSections().Num() > 0)
-                 {
-                     if (const UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(FloatTrack->GetAllSections()[0]))
-                     {
-                         TArrayView<const FFrameNumber> Times = Section->GetChannel().GetData().GetTimes();
-                         TArrayView<const FMovieSceneFloatValue> Values = Section->GetChannel().GetData().GetValues();
-                         
-                         FFrameRate TickResolution = MovieScene->GetTickResolution();
+            TArray<TSharedPtr<FJsonValue>> KeysArray;
+            for (const UMovieSceneSection* Section : FloatTrack->GetAllSections())
+            {
+                const UMovieSceneFloatSection* FloatSection = Cast<UMovieSceneFloatSection>(Section);
+                if (!FloatSection) continue;
 
-                         for (int32 i = 0; i < Times.Num(); ++i)
-                         {
-                             TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
-                             double Time = (double)Times[i].Value / (double)TickResolution.Numerator * (double)TickResolution.Denominator; // Simplified conversion
-                             KeyObj->SetNumberField(TEXT("time"), Time);
-                             KeyObj->SetNumberField(TEXT("value"), Values[i].Value);
-                             KeysArray.Add(MakeShared<FJsonValueObject>(KeyObj));
-                         }
-                     }
-                 }
-                 TrackObj->SetArrayField(TEXT("keys"), KeysArray);
-                 TracksArray.Add(MakeShared<FJsonValueObject>(TrackObj));
-             }
+                const auto Times = FloatSection->GetChannel().GetData().GetTimes();
+                const auto Values = FloatSection->GetChannel().GetData().GetValues();
+                for (int32 i = 0; i < Times.Num(); ++i)
+                {
+                    TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
+                    KeyObj->SetNumberField(TEXT("time"), TickResolution.AsSeconds(Times[i]));
+                    KeyObj->SetNumberField(TEXT("value"), Values[i].Value);
+                    KeysArray.Add(MakeShared<FJsonValueObject>(KeyObj));
+                }
+            }
+
+            TSharedPtr<FJsonObject> TrackObj = MakeShared<FJsonObject>();
+            TrackObj->SetStringField(TEXT("widget_name"), WidgetName);
+            TrackObj->SetStringField(TEXT("property_name"), GetPropertyTrackPath(FloatTrack));
+            TrackObj->SetStringField(TEXT("track_type"), TEXT("float"));
+            TrackObj->SetArrayField(TEXT("keys"), KeysArray);
+            TracksArray.Add(MakeShared<FJsonValueObject>(TrackObj));
+        }
+
+        for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieSceneColorTrack::StaticClass(), ObjectGuid))
+        {
+            const UMovieSceneColorTrack* ColorTrack = Cast<UMovieSceneColorTrack>(Track);
+            if (!ColorTrack) continue;
+
+            TArray<TSharedPtr<FJsonValue>> KeysArray;
+            for (const UMovieSceneSection* Section : ColorTrack->GetAllSections())
+            {
+                const UMovieSceneColorSection* ColorSection = Cast<UMovieSceneColorSection>(Section);
+                if (!ColorSection) continue;
+
+                const auto Times = ColorSection->GetRedChannel().GetData().GetTimes();
+                const auto Reds = ColorSection->GetRedChannel().GetData().GetValues();
+                const auto Greens = ColorSection->GetGreenChannel().GetData().GetValues();
+                const auto Blues = ColorSection->GetBlueChannel().GetData().GetValues();
+                const auto Alphas = ColorSection->GetAlphaChannel().GetData().GetValues();
+                for (int32 i = 0; i < Times.Num(); ++i)
+                {
+                    TSharedPtr<FJsonObject> ColorObj = MakeShared<FJsonObject>();
+                    ColorObj->SetNumberField(TEXT("r"), Reds.IsValidIndex(i) ? Reds[i].Value : 0.f);
+                    ColorObj->SetNumberField(TEXT("g"), Greens.IsValidIndex(i) ? Greens[i].Value : 0.f);
+                    ColorObj->SetNumberField(TEXT("b"), Blues.IsValidIndex(i) ? Blues[i].Value : 0.f);
+                    ColorObj->SetNumberField(TEXT("a"), Alphas.IsValidIndex(i) ? Alphas[i].Value : 1.f);
+
+                    TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
+                    KeyObj->SetNumberField(TEXT("time"), TickResolution.AsSeconds(Times[i]));
+                    KeyObj->SetObjectField(TEXT("value"), ColorObj);
+                    KeysArray.Add(MakeShared<FJsonValueObject>(KeyObj));
+                }
+            }
+
+            TSharedPtr<FJsonObject> TrackObj = MakeShared<FJsonObject>();
+            TrackObj->SetStringField(TEXT("widget_name"), WidgetName);
+            TrackObj->SetStringField(TEXT("property_name"), GetPropertyTrackPath(ColorTrack));
+            TrackObj->SetStringField(TEXT("track_type"), TEXT("color"));
+            TrackObj->SetArrayField(TEXT("keys"), KeysArray);
+            TracksArray.Add(MakeShared<FJsonValueObject>(TrackObj));
+        }
+
+        for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieSceneDoubleVectorTrack::StaticClass(), ObjectGuid))
+        {
+            const UMovieSceneDoubleVectorTrack* VectorTrack = Cast<UMovieSceneDoubleVectorTrack>(Track);
+            if (!VectorTrack || VectorTrack->GetNumChannelsUsed() < 2) continue;
+
+            TArray<TSharedPtr<FJsonValue>> KeysArray;
+            for (const UMovieSceneSection* Section : VectorTrack->GetAllSections())
+            {
+                const UMovieSceneDoubleVectorSection* VectorSection = Cast<UMovieSceneDoubleVectorSection>(Section);
+                if (!VectorSection) continue;
+
+                FMovieSceneChannelProxy& Proxy = VectorSection->GetChannelProxy();
+                TArrayView<FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
+                if (Channels.Num() < 2) continue;
+
+                const auto Times = Channels[0]->GetData().GetTimes();
+                const auto XValues = Channels[0]->GetData().GetValues();
+                const auto YValues = Channels[1]->GetData().GetValues();
+                for (int32 i = 0; i < Times.Num(); ++i)
+                {
+                    TSharedPtr<FJsonObject> VecObj = MakeShared<FJsonObject>();
+                    VecObj->SetNumberField(TEXT("x"), XValues.IsValidIndex(i) ? XValues[i].Value : 0.0);
+                    VecObj->SetNumberField(TEXT("y"), YValues.IsValidIndex(i) ? YValues[i].Value : 0.0);
+
+                    TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
+                    KeyObj->SetNumberField(TEXT("time"), TickResolution.AsSeconds(Times[i]));
+                    KeyObj->SetObjectField(TEXT("value"), VecObj);
+                    KeysArray.Add(MakeShared<FJsonValueObject>(KeyObj));
+                }
+            }
+
+            TSharedPtr<FJsonObject> TrackObj = MakeShared<FJsonObject>();
+            TrackObj->SetStringField(TEXT("widget_name"), WidgetName);
+            TrackObj->SetStringField(TEXT("property_name"), GetPropertyTrackPath(VectorTrack));
+            TrackObj->SetStringField(TEXT("track_type"), TEXT("vector2d"));
+            TrackObj->SetArrayField(TEXT("keys"), KeysArray);
+            TracksArray.Add(MakeShared<FJsonValueObject>(TrackObj));
+        }
+
+        for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieScene2DTransformTrack::StaticClass(), ObjectGuid))
+        {
+            const UMovieScene2DTransformTrack* TransformTrack = Cast<UMovieScene2DTransformTrack>(Track);
+            if (!TransformTrack) continue;
+
+            const ERenderTransformComponent Components[] = {
+                ERenderTransformComponent::TranslationX,
+                ERenderTransformComponent::TranslationY,
+                ERenderTransformComponent::Angle,
+                ERenderTransformComponent::ScaleX,
+                ERenderTransformComponent::ScaleY,
+                ERenderTransformComponent::ShearX,
+                ERenderTransformComponent::ShearY
+            };
+
+            for (ERenderTransformComponent Component : Components)
+            {
+                TArray<TSharedPtr<FJsonValue>> KeysArray;
+                for (const UMovieSceneSection* Section : TransformTrack->GetAllSections())
+                {
+                    const UMovieScene2DTransformSection* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+                    const FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, Component);
+                    if (!Channel || !Channel->HasAnyData()) continue;
+
+                    const auto Times = Channel->GetData().GetTimes();
+                    const auto Values = Channel->GetData().GetValues();
+                    for (int32 i = 0; i < Times.Num(); ++i)
+                    {
+                        TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
+                        KeyObj->SetNumberField(TEXT("time"), TickResolution.AsSeconds(Times[i]));
+                        KeyObj->SetNumberField(TEXT("value"), Values[i].Value);
+                        KeysArray.Add(MakeShared<FJsonValueObject>(KeyObj));
+                    }
+                }
+
+                if (KeysArray.Num() == 0) continue;
+
+                TSharedPtr<FJsonObject> TrackObj = MakeShared<FJsonObject>();
+                TrackObj->SetStringField(TEXT("widget_name"), WidgetName);
+                TrackObj->SetStringField(TEXT("property_name"), ToTransformPropertyName(Component));
+                TrackObj->SetStringField(TEXT("track_type"), TEXT("2d_transform"));
+                TrackObj->SetArrayField(TEXT("keys"), KeysArray);
+                TracksArray.Add(MakeShared<FJsonValueObject>(TrackObj));
+            }
         }
     }
 
@@ -415,8 +753,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetWidgetPropertyTimeline(cons
         {
             const UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track);
             if (!FloatTrack) continue;
-            const FString PropertyName = FloatTrack->GetPropertyName().ToString();
-            if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+            const FString PropertyName = GetPropertyTrackPath(FloatTrack);
+            if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
             for (const UMovieSceneSection* Section : FloatTrack->GetAllSections())
             {
@@ -439,8 +777,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetWidgetPropertyTimeline(cons
         {
             const UMovieSceneColorTrack* ColorTrack = Cast<UMovieSceneColorTrack>(Track);
             if (!ColorTrack) continue;
-            const FString PropertyName = ColorTrack->GetPropertyName().ToString();
-            if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+            const FString PropertyName = GetPropertyTrackPath(ColorTrack);
+            if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
             for (const UMovieSceneSection* Section : ColorTrack->GetAllSections())
             {
@@ -473,8 +811,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetWidgetPropertyTimeline(cons
             const UMovieSceneDoubleVectorTrack* VectorTrack = Cast<UMovieSceneDoubleVectorTrack>(Track);
             if (!VectorTrack || VectorTrack->GetNumChannelsUsed() < 2) continue;
 
-            const FString PropertyName = VectorTrack->GetPropertyName().ToString();
-            if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+            const FString PropertyName = GetPropertyTrackPath(VectorTrack);
+            if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
             for (const UMovieSceneSection* Section : VectorTrack->GetAllSections())
             {
@@ -496,6 +834,45 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetWidgetPropertyTimeline(cons
                     VecObj->SetNumberField(TEXT("x"), XValues.IsValidIndex(i) ? XValues[i].Value : 0.0);
                     VecObj->SetNumberField(TEXT("y"), YValues.IsValidIndex(i) ? YValues[i].Value : 0.0);
                     AddChange(BindingWidget, PropertyName, TEXT("vector2d"), TickResolution.AsSeconds(Times[i]), MakeShared<FJsonValueObject>(VecObj));
+                }
+            }
+        }
+
+        // UMG RenderTransform tracks
+        for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieScene2DTransformTrack::StaticClass(), ObjectGuid))
+        {
+            const UMovieScene2DTransformTrack* TransformTrack = Cast<UMovieScene2DTransformTrack>(Track);
+            if (!TransformTrack) continue;
+
+            for (const UMovieSceneSection* Section : TransformTrack->GetAllSections())
+            {
+                const UMovieScene2DTransformSection* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+                if (!TransformSection) continue;
+
+                const ERenderTransformComponent Components[] = {
+                    ERenderTransformComponent::TranslationX,
+                    ERenderTransformComponent::TranslationY,
+                    ERenderTransformComponent::Angle,
+                    ERenderTransformComponent::ScaleX,
+                    ERenderTransformComponent::ScaleY,
+                    ERenderTransformComponent::ShearX,
+                    ERenderTransformComponent::ShearY
+                };
+
+                for (ERenderTransformComponent Component : Components)
+                {
+                    if (!DoesTransformFilterMatch(Component, PropertyFilter)) continue;
+
+                    const FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, Component);
+                    if (!Channel || !Channel->HasAnyData()) continue;
+
+                    const auto Times = Channel->GetData().GetTimes();
+                    const auto Values = Channel->GetData().GetValues();
+                    const FString ComponentProperty = ToTransformPropertyName(Component);
+                    for (int32 i = 0; i < Times.Num(); ++i)
+                    {
+                        AddChange(BindingWidget, ComponentProperty, TEXT("float"), TickResolution.AsSeconds(Times[i]), MakeShared<FJsonValueNumber>(Values[i].Value));
+                    }
                 }
             }
         }
@@ -567,8 +944,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetTimeSliceProperties(const T
             {
                 const UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track);
                 if (!FloatTrack) continue;
-                const FString PropertyName = FloatTrack->GetPropertyName().ToString();
-                if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+                const FString PropertyName = GetPropertyTrackPath(FloatTrack);
+                if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
                 for (const UMovieSceneSection* Section : FloatTrack->GetAllSections())
                 {
@@ -594,8 +971,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetTimeSliceProperties(const T
             {
                 const UMovieSceneColorTrack* ColorTrack = Cast<UMovieSceneColorTrack>(Track);
                 if (!ColorTrack) continue;
-                const FString PropertyName = ColorTrack->GetPropertyName().ToString();
-                if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+                const FString PropertyName = GetPropertyTrackPath(ColorTrack);
+                if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
                 for (const UMovieSceneSection* Section : ColorTrack->GetAllSections())
                 {
@@ -634,8 +1011,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetTimeSliceProperties(const T
                 const UMovieSceneDoubleVectorTrack* VectorTrack = Cast<UMovieSceneDoubleVectorTrack>(Track);
                 if (!VectorTrack || VectorTrack->GetNumChannelsUsed() < 2) continue;
 
-                const FString PropertyName = VectorTrack->GetPropertyName().ToString();
-                if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+                const FString PropertyName = GetPropertyTrackPath(VectorTrack);
+                if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
                 for (const UMovieSceneSection* Section : VectorTrack->GetAllSections())
                 {
@@ -662,6 +1039,48 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetTimeSliceProperties(const T
 
                         ValuesAtTime.Add(MakeShared<FJsonValueObject>(Obj));
                         break;
+                    }
+                }
+            }
+
+            // UMG RenderTransform
+            for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieScene2DTransformTrack::StaticClass(), ObjectGuid))
+            {
+                const UMovieScene2DTransformTrack* TransformTrack = Cast<UMovieScene2DTransformTrack>(Track);
+                if (!TransformTrack) continue;
+
+                for (const UMovieSceneSection* Section : TransformTrack->GetAllSections())
+                {
+                    const UMovieScene2DTransformSection* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+                    if (!TransformSection) continue;
+
+                    const ERenderTransformComponent Components[] = {
+                        ERenderTransformComponent::TranslationX,
+                        ERenderTransformComponent::TranslationY,
+                        ERenderTransformComponent::Angle,
+                        ERenderTransformComponent::ScaleX,
+                        ERenderTransformComponent::ScaleY,
+                        ERenderTransformComponent::ShearX,
+                        ERenderTransformComponent::ShearY
+                    };
+
+                    for (ERenderTransformComponent Component : Components)
+                    {
+                        if (!DoesTransformFilterMatch(Component, PropertyFilter)) continue;
+
+                        const FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, Component);
+                        if (!Channel) continue;
+
+                        float EvalValue = 0.f;
+                        if (Channel->Evaluate(QueryFrame, EvalValue))
+                        {
+                            TSharedPtr<FJsonObject> Obj = MakeShared<FJsonObject>();
+                            Obj->SetStringField(TEXT("widget"), BindingWidget);
+                            Obj->SetStringField(TEXT("property"), ToTransformPropertyName(Component));
+                            Obj->SetStringField(TEXT("value_type"), TEXT("float"));
+                            Obj->SetNumberField(TEXT("value"), EvalValue);
+                            ValuesAtTime.Add(MakeShared<FJsonValueObject>(Obj));
+                        }
                     }
                 }
             }
@@ -727,8 +1146,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationOverview(const TSh
         {
             const UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track);
             if (!FloatTrack) continue;
-            const FString PropertyName = FloatTrack->GetPropertyName().ToString();
-            if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+            const FString PropertyName = GetPropertyTrackPath(FloatTrack);
+            if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
             for (const UMovieSceneSection* Section : FloatTrack->GetAllSections())
             {
@@ -742,8 +1161,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationOverview(const TSh
         {
             const UMovieSceneColorTrack* ColorTrack = Cast<UMovieSceneColorTrack>(Track);
             if (!ColorTrack) continue;
-            const FString PropertyName = ColorTrack->GetPropertyName().ToString();
-            if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+            const FString PropertyName = GetPropertyTrackPath(ColorTrack);
+            if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
             for (const UMovieSceneSection* Section : ColorTrack->GetAllSections())
             {
@@ -757,8 +1176,8 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationOverview(const TSh
         {
             const UMovieSceneDoubleVectorTrack* VectorTrack = Cast<UMovieSceneDoubleVectorTrack>(Track);
             if (!VectorTrack || VectorTrack->GetNumChannelsUsed() < 2) continue;
-            const FString PropertyName = VectorTrack->GetPropertyName().ToString();
-            if (!PropertyFilter.IsEmpty() && PropertyName != PropertyFilter) continue;
+            const FString PropertyName = GetPropertyTrackPath(VectorTrack);
+            if (!DoesPropertyFilterMatch(PropertyName, PropertyFilter)) continue;
 
             for (const UMovieSceneSection* Section : VectorTrack->GetAllSections())
             {
@@ -768,6 +1187,38 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::GetAnimationOverview(const TSh
                 TArrayView<FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
                 if (Channels.Num() < 2) continue;
                 AccumulateTimes(BindingWidget, PropertyName, TEXT("vector2d"), Channels[0]->GetData().GetTimes());
+            }
+        }
+
+        for (const UMovieSceneTrack* Track : MovieScene->FindTracks(UMovieScene2DTransformTrack::StaticClass(), ObjectGuid))
+        {
+            const UMovieScene2DTransformTrack* TransformTrack = Cast<UMovieScene2DTransformTrack>(Track);
+            if (!TransformTrack) continue;
+
+            for (const UMovieSceneSection* Section : TransformTrack->GetAllSections())
+            {
+                const UMovieScene2DTransformSection* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+                if (!TransformSection) continue;
+
+                const ERenderTransformComponent Components[] = {
+                    ERenderTransformComponent::TranslationX,
+                    ERenderTransformComponent::TranslationY,
+                    ERenderTransformComponent::Angle,
+                    ERenderTransformComponent::ScaleX,
+                    ERenderTransformComponent::ScaleY,
+                    ERenderTransformComponent::ShearX,
+                    ERenderTransformComponent::ShearY
+                };
+
+                for (ERenderTransformComponent Component : Components)
+                {
+                    if (!DoesTransformFilterMatch(Component, PropertyFilter)) continue;
+
+                    const FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, Component);
+                    if (!Channel || !Channel->HasAnyData()) continue;
+
+                    AccumulateTimes(BindingWidget, ToTransformPropertyName(Component), TEXT("2d_transform"), Channel->GetData().GetTimes());
+                }
             }
         }
     }
@@ -1015,24 +1466,32 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
         }
     }
 
+    UWidget* Widget = Blueprint->WidgetTree ? Blueprint->WidgetTree->FindWidget(FName(*WidgetName)) : nullptr;
+    if (!Widget) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Widget not found in tree"));
+
+    if (!Widget->bIsVariable || !Blueprint->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
+    {
+        if (!Widget->bIsVariable) Widget->bIsVariable = true;
+        if (!Blueprint->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
+        {
+            Blueprint->WidgetVariableNameToGuidMap.Add(Widget->GetFName(), FGuid::NewGuid());
+        }
+        Blueprint->Modify();
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    }
+
     if (!WidgetGuid.IsValid())
     {
-        UWidget* Widget = Blueprint->WidgetTree->FindWidget(FName(*WidgetName));
-        if (!Widget) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Widget not found in tree"));
-        
-        if (!Widget->bIsVariable || !Blueprint->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
-        {
-            if (!Widget->bIsVariable) Widget->bIsVariable = true;
-            if (!Blueprint->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
-            {
-                Blueprint->WidgetVariableNameToGuidMap.Add(Widget->GetFName(), FGuid::NewGuid());
-            }
-            Blueprint->Modify();
-            FKismetEditorUtilities::CompileBlueprint(Blueprint); 
-        }
-
         WidgetGuid = MovieScene->AddPossessable(WidgetName, Widget->GetClass());
-        
+    }
+
+    const bool bHasAnimationBinding = TargetAnimation->AnimationBindings.ContainsByPredicate([&](const FWidgetAnimationBinding& Binding) {
+        return Binding.AnimationGuid == WidgetGuid;
+    });
+
+    if (!bHasAnimationBinding)
+    {
+        TargetAnimation->Modify();
         FWidgetAnimationBinding NewBinding;
         NewBinding.WidgetName = FName(*WidgetName);
         NewBinding.AnimationGuid = WidgetGuid;
@@ -1053,13 +1512,88 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
         if (Frame > RangeEnd) { RangeEnd = Frame; bRangeUpdated = true; }
     };
 
-    if (KeyType == EKeyType::Float)
+    FString TrackType = TEXT("float");
+    ERenderTransformComponent TransformComponent = ERenderTransformComponent::None;
+    ERenderTransformComponent VectorTransformX = ERenderTransformComponent::None;
+    ERenderTransformComponent VectorTransformY = ERenderTransformComponent::None;
+
+    if (KeyType == EKeyType::Float && TryParseRenderTransformComponent(PropertyName, TransformComponent))
     {
-        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneFloatTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieScene2DTransformTrack::StaticClass(), WidgetGuid, FName(TEXT("RenderTransform")));
+        if (!Track)
+        {
+            Track = MovieScene->AddTrack(UMovieScene2DTransformTrack::StaticClass(), WidgetGuid);
+            Cast<UMovieScene2DTransformTrack>(Track)->SetPropertyNameAndPath(FName(TEXT("RenderTransform")), TEXT("RenderTransform"));
+        }
+        Track->Modify();
+
+        bool bSectionAdded = false;
+        UMovieSceneSection* Section = Cast<UMovieScene2DTransformTrack>(Track)->FindOrAddSection(0, bSectionAdded);
+        Section->SetRange(TRange<FFrameNumber>::All());
+
+        auto* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+        ExpandTransformMask(TransformSection, ToTransformMask(TransformComponent));
+
+        if (FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, TransformComponent))
+        {
+            for (const auto& Val : *KeysPtr)
+            {
+                auto KeyObj = Val->AsObject();
+                double Time = KeyObj->GetNumberField(TEXT("time"));
+                float Value = (float)KeyObj->GetNumberField(TEXT("value"));
+                FFrameNumber Frame = (Time * TickResolution).RoundToFrame();
+                Channel->AddCubicKey(Frame, Value);
+                UpdateRange(Frame);
+            }
+        }
+        TrackType = TEXT("2d_transform");
+    }
+    else if (KeyType == EKeyType::Vector2D && TryParseRenderTransformVectorProperty(PropertyName, VectorTransformX, VectorTransformY))
+    {
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieScene2DTransformTrack::StaticClass(), WidgetGuid, FName(TEXT("RenderTransform")));
+        if (!Track)
+        {
+            Track = MovieScene->AddTrack(UMovieScene2DTransformTrack::StaticClass(), WidgetGuid);
+            Cast<UMovieScene2DTransformTrack>(Track)->SetPropertyNameAndPath(FName(TEXT("RenderTransform")), TEXT("RenderTransform"));
+        }
+        Track->Modify();
+
+        bool bSectionAdded = false;
+        UMovieSceneSection* Section = Cast<UMovieScene2DTransformTrack>(Track)->FindOrAddSection(0, bSectionAdded);
+        Section->SetRange(TRange<FFrameNumber>::All());
+
+        auto* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+        ExpandTransformMask(TransformSection, ToTransformMask(VectorTransformX) | ToTransformMask(VectorTransformY));
+
+        FMovieSceneFloatChannel* XChannel = GetTransformChannel(TransformSection, VectorTransformX);
+        FMovieSceneFloatChannel* YChannel = GetTransformChannel(TransformSection, VectorTransformY);
+        if (XChannel && YChannel)
+        {
+            for (const auto& Val : *KeysPtr)
+            {
+                auto KeyObj = Val->AsObject();
+                double Time = KeyObj->GetNumberField(TEXT("time"));
+                auto ValueObj = KeyObj->GetObjectField(TEXT("value"));
+
+                float X = (float)ValueObj->GetNumberField(TEXT("x"));
+                float Y = (float)ValueObj->GetNumberField(TEXT("y"));
+                FFrameNumber Frame = (Time * TickResolution).RoundToFrame();
+
+                XChannel->AddCubicKey(Frame, X);
+                YChannel->AddCubicKey(Frame, Y);
+                UpdateRange(Frame);
+            }
+        }
+        TrackType = TEXT("2d_transform");
+    }
+    else if (KeyType == EKeyType::Float)
+    {
+        const FName TrackPropertyName = GetPropertyLeafName(PropertyName);
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneFloatTrack::StaticClass(), WidgetGuid, TrackPropertyName);
         if (!Track)
         {
             Track = MovieScene->AddTrack(UMovieSceneFloatTrack::StaticClass(), WidgetGuid);
-            Cast<UMovieSceneFloatTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
+            Cast<UMovieSceneFloatTrack>(Track)->SetPropertyNameAndPath(TrackPropertyName, PropertyName);
         }
         Track->Modify();
         
@@ -1080,13 +1614,15 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
     }
     else if (KeyType == EKeyType::Color)
     {
-        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneColorTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
+        const FName TrackPropertyName = GetPropertyLeafName(PropertyName);
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneColorTrack::StaticClass(), WidgetGuid, TrackPropertyName);
         if (!Track)
         {
             Track = MovieScene->AddTrack(UMovieSceneColorTrack::StaticClass(), WidgetGuid);
-            Cast<UMovieSceneColorTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
+            Cast<UMovieSceneColorTrack>(Track)->SetPropertyNameAndPath(TrackPropertyName, PropertyName);
         }
         Track->Modify();
+        TrackType = TEXT("color");
 
         bool bSectionAdded = false;
         UMovieSceneSection* Section = Cast<UMovieSceneColorTrack>(Track)->FindOrAddSection(0, bSectionAdded);
@@ -1116,14 +1652,16 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
     }
     else if (KeyType == EKeyType::Vector2D)
     {
-        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid, FName(*PropertyName));
+        const FName TrackPropertyName = GetPropertyLeafName(PropertyName);
+        UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid, TrackPropertyName);
         if (!Track)
         {
             Track = MovieScene->AddTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid);
-            Cast<UMovieSceneDoubleVectorTrack>(Track)->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
+            Cast<UMovieSceneDoubleVectorTrack>(Track)->SetPropertyNameAndPath(TrackPropertyName, PropertyName);
             Cast<UMovieSceneDoubleVectorTrack>(Track)->SetNumChannelsUsed(2); 
         }
         Track->Modify();
+        TrackType = TEXT("vector2d");
 
         bool bSectionAdded = false;
         UMovieSceneSection* Section = Cast<UMovieSceneDoubleVectorTrack>(Track)->FindOrAddSection(0, bSectionAdded);
@@ -1179,6 +1717,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetPropertyKeys(const TSharedP
     Result->SetStringField(TEXT("animation"), AnimationName);
     Result->SetStringField(TEXT("widget"), WidgetName);
     Result->SetStringField(TEXT("property"), PropertyName);
+    Result->SetStringField(TEXT("track_type"), TrackType);
     Result->SetNumberField(TEXT("keys_count"), KeysPtr->Num());
     return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
 }
@@ -1250,6 +1789,11 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::AppendWidgetTracks(const TShar
         TSharedPtr<FJsonObject> TrackSummary = MakeShared<FJsonObject>();
         TrackSummary->SetStringField(TEXT("property"), PropertyName);
         TrackSummary->SetNumberField(TEXT("keys_applied"), KeysPtr->Num());
+        FString TrackType;
+        if (SubResult->TryGetStringField(TEXT("track_type"), TrackType))
+        {
+            TrackSummary->SetStringField(TEXT("track_type"), TrackType);
+        }
         TrackSummaries.Add(MakeShared<FJsonValueObject>(TrackSummary));
     }
 
@@ -1358,25 +1902,6 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::AppendTimeSlice(const TSharedP
 
 TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSharedPtr<FJsonObject>& Params)
 {
-    // Simplified Implementation: Removes all tracks of a property for the scoped widget
-    FString ErrorMessage;
-    UWidgetBlueprint* Blueprint = FUmgMcpCommonUtils::GetTargetWidgetBlueprint(Params, ErrorMessage);
-    if (!Blueprint) return FUmgMcpCommonUtils::CreateErrorResponse(ErrorMessage);
-
-    // Resolve Context (Animation & Widget) ... (Similar to SetPropertyKeys)
-     FString AnimationName, WidgetName;
-    if (Params->HasField(TEXT("animation_name"))) Params->TryGetStringField(TEXT("animation_name"), AnimationName);
-    if (Params->HasField(TEXT("widget_name"))) Params->TryGetStringField(TEXT("widget_name"), WidgetName);
-    if (GEditor && (AnimationName.IsEmpty() || WidgetName.IsEmpty()))
-    {
-        if (auto* Sub = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
-        {
-            if (AnimationName.IsEmpty()) AnimationName = Sub->GetTargetAnimation();
-            if (WidgetName.IsEmpty()) WidgetName = Sub->GetTargetWidget();
-        }
-    }
-    if (AnimationName.IsEmpty() || WidgetName.IsEmpty()) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing context"));
-
     bool bConfirmed = false;
     Params->TryGetBoolField(TEXT("confirm_delete"), bConfirmed);
     if (!bConfirmed)
@@ -1384,18 +1909,27 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
         return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Deletion is hardened: set 'confirm_delete': true and prefer animation_delete_widget_keys for scoped removal."));
     }
 
-    FString PropertyName;
-    if (!Params->TryGetStringField(TEXT("property_name"), PropertyName)) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing property_name"));
-
-    // Find Animation
+    UWidgetBlueprint* Blueprint = nullptr;
     UWidgetAnimation* TargetAnimation = nullptr;
-    for (UWidgetAnimation* Anim : Blueprint->Animations) { if (Anim && Anim->GetName() == AnimationName) { TargetAnimation = Anim; break; } }
-    if (!TargetAnimation) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Animation not found"));
+    FString Error;
+    if (TSharedPtr<FJsonObject> Err = ResolveAnimationContext(Params, Blueprint, TargetAnimation, Error)) return Err;
+
+    FString WidgetName;
+    if (!ResolveWidgetName(Params, WidgetName))
+    {
+        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' for track deletion."));
+    }
+
+    FString PropertyName;
+    if (!Params->TryGetStringField(TEXT("property_name"), PropertyName) || PropertyName.IsEmpty())
+    {
+        return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Missing property_name"));
+    }
 
     UMovieScene* MovieScene = TargetAnimation->GetMovieScene();
+    if (!MovieScene) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("MovieScene is null"));
     MovieScene->Modify();
 
-    // Find Binding GUID
     FGuid WidgetGuid;
     for (int32 i = 0; i < MovieScene->GetPossessableCount(); ++i)
     {
@@ -1407,10 +1941,62 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
     }
     if (!WidgetGuid.IsValid()) return FUmgMcpCommonUtils::CreateErrorResponse(TEXT("Widget binding not found in animation"));
 
-    // Remove Track
     bool bFound = false;
-    
-    TArray<TSubclassOf<UMovieSceneTrack>> TrackTypes = { 
+    int32 RemovedTracks = 0;
+    int32 ClearedTransformChannels = 0;
+
+    ERenderTransformComponent TransformComponent = ERenderTransformComponent::None;
+    ERenderTransformComponent TransformVectorX = ERenderTransformComponent::None;
+    ERenderTransformComponent TransformVectorY = ERenderTransformComponent::None;
+    const bool bIsWholeRenderTransform = PropertyName.Equals(TEXT("RenderTransform"), ESearchCase::IgnoreCase);
+    const bool bIsTransformComponent = TryParseRenderTransformComponent(PropertyName, TransformComponent);
+    const bool bIsTransformVector = TryParseRenderTransformVectorProperty(PropertyName, TransformVectorX, TransformVectorY);
+
+    if (bIsWholeRenderTransform)
+    {
+        for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, UMovieScene2DTransformTrack::StaticClass(), WidgetGuid, TEXT("RenderTransform")))
+        {
+            MovieScene->RemoveTrack(*Track);
+            bFound = true;
+            ++RemovedTracks;
+        }
+    }
+    else if (bIsTransformComponent || bIsTransformVector)
+    {
+        TArray<ERenderTransformComponent> ComponentsToClear;
+        if (bIsTransformComponent)
+        {
+            ComponentsToClear.Add(TransformComponent);
+        }
+        if (bIsTransformVector)
+        {
+            ComponentsToClear.Add(TransformVectorX);
+            ComponentsToClear.Add(TransformVectorY);
+        }
+
+        for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, UMovieScene2DTransformTrack::StaticClass(), WidgetGuid, TEXT("RenderTransform")))
+        {
+            for (UMovieSceneSection* Section : Track->GetAllSections())
+            {
+                UMovieScene2DTransformSection* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+                if (!TransformSection) continue;
+
+                TransformSection->Modify();
+                for (ERenderTransformComponent Component : ComponentsToClear)
+                {
+                    FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, Component);
+                    if (!Channel) continue;
+
+                    Channel->Reset();
+                    ReduceTransformMask(TransformSection, ToTransformMask(Component));
+                    bFound = true;
+                    ++ClearedTransformChannels;
+                }
+            }
+        }
+    }
+
+    TArray<TSubclassOf<UMovieSceneTrack>> TrackTypes = {
         UMovieSceneFloatTrack::StaticClass(), 
         UMovieSceneColorTrack::StaticClass(), 
         UMovieSceneDoubleVectorTrack::StaticClass() 
@@ -1418,11 +2004,11 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
 
     for (auto Class : TrackTypes)
     {
-        UMovieSceneTrack* Track = MovieScene->FindTrack(Class, WidgetGuid, FName(*PropertyName));
-        if (Track)
+        for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, Class, WidgetGuid, PropertyName))
         {
             MovieScene->RemoveTrack(*Track);
             bFound = true;
+            ++RemovedTracks;
         }
     }
 
@@ -1440,9 +2026,11 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::RemovePropertyTrack(const TSha
         }
 
         TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
-        Result->SetStringField(TEXT("animation"), AnimationName);
+        Result->SetStringField(TEXT("animation"), TargetAnimation->GetName());
         Result->SetStringField(TEXT("widget"), WidgetName);
         Result->SetStringField(TEXT("property"), PropertyName);
+        Result->SetNumberField(TEXT("removed_tracks"), RemovedTracks);
+        Result->SetNumberField(TEXT("cleared_transform_channels"), ClearedTransformChannels);
         return FUmgMcpCommonUtils::CreateSuccessResponse(Result);
     }
     
@@ -1539,64 +2127,80 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteWidgetKeys(const TShared
         return MoveTemp(Indices);
     };
 
+    auto DeleteFloatChannelKeys = [&](FMovieSceneFloatChannel& Channel) -> int32
+    {
+        auto Times = Channel.GetData().GetTimes();
+        TArray<int32> Indices = CollectIndices(Times);
+        if (Indices.Num() == 0)
+        {
+            return 0;
+        }
+
+        TArray<FKeyHandle> Handles;
+        Handles.Reserve(Indices.Num());
+        for (int32 Index : Indices)
+        {
+            Handles.Add(Channel.GetHandle(Index));
+        }
+        Channel.DeleteKeys(Handles);
+        return Indices.Num();
+    };
+
+    auto DeleteDoubleChannelKeys = [&](FMovieSceneDoubleChannel& Channel) -> int32
+    {
+        auto Times = Channel.GetData().GetTimes();
+        TArray<int32> Indices = CollectIndices(Times);
+        if (Indices.Num() == 0)
+        {
+            return 0;
+        }
+
+        TArray<FKeyHandle> Handles;
+        Handles.Reserve(Indices.Num());
+        for (int32 Index : Indices)
+        {
+            Handles.Add(Channel.GetHandle(Index));
+        }
+        Channel.DeleteKeys(Handles);
+        return Indices.Num();
+    };
+
     bool bTrackFound = false;
     int32 RemovedKeys = 0;
 
     // Float track
-    if (UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneFloatTrack::StaticClass(), WidgetGuid, FName(*PropertyName)))
+    for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, UMovieSceneFloatTrack::StaticClass(), WidgetGuid, PropertyName))
     {
         bTrackFound = true;
         for (UMovieSceneSection* Section : Track->GetAllSections())
         {
             if (UMovieSceneFloatSection* FloatSection = Cast<UMovieSceneFloatSection>(Section))
             {
-                auto Times = FloatSection->GetChannel().GetData().GetTimes();
-                TArray<int32> Indices = CollectIndices(Times);
-                if (Indices.Num() > 0)
-                {
-                    TArray<FKeyHandle> Handles;
-                    Handles.Reserve(Indices.Num());
-                    for (int32 Index : Indices)
-                    {
-                        Handles.Add(FloatSection->GetChannel().GetHandle(Index));
-                    }
-                    FloatSection->GetChannel().DeleteKeys(Handles);
-                    RemovedKeys += Indices.Num();
-                }
+                RemovedKeys += DeleteFloatChannelKeys(FloatSection->GetChannel());
             }
         }
     }
 
     // Color track
-    if (UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneColorTrack::StaticClass(), WidgetGuid, FName(*PropertyName)))
+    for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, UMovieSceneColorTrack::StaticClass(), WidgetGuid, PropertyName))
     {
         bTrackFound = true;
         for (UMovieSceneSection* Section : Track->GetAllSections())
         {
             if (UMovieSceneColorSection* ColorSection = Cast<UMovieSceneColorSection>(Section))
             {
-                auto Times = ColorSection->GetRedChannel().GetData().GetTimes();
-                TArray<int32> Indices = CollectIndices(Times);
-                if (Indices.Num() > 0)
-                {
-                    TArray<FKeyHandle> Handles;
-                    Handles.Reserve(Indices.Num());
-                    for (int32 Index : Indices)
-                    {
-                        Handles.Add(ColorSection->GetRedChannel().GetHandle(Index));
-                    }
-                    ColorSection->GetRedChannel().DeleteKeys(Handles);
-                    ColorSection->GetGreenChannel().DeleteKeys(Handles);
-                    ColorSection->GetBlueChannel().DeleteKeys(Handles);
-                    ColorSection->GetAlphaChannel().DeleteKeys(Handles);
-                    RemovedKeys += Indices.Num();
-                }
+                int32 RemovedFromColor = 0;
+                RemovedFromColor = FMath::Max(RemovedFromColor, DeleteFloatChannelKeys(ColorSection->GetRedChannel()));
+                RemovedFromColor = FMath::Max(RemovedFromColor, DeleteFloatChannelKeys(ColorSection->GetGreenChannel()));
+                RemovedFromColor = FMath::Max(RemovedFromColor, DeleteFloatChannelKeys(ColorSection->GetBlueChannel()));
+                RemovedFromColor = FMath::Max(RemovedFromColor, DeleteFloatChannelKeys(ColorSection->GetAlphaChannel()));
+                RemovedKeys += RemovedFromColor;
             }
         }
     }
 
     // Vector2D track
-    if (UMovieSceneTrack* Track = MovieScene->FindTrack(UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid, FName(*PropertyName)))
+    for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, UMovieSceneDoubleVectorTrack::StaticClass(), WidgetGuid, PropertyName))
     {
         bTrackFound = true;
         for (UMovieSceneSection* Section : Track->GetAllSections())
@@ -1607,20 +2211,57 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::DeleteWidgetKeys(const TShared
                 TArrayView<FMovieSceneDoubleChannel*> Channels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
                 if (Channels.Num() >= 2)
                 {
-                auto Times = Channels[0]->GetData().GetTimes();
-                TArray<int32> Indices = CollectIndices(Times);
-                if (Indices.Num() > 0)
-                    {
-                    TArray<FKeyHandle> Handles;
-                    Handles.Reserve(Indices.Num());
-                    for (int32 Index : Indices)
-                    {
-                        Handles.Add(Channels[0]->GetHandle(Index));
-                    }
-                    Channels[0]->DeleteKeys(Handles);
-                    Channels[1]->DeleteKeys(Handles);
-                        RemovedKeys += Indices.Num();
-                    }
+                    int32 RemovedFromVector = 0;
+                    RemovedFromVector = FMath::Max(RemovedFromVector, DeleteDoubleChannelKeys(*Channels[0]));
+                    RemovedFromVector = FMath::Max(RemovedFromVector, DeleteDoubleChannelKeys(*Channels[1]));
+                    RemovedKeys += RemovedFromVector;
+                }
+            }
+        }
+    }
+
+    TArray<ERenderTransformComponent> TransformComponentsToDelete;
+    ERenderTransformComponent TransformComponent = ERenderTransformComponent::None;
+    ERenderTransformComponent TransformVectorX = ERenderTransformComponent::None;
+    ERenderTransformComponent TransformVectorY = ERenderTransformComponent::None;
+    if (PropertyName.Equals(TEXT("RenderTransform"), ESearchCase::IgnoreCase))
+    {
+        TransformComponentsToDelete = {
+            ERenderTransformComponent::TranslationX,
+            ERenderTransformComponent::TranslationY,
+            ERenderTransformComponent::Angle,
+            ERenderTransformComponent::ScaleX,
+            ERenderTransformComponent::ScaleY,
+            ERenderTransformComponent::ShearX,
+            ERenderTransformComponent::ShearY
+        };
+    }
+    else if (TryParseRenderTransformComponent(PropertyName, TransformComponent))
+    {
+        TransformComponentsToDelete.Add(TransformComponent);
+    }
+    else if (TryParseRenderTransformVectorProperty(PropertyName, TransformVectorX, TransformVectorY))
+    {
+        TransformComponentsToDelete.Add(TransformVectorX);
+        TransformComponentsToDelete.Add(TransformVectorY);
+    }
+
+    if (TransformComponentsToDelete.Num() > 0)
+    {
+        for (UMovieSceneTrack* Track : FindMatchingPropertyTracks(MovieScene, UMovieScene2DTransformTrack::StaticClass(), WidgetGuid, TEXT("RenderTransform")))
+        {
+            bTrackFound = true;
+            for (UMovieSceneSection* Section : Track->GetAllSections())
+            {
+                UMovieScene2DTransformSection* TransformSection = Cast<UMovieScene2DTransformSection>(Section);
+                if (!TransformSection) continue;
+
+                for (ERenderTransformComponent Component : TransformComponentsToDelete)
+                {
+                    FMovieSceneFloatChannel* Channel = GetTransformChannel(TransformSection, Component);
+                    if (!Channel) continue;
+
+                    RemovedKeys += DeleteFloatChannelKeys(*Channel);
                 }
             }
         }
