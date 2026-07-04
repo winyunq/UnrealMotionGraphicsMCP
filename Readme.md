@@ -269,39 +269,25 @@ Notes:
 - Write paths are union/overwrite only—no implicit deletion. Use `animation_delete_widget_keys` with `confirm_delete=true` for scoped removals.
 - Responses now include counts/timeline context so every sequencer MCP returns actionable data.
 
-## UMG Material API Status (New: The 5 Core Pillars Strategy)
+## UMG Material API Status
 
-| Category                | API Name                       |  Status   | Description                                                                                     |
-| ----------------------- | ------------------------------ | :-------: | ----------------------------------------------------------------------------------------------- |
-| **P0: Context**         | `material_set_target`          |     ✅     | **Anchor**: Specify target asset (path or parent). Required for stateful editing.               |
-| **P1: Def & Query**     | `material_define_variable`     |     ✅     | Define external interface parameters (Def, not wire). Supports Scalar, Vector, Texture.         |
-| **P2: Symbol Place**    | `material_add_node`            |     ✅     | **Drag Symbol**: Place a symbol from lib into graph and assign a unique instance handle.        |
-|                         | `material_get_graph`           |     ✅     | Query existence and state of node instances in the graph.                                       |
-| **P3: Connectivity**    | `material_connect_nodes`       |     ✅     | **Natural Connection**: Establish node-to-node functional flow (A -> B).                        |
-|                         | `material_connect_pins`        |     ✅     | **Surgical Wiring**: Manually connect specific pins for complex topologies.                     |
-| **P4: Lib Search**      | `material_search_library`      | 🚧 Planned | Search for available Material Expressions (symbols) and Functions.                              |
-| **P5: Tactical Detail** | `material_set_hlsl_node_io`    |     ✅     | **Tactical Code**: Inject HLSL into Custom nodes and sync IO pins via JSON mapping.             |
-|                         | `material_set_node_properties` |     ✅     | **Property Editing**: Set internal properties for regular nodes (e.g. Constant Value, Texture). |
-| **Lifecycle**           | `material_compile_asset`       |     ✅     | Submit changes and analyze HLSL compilation errors.                                             |
-| **Maintenance**         | `material_delete`              |     ✅     | Delete node instances or clean up logic by unique handle.                                       |
-|                         | `material_get_pins`            |     ✅     | Introspect pins for a specific node handle.                                                     |
-
-## UMG HLSL MCP API Status (New: Text-Edit Loop for UMG)
-
-| Command             | Status | Description                                                                                                                           |
-| ------------------- | :----: | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `hlsl_set_target`   |   ✅    | Lock/create HLSL target material. Validates UI-domain + single Custom node topology; can request confirmation before overwrite.     |
-| `hlsl_get`          |   ✅    | Read current HLSL code and structured input parameters from the single Custom node.                                                  |
-| `hlsl_set`          |   ✅    | Incremental update of HLSL and/or parameters. Deletion is explicit (`delete: true`) to avoid accidental destructive edits.           |
-| `hlsl_compile`      |   ✅    | Compile current HLSL target and return concise diagnostics for AI post-processing.                                                   |
+| Command           | Status | Description                                                                                                      |
+| ----------------- | :----: | ---------------------------------------------------------------------------------------------------------------- |
+| `hlsl_set_target` |   ✅    | Lock/create the HLSL target material. New assets default to UI; pass type fields for non-UMG materials.          |
+| `hlsl_get`        |   ✅    | Read current HLSL code, structured parameters, and the semantic output contract.                                  |
+| `hlsl_set`        |   ✅    | Union-style write for HLSL, parameters, and extra outputs: overwrite existing items and append missing ones.      |
+| `hlsl_delete`     |   ✅    | Explicitly delete HLSL parameters or outputs with `confirm_delete=true`; add `kind` only when a name is ambiguous. |
+| `hlsl_compile`    |   ✅    | Compile current HLSL target and return concise diagnostics for AI post-processing.                                |
 
 ### HLSL Protocol Contract (UMG-Optimized)
 
 - Material is treated as a single HLSL program.
 - Backend assumes HLSL returns `float4`.
-- Output auto-wiring is fixed: `.rgb -> FinalColor`, `.a -> Opacity`.
+- Output auto-wiring is semantic: UI/Post Process/Light Function/Unlit routes rgb to `EmissiveColor`; Lit Surface routes rgb to `BaseColor`; alpha only connects to `Opacity` or `OpacityMask` when needed.
+- Extra material outputs use UE 5.8 Custom node `AdditionalOutputs`, so one HLSL block can drive `Roughness`, `Metallic`, `Normal`, `WorldPositionOffset`, and similar root outputs.
 - Input parameters are returned as structured descriptors (`name`, `kind`, `source_handle`) for learning/replay by AI agents.
-- `hlsl_set` is safety-biased: writing is easy, deletion must be explicit.
+- `hlsl_set` only performs union overwrite/append operations. Deletion must use `hlsl_delete(confirm_delete=true)`.
+- Low-level `material_*` graph tools are kept as a compatibility layer, but the Material ToolMode exposes the HLSL loop by default.
 
 ## UMG Style & Theming API Status (New)
 

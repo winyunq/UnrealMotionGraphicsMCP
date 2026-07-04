@@ -1,5 +1,6 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Bridge/UmgMcpBridge.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "Bridge/UmgMcpConfig.h"
 #include "UmgMcp.h"
 #include "Bridge/MCPServerRunnable.h"
@@ -242,7 +243,7 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
 {
     UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Received command: %s"), *CommandType);
     
-    // If we are already on the GameThread (e.g. called from FabServer or test), execute directly
+    // If we are already on the GameThread (e.g. internal call or test), execute directly
     if (IsInGameThread())
     {
         UE_LOG(LogUmgMcp, Verbose, TEXT("UmgMcpBridge: Already on GameThread, executing directly."));
@@ -490,7 +491,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         {
             ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
         }
-        // Material Commands (New 5 Pillars)
+        // Material commands
         else if (CommandType.StartsWith(TEXT("material_")) || CommandType.StartsWith(TEXT("hlsl_")))
         {
              ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
@@ -522,7 +523,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                          // Copy existing fields
                          for (auto& Elem : Params->Values)
                          {
-                             ModifiedParams->SetField(Elem.Key, Elem.Value);
+                             ModifiedParams->SetField(UmgMcpJsonCompat::KeyToString(Elem.Key), Elem.Value);
                          }
 
                          FString SubAction;
@@ -681,7 +682,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
             ResponseJson->SetStringField(TEXT("status"), TEXT("success"));
             for (const auto& Field : ResultJson->Values)
             {
-                const FString& Key = Field.Key;
+                const FString Key = UmgMcpJsonCompat::KeyToString(Field.Key);
                 if (Key != TEXT("success") && Key != TEXT("status"))
                 {
                     ResponseJson->SetField(Key, Field.Value);
@@ -690,9 +691,17 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         }
         else
         {
-            // Set error status and include the error message
+            // Preserve structured error metadata so clients can recover without reparsing text.
             ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
             ResponseJson->SetStringField(TEXT("error"), ErrorMessage);
+            for (const auto& Field : ResultJson->Values)
+            {
+                const FString Key = UmgMcpJsonCompat::KeyToString(Field.Key);
+                if (Key != TEXT("success") && Key != TEXT("status") && Key != TEXT("error"))
+                {
+                    ResponseJson->SetField(Key, Field.Value);
+                }
+            }
         }
     }
     catch (const std::exception& e)

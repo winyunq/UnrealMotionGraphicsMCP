@@ -1,5 +1,6 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Animation/UmgMcpSequencerCommands.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "Bridge/UmgMcpCommonUtils.h"
 #include "UmgMcp.h"
 #include "WidgetBlueprint.h"
@@ -1307,7 +1308,7 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::AppendTimeSlice(const TSharedP
         int32 WidgetKeys = 0;
         for (const auto& PropertyPair : PropertiesObj->Values)
         {
-            FString PropertyName = PropertyPair.Key;
+            FString PropertyName = UmgMcpJsonCompat::KeyToString(PropertyPair.Key);
             TSharedPtr<FJsonObject> KeyObj = MakeShared<FJsonObject>();
             KeyObj->SetNumberField(TEXT("time"), TimeSeconds);
             KeyObj->SetField(TEXT("value"), PropertyPair.Value);

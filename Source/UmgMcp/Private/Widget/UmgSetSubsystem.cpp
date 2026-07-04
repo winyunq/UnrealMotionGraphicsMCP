@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 
 #include "Widget/UmgSetSubsystem.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "FileManage/UmgAttentionSubsystem.h"
 #include "Editor.h"
 #include "WidgetBlueprint.h"
@@ -66,7 +67,16 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     
     // 2. Extract and expand aliases in NormalizedProperties
     TArray<FString> CurrentKeys;
-    NormalizedProperties->Values.GetKeys(CurrentKeys);
+    auto RefreshCurrentKeys = [&CurrentKeys, &NormalizedProperties]()
+    {
+        CurrentKeys.Reset();
+        for (const auto& Field : NormalizedProperties->Values)
+        {
+            CurrentKeys.Add(UmgMcpJsonCompat::KeyToString(Field.Key));
+        }
+    };
+
+    RefreshCurrentKeys();
     for (const FString& Key : CurrentKeys)
     {
         if (Key.StartsWith(TEXT("Slot."), ESearchCase::IgnoreCase))
@@ -95,7 +105,8 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             // [智能反射匹配失败]：安全降级，进入 Canvas 别名处理层判断
             if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
             {
-                TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
+                if (!Val.IsValid()) continue;
                 if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Left"), Val->AsArray()[0]);
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Top"), Val->AsArray()[1]);
@@ -104,7 +115,8 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             }
             else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
             {
-                TSharedPtr<FJsonValue> Val = NormalizedProperties->Values[Key];
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
+                if (!Val.IsValid()) continue;
                 if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Right"), Val->AsArray()[0]);
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Bottom"), Val->AsArray()[1]);
@@ -113,12 +125,16 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             }
             else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
             {
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), NormalizedProperties->Values[Key]);
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
+                if (!Val.IsValid()) continue;
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), Val);
                 NormalizedProperties->RemoveField(Key);
             }
             else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
             {
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), NormalizedProperties->Values[Key]);
+                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
+                if (!Val.IsValid()) continue;
+                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), Val);
                 NormalizedProperties->RemoveField(Key);
             }
         }
@@ -133,7 +149,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     }
 
     // Re-scan for any dotted keys (including expanded aliases)
-    NormalizedProperties->Values.GetKeys(CurrentKeys);
+    RefreshCurrentKeys();
     for (const FString& FullKey : CurrentKeys)
     {
         if (FullKey.Contains(TEXT(".")))
@@ -163,7 +179,9 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
                     TargetObj = ConstCastSharedPtr<FJsonObject>(*ExistingObj);
                 }
             }
-            TargetObj->SetField(Parts.Last(), NormalizedProperties->Values[FullKey]);
+            TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(FullKey);
+            if (!Val.IsValid()) continue;
+            TargetObj->SetField(Parts.Last(), Val);
             NormalizedProperties->RemoveField(FullKey);
         }
     }
@@ -212,7 +230,8 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     {
         for (const auto& Pair : NormalizedProperties->Values)
         {
-            FProperty* Prop = FoundWidget->GetClass()->FindPropertyByName(FName(*Pair.Key));
+            const FString PropertyName = UmgMcpJsonCompat::KeyToString(Pair.Key);
+            FProperty* Prop = FoundWidget->GetClass()->FindPropertyByName(FName(*PropertyName));
             if (!Prop) continue;
 
             // SPECIAL CASE: Auto-resolve Object Pointers from paths
@@ -232,7 +251,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
 
             // Fallback: Use standard converter for this specific field
             TSharedPtr<FJsonObject> SinglePropJson = MakeShared<FJsonObject>();
-            SinglePropJson->SetField(Pair.Key, Pair.Value);
+            SinglePropJson->SetField(PropertyName, Pair.Value);
             FJsonObjectConverter::JsonObjectToUStruct(SinglePropJson.ToSharedRef(), FoundWidget->GetClass(), FoundWidget, 0, 0);
         }
     }

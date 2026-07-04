@@ -308,7 +308,7 @@ async def get_creatable_widget_types() -> Dict[str, Any]:
     (Description loaded from prompts.json)
     """
     # Per user instruction, return a philosophical guide instead of a fixed list.
-    # This encourages the AI to experiment based on its own knowledge.
+    # This encourages the AI to experiment based on its knowledge.
     return {
         "status": "success",
         "result": {
@@ -1036,7 +1036,7 @@ async def animation_delete_widget_keys(property_name: str, times: List[float], w
 
 
 # =============================================================================
-#  Category: Material (New - 5 Pillars API)
+#  Category: Material
 # =============================================================================
 
 @register_tool("material_set_target", "Specify target asset (path or parent). Required for stateful editing.")
@@ -1047,6 +1047,22 @@ async def material_set_target(path: str, create_if_not_found: bool = True) -> Di
     conn = get_unreal_connection()
     material_client = UMGMaterial.UMGMaterial(conn)
     return await material_client.set_target_material(path, create_if_not_found)
+
+@register_tool("material_modify_type", "Modify the active material type for non-UMG materials.")
+async def material_modify_type(
+    path: Optional[str] = None,
+    domain: Optional[str] = None,
+    blend_mode: Optional[str] = None,
+    shading_model: Optional[str] = None,
+    two_sided: Optional[bool] = None,
+    refresh_hlsl_wiring: bool = True
+) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.modify_type(path, domain, blend_mode, shading_model, two_sided, refresh_hlsl_wiring)
 
 @register_tool("material_define_variable", "Define external interface parameters (Scalar, Vector, Texture).")
 async def material_define_variable(name: str, type: str) -> Dict[str, Any]:
@@ -1140,13 +1156,21 @@ async def material_get_graph() -> Dict[str, Any]:
 
 
 @register_tool("hlsl_set_target", "Set HLSL editing target material; supports create/overwrite flow.")
-async def hlsl_set_target(path: str, confirm_overwrite: bool = False, create_if_not_found: bool = True) -> Dict[str, Any]:
+async def hlsl_set_target(
+    path: str,
+    confirm_overwrite: bool = False,
+    create_if_not_found: bool = True,
+    domain: Optional[str] = None,
+    blend_mode: Optional[str] = None,
+    shading_model: Optional[str] = None,
+    two_sided: Optional[bool] = None
+) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     material_client = UMGMaterial.UMGMaterial(conn)
-    return await material_client.hlsl_set_target(path, confirm_overwrite, create_if_not_found)
+    return await material_client.hlsl_set_target(path, confirm_overwrite, create_if_not_found, domain, blend_mode, shading_model, two_sided)
 
 
 @register_tool("hlsl_get", "Read current HLSL code and parameter definitions.")
@@ -1159,14 +1183,48 @@ async def hlsl_get() -> Dict[str, Any]:
     return await material_client.hlsl_get()
 
 
-@register_tool("hlsl_set", "Incrementally update HLSL code and/or parameter list with explicit delete semantics.")
-async def hlsl_set(hlsl: Optional[str] = None, parameters: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+@register_tool("hlsl_set", "Incrementally apply HLSL code, parameters, and/or outputs; union-only, no deletion.")
+async def hlsl_set(
+    hlsl: Optional[str] = None,
+    parameters: Optional[List[Dict[str, Any]]] = None,
+    outputs: Optional[List[Any]] = None
+) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     material_client = UMGMaterial.UMGMaterial(conn)
-    return await material_client.hlsl_set(hlsl, parameters)
+    return await material_client.hlsl_set(hlsl, parameters, outputs)
+
+
+@register_tool("hlsl_delete_parameter", "Explicitly delete HLSL parameters from the active HLSL material target.")
+async def hlsl_delete_parameter(names: List[str], confirm_delete: bool = False) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_delete_parameter(names, confirm_delete)
+
+
+@register_tool("hlsl_delete", "Explicitly delete HLSL parameters or outputs from the active HLSL material target.")
+async def hlsl_delete(names: List[str], confirm_delete: bool = False, kind: Optional[str] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_delete(names, confirm_delete, kind)
+
+
+@register_tool("hlsl_delete_output", "Explicitly delete HLSL outputs from the active HLSL material target.")
+async def hlsl_delete_output(names: List[str], confirm_delete: bool = False) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    material_client = UMGMaterial.UMGMaterial(conn)
+    return await material_client.hlsl_delete_output(names, confirm_delete)
 
 
 @register_tool("hlsl_compile", "Compile current HLSL material target and return concise diagnostics.")

@@ -1,5 +1,6 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Material/UmgMcpMaterialSubsystem.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Factories/MaterialFactoryNew.h"
 #include "Materials/Material.h"
@@ -115,7 +116,7 @@ FString UUmgMcpMaterialSubsystem::SetTargetMaterial(const FString& AssetPath, bo
         if (NewMat)
         {
             // Set Default Config for UMG
-            NewMat->MaterialDomain = MD_UI;
+            NewMat->MaterialDomain = EMaterialDomain::MD_UI;
             NewMat->BlendMode = BLEND_Translucent;
             
             FAssetRegistryModule::AssetCreated(NewMat);
@@ -319,7 +320,7 @@ FExpressionInput* FindInputProperty(UObject* Owner, const FString& PinName)
     {
         if (SearchName.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
         {
-            SearchName = (Mat->MaterialDomain == MD_UI) ? TEXT("EmissiveColor") : TEXT("BaseColor");
+            SearchName = (Mat->MaterialDomain == EMaterialDomain::MD_UI) ? TEXT("EmissiveColor") : TEXT("BaseColor");
         }
         else if (SearchName.Equals(TEXT("FinalColor"), ESearchCase::IgnoreCase) || SearchName.Equals(TEXT("最终颜色"), ESearchCase::IgnoreCase))
         {
@@ -376,6 +377,27 @@ FExpressionInput* FindInputProperty(UObject* Owner, const FString& PinName)
         }
     }
     return nullptr;
+}
+
+static int32 ResolveExpressionOutputIndex(UMaterialExpression* Expression, const FString& PinName)
+{
+    if (!Expression || PinName.IsEmpty() || PinName.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
+    {
+        return 0;
+    }
+
+    if (UMaterialExpressionCustom* CustomNode = Cast<UMaterialExpressionCustom>(Expression))
+    {
+        for (int32 i = 0; i < CustomNode->AdditionalOutputs.Num(); ++i)
+        {
+            if (CustomNode->AdditionalOutputs[i].OutputName.ToString().Equals(PinName, ESearchCase::IgnoreCase))
+            {
+                return i + 1;
+            }
+        }
+    }
+
+    return 0;
 }
 
 bool UUmgMcpMaterialSubsystem::ConnectNodes(const FString& FromHandle, const FString& ToHandle)
@@ -453,27 +475,42 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
 
         // 3. Find Output Pin on Source
         UEdGraphPin* SourcePin = nullptr;
+        int32 SourceOutputIndex = 0;
         if (FromPin.IsEmpty() || FromPin.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
         {
             // If empty or named "Output", take the first output pin found
+            int32 OutputIndex = 0;
             for (UEdGraphPin* Pin : SourceGraphNode->Pins)
             {
+                if (Pin->Direction != EGPD_Output)
+                {
+                    continue;
+                }
                 if (Pin->Direction == EGPD_Output)
                 {
                     SourcePin = Pin;
+                    SourceOutputIndex = OutputIndex;
                     break;
                 }
+                ++OutputIndex;
             }
         }
         else
         {
+            int32 OutputIndex = 0;
             for (UEdGraphPin* Pin : SourceGraphNode->Pins)
             {
-                if (Pin->Direction == EGPD_Output && Pin->PinName.ToString().Equals(FromPin, ESearchCase::IgnoreCase))
+                if (Pin->Direction != EGPD_Output)
+                {
+                    continue;
+                }
+                if (Pin->PinName.ToString().Equals(FromPin, ESearchCase::IgnoreCase))
                 {
                     SourcePin = Pin;
+                    SourceOutputIndex = OutputIndex;
                     break;
                 }
+                ++OutputIndex;
             }
         }
 
@@ -491,7 +528,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
         FString CleanPinName = TargetPinName.TrimStartAndEnd().Replace(TEXT(" "), TEXT(""));
         if (CleanPinName.IsEmpty() || CleanPinName.Equals(TEXT("Output"), ESearchCase::IgnoreCase))
         {
-            TargetPinName = (Mat->MaterialDomain == MD_UI) ? TEXT("EmissiveColor") : TEXT("BaseColor");
+            TargetPinName = (Mat->MaterialDomain == EMaterialDomain::MD_UI) ? TEXT("EmissiveColor") : TEXT("BaseColor");
         }
         else if (CleanPinName.Equals(TEXT("FinalColor"), ESearchCase::IgnoreCase) || CleanPinName.Equals(TEXT("最终颜色"), ESearchCase::IgnoreCase))
         {
@@ -620,7 +657,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
         if (DataInput && SourceGraphNode->MaterialExpression)
         {
             DataInput->Expression = SourceGraphNode->MaterialExpression;
-            DataInput->OutputIndex = 0;
+            DataInput->OutputIndex = SourceOutputIndex;
             UE_LOG(LogTemp, Log, TEXT("[MaterialSubsystem] ConnectPins: Data-layer synced for Root.%s"), *TargetPinName);
         }
 
@@ -643,7 +680,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
         if (InputPtr)
         {
             InputPtr->Expression = FromExpr;
-            InputPtr->OutputIndex = 0;
+            InputPtr->OutputIndex = ResolveExpressionOutputIndex(FromExpr, FromPin);
             
             Mat->PostEditChange();
             Mat->MarkPackageDirty();
@@ -707,7 +744,7 @@ bool UUmgMcpMaterialSubsystem::ConnectPins(const FString& FromHandle, const FStr
         if (InputPtr)
         {
             InputPtr->Expression = FromNode;
-            InputPtr->OutputIndex = 0;
+            InputPtr->OutputIndex = ResolveExpressionOutputIndex(FromNode, FromPin);
             
             // UE_LOG(LogTemp, Warning, TEXT("[ConnectPins] Reflection: Connected %s -> %s"), *FromHandle, *ToHandle);
             
@@ -787,7 +824,7 @@ bool UUmgMcpMaterialSubsystem::SetNodeProperties(const FString& NodeHandle, cons
     // Use Reflection to apply properties
     for (const auto& Elem : Properties->Values)
     {
-        FString PropName = Elem.Key;
+        FString PropName = UmgMcpJsonCompat::KeyToString(Elem.Key);
         TSharedPtr<FJsonValue> JsonVal = Elem.Value;
         
         FProperty* Prop = TargetObject->GetClass()->FindPropertyByName(*PropName);
@@ -969,7 +1006,7 @@ bool UUmgMcpMaterialSubsystem::SetOutputNode(const FString& NodeHandle)
         }
 
         // Also try to connect to Opacity if available (for translucent UI materials)
-        if (bSuccess && Mat->MaterialDomain == MD_UI)
+        if (bSuccess && Mat->MaterialDomain == EMaterialDomain::MD_UI)
         {
             for (UEdGraphPin* Pin : RootNode->Pins)
             {

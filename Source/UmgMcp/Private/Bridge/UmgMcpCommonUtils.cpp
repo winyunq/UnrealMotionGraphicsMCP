@@ -1,5 +1,6 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Bridge/UmgMcpCommonUtils.h"
+#include "Bridge/UmgMcpJsonCompat.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Blueprint.h"
 #include "EdGraph/EdGraph.h"
@@ -50,7 +51,7 @@ TSharedPtr<FJsonObject> FUmgMcpCommonUtils::CreateSuccessResponse(const TSharedP
         // Merge data fields directly instead of nesting under "data"
         for (const auto& Field : Data->Values)
         {
-            ResponseObject->SetField(Field.Key, Field.Value);
+            ResponseObject->SetField(UmgMcpJsonCompat::KeyToString(Field.Key), Field.Value);
         }
     }
     

@@ -5,7 +5,7 @@ logger = logging.getLogger("UmgMcpServer")
 
 class UMGMaterial:
     """
-    Client for the 'Material' category of commands (5 Pillars API).
+    Client for the 'Material' category of commands.
     """
     def __init__(self, connection):
         self.connection = connection
@@ -16,6 +16,28 @@ class UMGMaterial:
         # We can still pass it if we want, but user asked to simplify.
         # Let's just pass path.
         return await self.connection.send_command("material_set_target", params)
+
+    async def modify_type(
+        self,
+        path: Optional[str] = None,
+        domain: Optional[str] = None,
+        blend_mode: Optional[str] = None,
+        shading_model: Optional[str] = None,
+        two_sided: Optional[bool] = None,
+        refresh_hlsl_wiring: bool = True
+    ) -> dict:
+        params: Dict[str, Any] = {"refresh_hlsl_wiring": refresh_hlsl_wiring}
+        if path:
+            params["path"] = path
+        if domain is not None:
+            params["domain"] = domain
+        if blend_mode is not None:
+            params["blend_mode"] = blend_mode
+        if shading_model is not None:
+            params["shading_model"] = shading_model
+        if two_sided is not None:
+            params["two_sided"] = two_sided
+        return await self.connection.send_command("material_modify_type", params)
 
     async def define_variable(self, name: str, type: str) -> dict:
         return await self.connection.send_command("material_define_variable", {"name": name, "type": type})
@@ -75,23 +97,69 @@ class UMGMaterial:
     # ------------------------------
     # HLSL streamlined protocol
     # ------------------------------
-    async def hlsl_set_target(self, path: str, confirm_overwrite: bool = False, create_if_not_found: bool = True) -> dict:
-        return await self.connection.send_command("hlsl_set_target", {
+    async def hlsl_set_target(
+        self,
+        path: str,
+        confirm_overwrite: bool = False,
+        create_if_not_found: bool = True,
+        domain: Optional[str] = None,
+        blend_mode: Optional[str] = None,
+        shading_model: Optional[str] = None,
+        two_sided: Optional[bool] = None
+    ) -> dict:
+        params: Dict[str, Any] = {
             "path": path,
             "confirm_overwrite": confirm_overwrite,
             "create_if_not_found": create_if_not_found
-        })
+        }
+        if domain is not None:
+            params["domain"] = domain
+        if blend_mode is not None:
+            params["blend_mode"] = blend_mode
+        if shading_model is not None:
+            params["shading_model"] = shading_model
+        if two_sided is not None:
+            params["two_sided"] = two_sided
+        return await self.connection.send_command("hlsl_set_target", params)
 
     async def hlsl_get(self) -> dict:
         return await self.connection.send_command("hlsl_get", {})
 
-    async def hlsl_set(self, hlsl: Optional[str] = None, parameters: Optional[List[Dict[str, Any]]] = None) -> dict:
+    async def hlsl_set(
+        self,
+        hlsl: Optional[str] = None,
+        parameters: Optional[List[Dict[str, Any]]] = None,
+        outputs: Optional[List[Any]] = None
+    ) -> dict:
         params: Dict[str, Any] = {}
         if hlsl is not None:
             params["hlsl"] = hlsl
         if parameters is not None:
             params["parameters"] = parameters
+        if outputs is not None:
+            params["outputs"] = outputs
         return await self.connection.send_command("hlsl_set", params)
+
+    async def hlsl_delete_parameter(self, names: List[str], confirm_delete: bool = False) -> dict:
+        return await self.connection.send_command("hlsl_delete_parameter", {
+            "names": names,
+            "confirm_delete": confirm_delete
+        })
+
+    async def hlsl_delete(self, names: List[str], confirm_delete: bool = False, kind: Optional[str] = None) -> dict:
+        params: Dict[str, Any] = {
+            "names": names,
+            "confirm_delete": confirm_delete
+        }
+        if kind is not None:
+            params["kind"] = kind
+        return await self.connection.send_command("hlsl_delete", params)
+
+    async def hlsl_delete_output(self, names: List[str], confirm_delete: bool = False) -> dict:
+        return await self.connection.send_command("hlsl_delete_output", {
+            "names": names,
+            "confirm_delete": confirm_delete
+        })
 
     async def hlsl_compile(self) -> dict:
         return await self.connection.send_command("hlsl_compile", {})
