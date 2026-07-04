@@ -219,15 +219,19 @@ flowchart LR
 |                    | `get_creatable_widget_types`     |   ✅   | 获取所有可创建的控件类名列表。                                                                  |
 |                    | `get_widget_schema`              |   ✅   | 获取指定控件类的属性 Schema。                                                                   |
 |                    | `get_layout_data`                |   ✅   | 获取所有控件在视口中的布局包围盒坐标。                                                          |
-|                    | `check_widget_overlap`           |   ✅   | 校验当前资产中的控件是否存在空间重叠。                                                          |
+|                    | `check_widget_overlap`           | 隐藏  | 诊断兼容工具；默认提示面不暴露。                                                                |
 | **动作与修改**     | `create_widget`                  |   ✅   | 创建新的控件。                                                                                  |
-|                    | `delete_widget`                  |   ✅   | 删除指定的控件。                                                                                |
+|                    | `delete_widget`                  |   ✅   | 显式删除指定控件；必须传入 `confirm_delete=true`。                                              |
 |                    | `set_widget_properties`          |   ✅   | 设置控件属性（widget_name 缺省时默认修改当前 target；采用并集覆盖写入）。                        |
-|                    | `reparent_widget`                |   ✅   | 重新指定控件的父级。                                                                            |
+|                    | `reparent_widget`                |   ✅   | 转换/移动控件，并尽可能保留子控件；可能丢失子控件的场景会失败。                                 |
 |                    | `save_asset`                     |   ✅   | 保存当前活跃的 UMG 资产。                                                                       |
-| **文件转换**       | `export_umg_to_json`             |   ✅   | 将 UMG 资产反编译导出为 JSON 格式。                                                             |
-|                    | `apply_json_to_umg`              |   ✅   | 将 JSON 布局定义应用到 UMG 资产中。                                                             |
 |                    | `apply_layout`                   |   ✅   | 应用整盘的 HTML/JSON 布局代码。                                                                 |
+| **隐藏兼容命令**   | `export_umg_to_json`             | 隐藏  | 完整 JSON 导出，仅用于调试/兼容，不属于默认语义读流程。                                         |
+|                    | `apply_json_to_umg`              | 隐藏  | 兼容批量 JSON 应用；默认应使用 `apply_layout`。                                                 |
+
+说明：
+- UMG 写操作采用追加/upsert 语义：`create_widget` 创建缺失控件，`set_widget_properties` 只覆盖传入属性。
+- 删除是显式且加固的：`delete_widget` 未传 `confirm_delete=true` 时必须失败。
 
 
 ## UMG 蓝图 (Blueprint) API 实现状态（过渡期）

@@ -220,15 +220,19 @@ This project has been developed with significant assistance from **Gemini, an AI
 |                             | `get_creatable_widget_types`     |   ✅    | Get all creatable widget classes.                                                                |
 |                             | `get_widget_schema`              |   ✅    | Get the property schema of a widget class.                                                       |
 |                             | `get_layout_data`                |   ✅    | Get screen-space layout bounding boxes.                                                          |
-|                             | `check_widget_overlap`           |   ✅    | Check if there are overlapping widgets.                                                          |
+|                             | `check_widget_overlap`           | Hidden | Diagnostic compatibility tool; not exposed in the default prompt surface.                        |
 | **Actions & Modifications** | `create_widget`                  |   ✅    | Create a new widget.                                                                             |
-|                             | `delete_widget`                  |   ✅    | Delete a widget.                                                                                 |
+|                             | `delete_widget`                  |   ✅    | Explicitly delete a widget; requires `confirm_delete=true`.                                      |
 |                             | `set_widget_properties`          |   ✅    | Set properties of a widget (omit widget_name to target active widget; union write fashion).      |
-|                             | `reparent_widget`                |   ✅    | Move a widget to a new parent.                                                                   |
+|                             | `reparent_widget`                |   ✅    | Convert/move a widget while preserving children where possible; child-loss cases fail.           |
 |                             | `save_asset`                     |   ✅    | Save the active UMG asset.                                                                       |
-| **File Transformation**     | `export_umg_to_json`             |   ✅    | Export UMG asset to JSON format.                                                                 |
-|                             | `apply_json_to_umg`              |   ✅    | Apply JSON layout definition to UMG asset.                                                       |
 |                             | `apply_layout`                   |   ✅    | Apply bulk layout definition (HTML/JSON).                                                        |
+| **Hidden Compatibility**    | `export_umg_to_json`             | Hidden | Full JSON export for debug/compatibility; not part of the default semantic read flow.            |
+|                             | `apply_json_to_umg`              | Hidden | Compatibility bulk JSON apply; prefer `apply_layout`.                                           |
+
+Notes:
+- UMG writes are append/upsert style: `create_widget` creates missing widgets and `set_widget_properties` only overwrites supplied properties.
+- Deletion is explicit and hardened: `delete_widget` fails unless `confirm_delete=true` is supplied.
 
 
 ## UMG Blueprint API Status (Transitional)

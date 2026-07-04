@@ -81,13 +81,13 @@
         },
         {
             "name": "set_widget_properties",
-            "description": "Modifies properties of an existing widget.",
+            "description": "Union-write properties of an existing widget. Only supplied properties are overwritten; omitted properties are not deleted.",
             "enabled": true,
             "category": "UMG"
         },
         {
             "name": "delete_widget",
-            "description": "Removes a widget from the tree.",
+            "description": "Explicitly deletes a widget from the tree. Requires `confirm_delete=true`; do not use for ordinary writes.",
             "enabled": true,
             "category": "UMG"
         },
@@ -106,6 +106,18 @@
         {
             "name": "export_umg_to_json",
             "description": "Converts the UMG asset to a JSON representation.",
+            "enabled": false,
+            "category": "System"
+        },
+        {
+            "name": "apply_json_to_umg",
+            "description": "Compatibility bulk JSON apply command. Prefer `apply_layout` for default MCP layout application.",
+            "enabled": false,
+            "category": "System"
+        },
+        {
+            "name": "apply_html_to_umg",
+            "description": "Compatibility bulk HTML apply command. Prefer `apply_layout` for default MCP layout application.",
             "enabled": false,
             "category": "System"
         },

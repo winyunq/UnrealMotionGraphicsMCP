@@ -55,6 +55,19 @@ async def call_tool(session: ClientSession, name: str, arguments: Dict[str, Any]
     return last_response
 
 
+async def call_tool_raw(session: ClientSession, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    result = await session.call_tool(name, arguments)
+    return parse_tool_result(result)
+
+
+async def expect_tool_failure(session: ClientSession, name: str, arguments: Dict[str, Any], message_part: str) -> Dict[str, Any]:
+    response = await call_tool_raw(session, name, arguments)
+    require(not ok(response), f"MCP tool call unexpectedly succeeded: {name}", response)
+    error_text = str(response.get("error") or response.get("message") or "")
+    require(message_part in error_text, f"MCP tool failure did not mention {message_part!r}: {name}", response)
+    return response
+
+
 async def run_check() -> None:
     server = StdioServerParameters(
         command="uv",
@@ -66,7 +79,7 @@ async def run_check() -> None:
             await session.initialize()
 
             tool_names = {tool.name for tool in (await session.list_tools()).tools}
-            for required_tool in ("set_target_umg_asset", "set_target_widget", "create_widget", "get_widget_tree"):
+            for required_tool in ("set_target_umg_asset", "set_target_widget", "create_widget", "get_widget_tree", "delete_widget"):
                 require(required_tool in tool_names, f"MCP tool missing: {required_tool}", sorted(tool_names))
 
             asset_path = f"/Game/MCPWidgetTests/TreeScope_{int(time.time())}"
@@ -90,11 +103,32 @@ async def run_check() -> None:
             require("PanelA" in scoped_text and "ButtonA" in scoped_text, "PanelA scoped tree should include PanelA branch", scoped_tree)
             require("PanelB" not in scoped_text and "ButtonB" not in scoped_text, "PanelA scoped tree should not include sibling branch", scoped_tree)
 
+            delete_blocked = await expect_tool_failure(
+                session,
+                "delete_widget",
+                {"widget_name": "ButtonB", "confirm_delete": False},
+                "confirm_delete",
+            )
+            delete_result = await call_tool(
+                session,
+                "delete_widget",
+                {"widget_name": "ButtonB", "confirm_delete": True},
+                attempts=6,
+            )
+            require(delete_result.get("deleted_widget") == "ButtonB", "delete_widget did not delete the requested widget", delete_result)
+
+            await call_tool(session, "set_target_widget", {"widget_name": "RootCanvas"}, attempts=6)
+            after_delete_tree = await call_tool(session, "get_widget_tree", {}, attempts=6)
+            after_delete_text = after_delete_tree.get("widget_tree", "")
+            require("PanelB" in after_delete_text and "ButtonB" not in after_delete_text, "ButtonB should be removed while PanelB remains", after_delete_tree)
+
             print(json.dumps({
                 "asset_path": asset_path,
                 "root_scope": root_tree.get("scope"),
                 "scoped_root": scoped_tree.get("root_widget"),
                 "scoped_tree": scoped_text,
+                "delete_blocked": delete_blocked,
+                "delete_result": delete_result,
             }, indent=2, ensure_ascii=False))
 
 

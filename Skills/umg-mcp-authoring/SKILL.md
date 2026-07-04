@@ -25,6 +25,8 @@ For the five-system login demo and concrete script workflow, read [login-demo.md
    - `set_widget_properties` should set or overwrite supplied properties and leave unspecified properties intact.
    - Use `Slot.Position` and `Slot.Size` aliases for CanvasPanel children when possible.
    - Use nested `Slot` objects for panel-slot alignment and padding.
+   - Use `delete_widget` only for explicit deletion and pass `confirm_delete=true`.
+   - Prefer `apply_layout` for bulk layout authoring; `export_umg_to_json` and `apply_json_to_umg` are hidden compatibility/debug paths.
 
 4. Use HLSL materials for UI visual richness.
    - Prefer `hlsl_set_target`, `hlsl_set`, and `hlsl_compile`.
@@ -65,7 +67,8 @@ Useful reference directions:
 ## Validation Commands
 
 ```powershell
-python -m py_compile Resources\Python\UmgMcpServer.py Resources\Python\APITest\Login_Demo_Five_Systems.py Resources\Python\APITest\Blueprint_Protocol_Static_Check.py Resources\Python\APITest\Animation_Protocol_Static_Check.py Resources\Python\APITest\Sequencer_RenderTransform_Check.py
+python -m py_compile Resources\Python\UmgMcpServer.py Resources\Python\APITest\Login_Demo_Five_Systems.py Resources\Python\APITest\Umg_Widget_Protocol_Static_Check.py Resources\Python\APITest\Blueprint_Protocol_Static_Check.py Resources\Python\APITest\Animation_Protocol_Static_Check.py Resources\Python\APITest\Sequencer_RenderTransform_Check.py
+python Resources\Python\APITest\Umg_Widget_Protocol_Static_Check.py
 python Resources\Python\APITest\Blueprint_Protocol_Static_Check.py
 python Resources\Python\APITest\Animation_Protocol_Static_Check.py
 python Resources\Python\APITest\Material_Protocol_Static_Check.py

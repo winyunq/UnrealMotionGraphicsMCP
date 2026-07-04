@@ -252,6 +252,15 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
         FString WidgetName;
         if (Params->TryGetStringField(TEXT("widget_name"), WidgetName))
         {
+            bool bConfirmed = false;
+            Params->TryGetBoolField(TEXT("confirm_delete"), bConfirmed);
+            if (!bConfirmed)
+            {
+                Response->SetBoolField(TEXT("success"), false);
+                Response->SetStringField(TEXT("error"), TEXT("Deletion hardened (Issue 15): set 'confirm_delete': true to delete a widget explicitly."));
+                return Response;
+            }
+
             if (SetSubsystem->DeleteWidget(TargetBlueprint, WidgetName))
             {
                 Response->SetBoolField(TEXT("success"), true);

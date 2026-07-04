@@ -21,9 +21,9 @@ class UMGSet:
         }
         return self.client.send_command("create_widget", params)
 
-    def delete_widget(self, widget_name: str) -> Dict[str, Any]:
+    def delete_widget(self, widget_name: str, confirm_delete: bool = False) -> Dict[str, Any]:
         """Deletes a widget from the UMG asset."""
-        params = {"widget_name": widget_name}
+        params = {"widget_name": widget_name, "confirm_delete": confirm_delete}
         return self.client.send_command("delete_widget", params)
 
     def reparent_widget(self, widget_name: str, new_parent_name: str) -> Dict[str, Any]:

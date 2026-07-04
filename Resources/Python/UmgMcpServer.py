@@ -545,14 +545,14 @@ async def set_widget_properties(widget_name: str, properties: Dict[str, Any]) ->
     umg_set_client = UMGSet.UMGSet(conn)
     return await umg_set_client.set_widget_properties(widget_name, properties)
 
-@register_tool("delete_widget", "Deletes a widget.")
-async def delete_widget(widget_name: str) -> Dict[str, Any]:
+@register_tool("delete_widget", "Deletes a widget (requires confirm_delete=true).")
+async def delete_widget(widget_name: str, confirm_delete: bool = False) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return await umg_set_client.delete_widget(widget_name)
+    return await umg_set_client.delete_widget(widget_name, confirm_delete)
 
 @register_tool("reparent_widget", "Moves a widget to a new parent.")
 async def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
@@ -634,7 +634,7 @@ async def apply_layout(layout_content: str, widget_name: Optional[str] = None) -
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
     return await umg_trans_client.apply_json_to_umg(final_path, json_data, target_widget)
 
-@mcp.tool()
+@register_tool("apply_json_to_umg", "Compatibility bulk JSON apply command. Prefer apply_layout.")
 async def apply_json_to_umg(asset_path: str, json_data: dict, widget_name: Optional[str] = None) -> Dict[str, Any]:
     """Applies a JSON definition to a UMG asset. (Maintained for backward compatibility and specialized agent workflows)"""
     asset_path = normalize_project_path(asset_path)
@@ -643,7 +643,7 @@ async def apply_json_to_umg(asset_path: str, json_data: dict, widget_name: Optio
     umg_trans_client = UMGFileTransformation.UMGFileTransformation(conn)
     return await umg_trans_client.apply_json_to_umg(asset_path, json_data, target_widget)
 
-@mcp.tool()
+@register_tool("apply_html_to_umg", "Compatibility bulk HTML apply command. Prefer apply_layout.")
 async def apply_html_to_umg(asset_path: str, html_content: str, widget_name: Optional[str] = None) -> Dict[str, Any]:
     """Applies an HTML definition to a UMG asset. (Maintained for backward compatibility)"""
     target_widget = widget_name

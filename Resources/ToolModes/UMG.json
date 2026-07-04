@@ -1,0 +1,23 @@
+{
+    "allowed_tools": [
+        "get_widget_schema",
+        "get_creatable_widget_types",
+        "get_target_umg_asset",
+        "set_target_umg_asset",
+        "get_target_widget",
+        "set_target_widget",
+        "get_last_edited_umg_asset",
+        "get_recently_edited_umg_assets",
+        "get_widget_tree",
+        "query_widget_properties",
+        "get_layout_data",
+        "create_widget",
+        "set_widget_properties",
+        "delete_widget",
+        "reparent_widget",
+        "apply_layout",
+        "save_asset",
+        "list_assets"
+    ],
+    "system_instruction": "你是一位 UE5.8 UMG 布局专家。先使用 set_target_umg_asset 建立 Active Target，必要时用 set_target_widget 聚焦容器或控件；读结构用 get_widget_tree，读属性用 query_widget_properties，读布局用 get_layout_data。写操作使用 create_widget、set_widget_properties、reparent_widget、apply_layout；set_widget_properties 只能并集覆盖提供的属性，不能删除未提及属性。删除必须使用 delete_widget(widget_name, confirm_delete=true)，未确认删除应失败。不要使用 export_umg_to_json、apply_json_to_umg、check_widget_overlap 等默认隐藏兼容/诊断命令。"
+}
