@@ -309,8 +309,8 @@
         },
         {
             "name": "material_set_target",
-            "description": "Specify target material asset (path). Required for stateful editing. If not exist, will create a UI domain material.",
-            "enabled": true,
+            "description": "Legacy graph material target command retained for backend compatibility. Prefer hlsl_set_target.",
+            "enabled": false,
             "category": "Material"
         },
         {
@@ -321,62 +321,62 @@
         },
         {
             "name": "material_define_variable",
-            "description": "Define external interface parameters (Scalar, Vector, Texture).",
-            "enabled": true,
+            "description": "Legacy graph parameter command retained for backend compatibility. Prefer hlsl_set(parameters=...).",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_add_node",
-            "description": "Place a symbol (MaterialExpression) into graph. Use standard names like 'Add', 'Multiply', 'Custom'.",
-            "enabled": true,
+            "description": "Legacy graph node command retained for backend compatibility. Prefer the HLSL text-edit workflow.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_delete",
-            "description": "Delete node instances by unique handle.",
-            "enabled": true,
+            "description": "Legacy graph delete command retained for backend compatibility. Prefer hlsl_delete for semantic HLSL parameters/outputs.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_connect_nodes",
-            "description": "Establish node-to-node functional flow (A -> B).",
-            "enabled": true,
+            "description": "Legacy graph wiring command retained for backend compatibility. Prefer the HLSL text-edit workflow.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_connect_pins",
-            "description": "Surgical wiring between specific pins.",
-            "enabled": true,
+            "description": "Legacy graph wiring command retained for backend compatibility. Prefer the HLSL text-edit workflow.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_set_hlsl_node_io",
-            "description": "Inject HLSL into Custom nodes and sync IO pins via list of names.",
-            "enabled": true,
+            "description": "Legacy Custom-node graph command retained for backend compatibility. Prefer hlsl_set(hlsl=..., parameters=...).",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_set_node_properties",
-            "description": "Set internal properties for regular nodes (e.g. Constant Value, Box Mask).",
-            "enabled": true,
+            "description": "Legacy graph node-property command retained for backend compatibility. Prefer the HLSL text-edit workflow.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_compile_asset",
-            "description": "Submit changes and compile the material shader.",
-            "enabled": true,
+            "description": "Legacy graph compile command retained for backend compatibility. Prefer hlsl_compile.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_get_pins",
-            "description": "Introspects available pins for a node or 'Master'.",
-            "enabled": true,
+            "description": "Legacy graph introspection command retained for backend compatibility. Prefer hlsl_get semantic state.",
+            "enabled": false,
             "category": "Material"
         },
         {
             "name": "material_get_graph",
-            "description": "Retrieves full graph topology.",
-            "enabled": true,
+            "description": "Legacy graph introspection command retained for backend compatibility. Prefer hlsl_get semantic state.",
+            "enabled": false,
             "category": "Material"
         },
         {

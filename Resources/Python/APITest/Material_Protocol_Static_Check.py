@@ -31,6 +31,7 @@ def main() -> None:
         "hlsl_delete_parameter",
         "hlsl_delete_output",
     }
+    legacy_graph_tools = {name for name in tools if name.startswith("material_")}
 
     missing_prompts = required_tools - enabled_tool_names
     missing_mode = required_tools - allowed_tools
@@ -43,6 +44,11 @@ def main() -> None:
             raise AssertionError(f"Compatibility alias should be disabled in prompts: {alias}")
         if alias in allowed_tools:
             raise AssertionError(f"Compatibility alias should not be in Material mode: {alias}")
+    for legacy_tool in sorted(legacy_graph_tools):
+        if tools[legacy_tool].get("enabled", True):
+            raise AssertionError(f"Legacy graph material tool should be disabled in prompts: {legacy_tool}")
+        if legacy_tool in allowed_tools:
+            raise AssertionError(f"Legacy graph material tool should not be in Material mode: {legacy_tool}")
 
     require_text("Source/UmgMcp/Private/Material/UmgMcpMaterialCommands.cpp", "CommandType == TEXT(\"hlsl_delete\")")
     require_text("Source/UmgMcp/Private/Material/UmgMcpMaterialCommands.cpp", "HasMaterialTypeOptions")
