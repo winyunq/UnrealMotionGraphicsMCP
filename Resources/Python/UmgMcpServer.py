@@ -474,7 +474,7 @@ async def set_target_widget(widget_name: str) -> Dict[str, Any]:
 #  Category: Sensing
 # =============================================================================
 
-@register_tool("get_widget_tree", "Fetches the complete widget hierarchy.")
+@register_tool("get_widget_tree", "Fetches a compact widget tree from the focused widget target, or root if no widget is focused.")
 async def get_widget_tree() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)

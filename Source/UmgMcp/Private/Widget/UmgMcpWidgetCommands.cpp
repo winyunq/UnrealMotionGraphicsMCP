@@ -44,11 +44,36 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
     if (Command == TEXT("get_widget_tree"))
     {
         UUmgGetSubsystem* GetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
-        FString WidgetTreeString = GetSubsystem->GetWidgetTree(TargetBlueprint);
+        FString ScopedWidgetName;
+        if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+        {
+            ScopedWidgetName = AttentionSubsystem->GetTargetWidget();
+        }
+
+        bool bScopedWidgetFound = false;
+        if (!ScopedWidgetName.IsEmpty() && TargetBlueprint && TargetBlueprint->WidgetTree)
+        {
+            bScopedWidgetFound = TargetBlueprint->WidgetTree->FindWidget(FName(*ScopedWidgetName)) != nullptr;
+        }
+
+        FString WidgetTreeString = GetSubsystem->GetWidgetTree(TargetBlueprint, ScopedWidgetName);
         if (!WidgetTreeString.IsEmpty())
         {
             Response->SetBoolField(TEXT("success"), true);
             Response->SetStringField(TEXT("widget_tree"), WidgetTreeString);
+            if (!ScopedWidgetName.IsEmpty() && bScopedWidgetFound)
+            {
+                Response->SetStringField(TEXT("root_widget"), ScopedWidgetName);
+                Response->SetStringField(TEXT("scope"), TEXT("target_widget"));
+            }
+            else
+            {
+                Response->SetStringField(TEXT("scope"), TEXT("root"));
+                if (!ScopedWidgetName.IsEmpty())
+                {
+                    Response->SetStringField(TEXT("scope_warning"), FString::Printf(TEXT("Focused widget '%s' was not found; returned root tree."), *ScopedWidgetName));
+                }
+            }
         }
         else
         {

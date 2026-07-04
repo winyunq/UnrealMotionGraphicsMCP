@@ -12,8 +12,8 @@ DECLARE_LOG_CATEGORY_EXTERN(LogUmgGet, Log, All);
  * @brief Provides "sensing" capabilities for the AI to inspect and query UMG assets.
  *
  * This subsystem acts as the "eyes" of the AI agent. It contains functions for reading
- * information from a UMG asset without modifying it. Responsibilities include retrieving the
- * full widget hierarchy (GetWidgetTree), querying specific properties of a widget
+ * information from a UMG asset without modifying it. Responsibilities include retrieving a
+ * streamlined widget hierarchy from a target widget or root (GetWidgetTree), querying specific properties of a widget
  * (QueryWidgetProperties), and gathering layout information. All functions are read-only
  * and are fundamental for the AI to understand the current state of a UI before making changes.
  */
@@ -29,7 +29,7 @@ public:
 
 	// MCP Get Functions
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
-	FString GetWidgetTree(class UWidgetBlueprint* WidgetBlueprint);
+	FString GetWidgetTree(class UWidgetBlueprint* WidgetBlueprint, const FString& StartWidgetName = FString());
 
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Get")
 	FString QueryWidgetProperties(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName, const TArray<FString>& Properties);

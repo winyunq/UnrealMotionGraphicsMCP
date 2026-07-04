@@ -51,7 +51,7 @@
         },
         {
             "name": "get_widget_tree",
-            "description": "Fetches the full hierarchy of widgets. Use this to find `parent_name` for creation.",
+            "description": "Fetches a compact text tree from the focused widget target downward. If no widget target is focused, returns the root tree. Use `set_target_widget` to scope this read.",
             "enabled": true,
             "category": "UMG"
         },

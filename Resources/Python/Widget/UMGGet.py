@@ -18,7 +18,7 @@ class UMGGet:
 
     # --- Sensing ---
     def get_widget_tree(self) -> Dict[str, Any]:
-        """Retrieves the full widget hierarchy for a UMG asset as a nested JSON object."""
+        """Retrieves a compact text tree from the focused widget target, or root if no widget is focused."""
         return self.client.send_command("get_widget_tree", {})
 
     def query_widget_properties(self, widget_name: str, properties: List[str]) -> Dict[str, Any]:

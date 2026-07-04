@@ -565,6 +565,7 @@ async def run_demo(args: argparse.Namespace) -> None:
                 )
                 await build_widgets(session, trace, material_path)
 
+                await call_tool(session, trace, "target", "set_target_widget", {"widget_name": "RootCanvas"}, attempts=6)
                 tree = await call_tool(session, trace, "readback", "get_widget_tree", {}, attempts=6)
                 tree_text = json.dumps(tree, ensure_ascii=False)
                 for widget_name in ("RootCanvas", "LoginCard", "LoginButton", "SystemStrip"):

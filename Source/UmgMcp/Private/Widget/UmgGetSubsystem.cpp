@@ -171,7 +171,7 @@ static void BuildBStyleWidgetTree(UWidget* Widget, int32 Depth, FString& OutTree
     }
 }
 
-FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
+FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint, const FString& StartWidgetName)
 {
     if (!WidgetBlueprint)
     {
@@ -189,14 +189,28 @@ FString UUmgGetSubsystem::GetWidgetTree(UWidgetBlueprint* WidgetBlueprint)
         return TreeString;
     }
 
-    UWidget* RootWidget = WidgetBlueprint->WidgetTree->RootWidget;
-    if (!RootWidget)
+    UWidget* StartWidget = WidgetBlueprint->WidgetTree->RootWidget;
+    if (!StartWidget)
     {
         UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Root widget not found in UWidgetBlueprint '%s'. The UMG asset might be empty."), *WidgetBlueprint->GetPathName());
         return TreeString;
     }
 
-    BuildBStyleWidgetTree(RootWidget, 1, TreeString);
+    if (!StartWidgetName.IsEmpty())
+    {
+        if (UWidget* ScopedWidget = WidgetBlueprint->WidgetTree->FindWidget(FName(*StartWidgetName)))
+        {
+            StartWidget = ScopedWidget;
+        }
+        else
+        {
+            UE_LOG(LogUmgGet, Warning, TEXT("GetWidgetTree: Target widget '%s' was not found in '%s'; falling back to root widget."), *StartWidgetName, *WidgetBlueprint->GetPathName());
+        }
+    }
+
+    // Return a compact tree view from the focused widget target downward.
+    // If no widget target is focused, StartWidget is the UMG root.
+    BuildBStyleWidgetTree(StartWidget, 1, TreeString);
     return TreeString;
 }
 
