@@ -252,8 +252,9 @@ This project has been developed with significant assistance from **Gemini, an AI
 
 | Command                          | Status | Description                                                                                                      |
 | :------------------------------- | :----: | :--------------------------------------------------------------------------------------------------------------- |
-| `animation_target`               |   ✅    | Set/focus the current animation (alias of `set_animation_scope`, auto-creates when missing).                     |
-| `widget_target`                  |   ✅    | Set/focus the current widget (alias of `set_widget_scope`).                                                      |
+| `set_animation_scope`            |   ✅    | Animation target: focus the current animation and auto-create it when missing.                                   |
+| `set_widget_scope`               |   ✅    | Widget target inside the current animation.                                                                      |
+| `get_all_animations`             |   ✅    | Compact animation list for the active UMG target.                                                               |
 | `animation_overview`             |   ✅    | Returns keyframe counts, track counts, key times, and changed properties.                                        |
 | `animation_widget_properties`    |   ✅    | Timeline view: per-widget property changes (ignores unanimated properties).                                      |
 | `animation_time_properties`      |   ✅    | Time-slice view: property values at specific times (multi-time supported).                                       |
@@ -261,12 +262,13 @@ This project has been developed with significant assistance from **Gemini, an AI
 | `animation_append_time_slice`    |   ✅    | Append a diff-style time slice for multiple widgets at a given time.                                             |
 | `animation_delete_widget_keys`   |   ✅    | Scoped delete for widget+property at specific times (`confirm_delete=true` required per Issue 15 safety policy). |
 | `create_animation`               |   ✅    | Create or focus an animation with auto naming.                                                                   |
-| `set_property_keys`              |   ✅    | Low-level track write helper (supports float/color/vector2D).                                                    |
+| `delete_animation`               |   ✅    | Explicit whole-animation delete; requires `confirm_delete=true`.                                                 |
 
 Notes:
-- `animation_target`/`widget_target` reuse the current UMG target asset; names are auto-corrected (no “animal” typo) and auto-create when missing.
+- `set_animation_scope`/`set_widget_scope` implement the target/default semantics from the protocol; names are auto-corrected (no "animal" typo) and animations auto-create when missing.
 - Write paths are union/overwrite only—no implicit deletion. Use `animation_delete_widget_keys` with `confirm_delete=true` for scoped removals.
-- Responses now include counts/timeline context so every sequencer MCP returns actionable data.
+- Legacy low-level reads/writes such as `get_animation_keyframes`, `get_animation_full_data`, `set_property_keys`, `set_animation_data`, `remove_property_track`, and `remove_keys` remain backend compatibility commands but are hidden from the default MCP prompt surface.
+- Responses include counts/timeline context so every default Sequencer MCP returns actionable data.
 
 ## UMG Material API Status
 

@@ -251,8 +251,9 @@ flowchart LR
 
 | 命令                             |   状态   | 描述                                                                                        |
 | :------------------------------- | :------: | :------------------------------------------------------------------------------------------ |
-| `animation_target`               | ✅ 已实现 | 设置/聚焦当前动画（等价 `set_animation_scope`，若不存在会自动创建）。                       |
-| `widget_target`                  | ✅ 已实现 | 设置/聚焦当前控件（等价 `set_widget_scope`）。                                              |
+| `set_animation_scope`            | ✅ 已实现 | 动画 Target：聚焦当前动画，若不存在会自动创建。                                             |
+| `set_widget_scope`               | ✅ 已实现 | 当前动画内的控件 Target。                                                                   |
+| `get_all_animations`             | ✅ 已实现 | 返回当前 UMG Target 下的动画简表。                                                          |
 | `animation_overview`             | ✅ 已实现 | 返回关键帧数量、轨道数量、关键时间点、变更的属性列表。                                      |
 | `animation_widget_properties`    | ✅ 已实现 | 按控件视角查看属性时间线（忽略未被动画驱动的属性）。                                        |
 | `animation_time_properties`      | ✅ 已实现 | 按时间切片查看属性值，支持一次查询多个时间点。                                              |
@@ -260,12 +261,13 @@ flowchart LR
 | `animation_append_time_slice`    | ✅ 已实现 | 在指定时间为多个控件追加差分式属性值。                                                      |
 | `animation_delete_widget_keys`   | ✅ 已实现 | 仅删除指定控件+属性在指定时间的关键帧（需 `confirm_delete=true`，符合 Issue 15 安全策略）。 |
 | `create_animation`               | ✅ 已实现 | 创建或聚焦动画，支持自动命名。                                                              |
-| `set_property_keys`              | ✅ 已实现 | 底层轨道写入辅助（支持 float/color/vector2D）。                                             |
+| `delete_animation`               | ✅ 已实现 | 显式删除整段动画，必须传入 `confirm_delete=true`。                                          |
 
 说明：
-- `animation_target` / `widget_target` 复用当前 UMG 目标资产，命名自动纠错（不再出现 “animal” 拼写），并在缺失时自动创建。
+- `set_animation_scope` / `set_widget_scope` 实现协议中的 Target/缺省语义；命名自动纠错（不再出现 "animal" 拼写），动画缺失时自动创建。
 - 写入仅做并集/覆盖，不做隐式删除；如需删除，请使用 `animation_delete_widget_keys` 并显式传入 `confirm_delete=true`。
-- 所有动画指令都会返回有价值的计数/时间线信息，便于 AI 复述与复现。
+- `get_animation_keyframes`、`get_animation_full_data`、`set_property_keys`、`set_animation_data`、`remove_property_track`、`remove_keys` 等旧的底层读写命令仍保留后端兼容，但不进入默认 MCP 提示面。
+- 默认 Sequencer MCP 都会返回有价值的计数/时间线信息，便于 AI 复述与复现。
 
 ## UMG 材质 (Material) API 实现状态
 

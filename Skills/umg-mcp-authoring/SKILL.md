@@ -37,6 +37,7 @@ For the five-system login demo and concrete script workflow, read [login-demo.md
    - Use `animation_append_widget_tracks` for widget-oriented union key writes.
    - Use `animation_append_time_slice` when authoring a single moment across one or more widgets.
    - Read back with `animation_overview` or `animation_time_properties`; do not trust write responses alone.
+   - Treat `get_animation_keyframes`, `get_animation_full_data`, `set_property_keys`, `remove_property_track`, and `remove_keys` as hidden compatibility commands, not default authoring tools.
 
 6. Wire Blueprint only at the current semantic level.
    - Use `set_edit_function("WidgetName.EventName")` for component event scope.
@@ -62,7 +63,10 @@ Useful reference directions:
 ## Validation Commands
 
 ```powershell
-python -m py_compile Resources\Python\UmgMcpServer.py Resources\Python\APITest\Login_Demo_Five_Systems.py
+python -m py_compile Resources\Python\UmgMcpServer.py Resources\Python\APITest\Login_Demo_Five_Systems.py Resources\Python\APITest\Animation_Protocol_Static_Check.py Resources\Python\APITest\Sequencer_RenderTransform_Check.py
+python Resources\Python\APITest\Animation_Protocol_Static_Check.py
+python Resources\Python\APITest\Material_Protocol_Static_Check.py
+python Resources\Python\APITest\Sequencer_RenderTransform_Check.py
 python Resources\Python\APITest\Login_Demo_Five_Systems.py
 ```
 

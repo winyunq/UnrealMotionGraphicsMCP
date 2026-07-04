@@ -72,6 +72,19 @@ def values_at_time(time_response: Dict[str, Any], target_time: float) -> Dict[st
     return {}
 
 
+async def call_tool_raw(session: ClientSession, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    result = await session.call_tool(name, arguments)
+    return parse_tool_result(result)
+
+
+async def expect_tool_failure(session: ClientSession, name: str, arguments: Dict[str, Any], message_part: str) -> Dict[str, Any]:
+    response = await call_tool_raw(session, name, arguments)
+    require(not ok(response), f"MCP tool call unexpectedly succeeded: {name}", response)
+    error_text = str(response.get("error") or response.get("message") or "")
+    require(message_part in error_text, f"MCP tool failure did not mention {message_part!r}: {name}", response)
+    return response
+
+
 async def run_check() -> None:
     server = StdioServerParameters(
         command="uv",
@@ -96,13 +109,22 @@ async def run_check() -> None:
                 "animation_widget_properties",
                 "animation_time_properties",
                 "get_all_animations",
+                "delete_animation",
                 "animation_delete_widget_keys",
+            ):
+                require(required_tool in tool_names, f"MCP tool missing: {required_tool}", sorted(tool_names))
+
+            for hidden_tool in (
                 "get_animation_keyframes",
                 "get_animated_widgets",
                 "get_animation_full_data",
                 "get_widget_animation_data",
+                "set_property_keys",
+                "set_animation_data",
+                "remove_property_track",
+                "remove_keys",
             ):
-                require(required_tool in tool_names, f"MCP tool missing: {required_tool}", sorted(tool_names))
+                require(hidden_tool not in tool_names, f"Hidden animation compatibility tool leaked: {hidden_tool}", sorted(tool_names))
 
             asset_path = f"/Game/MCPSequencerTests/RenderTransformMcpCheck_{int(time.time())}"
             animation_name = "RT_MCP_Check"
@@ -195,10 +217,6 @@ async def run_check() -> None:
             animation_names = {item.get("name") for item in animations.get("animations", [])}
             require(animation_name in animation_names, "created animation missing from get_all_animations", animations)
 
-            widgets = await call_tool(session, "get_animated_widgets", {"animation_name": animation_name}, attempts=6)
-            animated_widget_names = {item.get("widget_name") for item in widgets.get("widgets", [])}
-            require(widget_name in animated_widget_names, "animated widget missing from get_animated_widgets", widgets)
-
             overview = await call_tool(
                 session,
                 "animation_overview",
@@ -211,17 +229,6 @@ async def run_check() -> None:
             require(changed["RenderTransform.Scale.X"].get("track_type") == "2d_transform", "Scale.X overview track type mismatch", overview)
             require(changed["RenderTransform.Scale.Y"].get("track_type") == "2d_transform", "Scale.Y overview track type mismatch", overview)
 
-            keyframes = await call_tool(session, "get_animation_keyframes", {"animation_name": animation_name}, attempts=6)
-            keyframe_props = {track.get("property_name") for track in keyframes.get("tracks", [])}
-            require("RenderTransform.Scale.X" in keyframe_props, "Scale.X missing from keyframe read", keyframes)
-            require("RenderTransform.Scale.Y" in keyframe_props, "Scale.Y missing from keyframe read", keyframes)
-            require("RenderTransform.Translation.X" in keyframe_props, "Translation.X missing from keyframe read", keyframes)
-            require("RenderTransform.Angle" in keyframe_props, "Angle missing from keyframe read", keyframes)
-
-            full_data = await call_tool(session, "get_animation_full_data", {"animation_name": animation_name}, attempts=6)
-            full_data_props = {track.get("property_name") for track in full_data.get("tracks", [])}
-            require("RenderOpacity" in full_data_props, "RenderOpacity missing from full animation read", full_data)
-
             widget_timeline = await call_tool(
                 session,
                 "animation_widget_properties",
@@ -229,14 +236,6 @@ async def run_check() -> None:
                 attempts=6,
             )
             require(widget_timeline.get("change_count", 0) >= 1, "widget timeline read returned no changes", widget_timeline)
-
-            widget_data = await call_tool(
-                session,
-                "get_widget_animation_data",
-                {"animation_name": animation_name, "widget_name": widget_name},
-                attempts=6,
-            )
-            require(widget_data.get("change_count", 0) >= 1, "focused widget animation data returned no changes", widget_data)
 
             time_slice = await call_tool(
                 session,
@@ -262,6 +261,20 @@ async def run_check() -> None:
             )
             require(delete.get("removed_keys", 0) >= 1, "Scale.X delete did not remove a key", delete)
 
+            delete_animation_blocked = await expect_tool_failure(
+                session,
+                "delete_animation",
+                {"animation_name": animation_name, "confirm_delete": False},
+                "confirm_delete",
+            )
+            delete_animation_result = await call_tool(
+                session,
+                "delete_animation",
+                {"animation_name": animation_name, "confirm_delete": True},
+                attempts=6,
+            )
+            require(delete_animation_result.get("deleted_animation") == animation_name, "delete_animation did not delete the target animation", delete_animation_result)
+
             print(json.dumps({
                 "asset_path": asset_path,
                 "animation": animation_name,
@@ -270,6 +283,8 @@ async def run_check() -> None:
                 "widget_timeline_changes": widget_timeline.get("change_count"),
                 "time_slice_values": values,
                 "delete_result": delete,
+                "delete_animation_blocked": delete_animation_blocked,
+                "delete_animation_result": delete_animation_result,
             }, indent=2, ensure_ascii=False))
 
 

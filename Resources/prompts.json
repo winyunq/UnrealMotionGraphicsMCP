@@ -135,26 +135,26 @@
         },
         {
             "name": "get_animation_keyframes",
-            "description": "Gets keyframes for the current animation scope.",
-            "enabled": true,
+            "description": "Compatibility detailed keyframe read retained for backend/debug flows. Prefer `animation_overview`, `animation_widget_properties`, or `animation_time_properties`.",
+            "enabled": false,
             "category": "Animation"
         },
         {
             "name": "get_animated_widgets",
-            "description": "Lists widgets affected by the current animation scope.",
-            "enabled": true,
+            "description": "Compatibility affected-widget read retained for backend/debug flows. Prefer `animation_overview`.",
+            "enabled": false,
             "category": "Animation"
         },
         {
             "name": "get_animation_full_data",
-            "description": "Gets full data for the current animation scope.",
-            "enabled": true,
+            "description": "Compatibility full animation dump retained for backend/debug flows. Prefer semantic reads unless a full dump is explicitly needed.",
+            "enabled": false,
             "category": "Animation"
         },
         {
             "name": "get_widget_animation_data",
-            "description": "Gets animation data for a specific widget in the current animation scope.",
-            "enabled": true,
+            "description": "Compatibility widget animation dump retained for backend/debug flows. Prefer `animation_widget_properties`.",
+            "enabled": false,
             "category": "Animation"
         },
         {
@@ -183,7 +183,7 @@
         },
         {
             "name": "delete_animation",
-            "description": "Deletes an animation.",
+            "description": "Explicitly deletes an animation. Requires `confirm_delete=true`; do not use for ordinary writes.",
             "enabled": true,
             "category": "Animation"
         },
