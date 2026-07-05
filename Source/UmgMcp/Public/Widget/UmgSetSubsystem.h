@@ -48,19 +48,13 @@ public:
     bool DeleteWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& WidgetName);
 
     /**
-     * @brief Moves a widget under a new target parent container.
+     * Reorders existing widgets under one or more panel parents using a partial tree specification.
      *
-     * This acts as a standard drag-and-drop operation. The widget is removed from its 
-     * old parent and appended to the target parent container.
-     *
-     * @param WidgetBlueprint The target widget blueprint containing the widgets.
-     * @param TargetParentName The name of the parent container to move the widget into.
-     *                         If empty, the current active target focused in attention subsystem is used.
-     * @param WidgetName The name of the widget to be moved. Cannot be empty.
-     * @return True if the widget was successfully moved, false otherwise.
-     **/
-    UFUNCTION(BlueprintCallable, Category = "UMG MCP|Set")
-    bool MoveWidget(class UWidgetBlueprint* WidgetBlueprint, const FString& TargetParentName, const FString& WidgetName);
+     * This is a union-style structural write: listed siblings are moved into the requested order,
+     * unlisted siblings keep their relative order, and missing names are reported as warnings
+     * without deleting or creating widgets.
+     */
+    bool ReorderWidgetTree(class UWidgetBlueprint* WidgetBlueprint, const FString& RootName, const FString& TreeSpec, TArray<FString>& OutReorderedWidgets, TArray<FString>& OutWarnings, FString& OutError);
 
     /**
      * @brief Performs in-place replacement by wrapping a widget with a new container.

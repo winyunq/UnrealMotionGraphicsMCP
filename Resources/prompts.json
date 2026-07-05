@@ -92,6 +92,12 @@
             "category": "UMG"
         },
         {
+            "name": "reorder_widget_tree",
+            "description": "Union-style sibling order write. Provide a partial tree or root+child order; existing listed direct children are moved into that order, omitted siblings keep relative order, and nothing is created or deleted.",
+            "enabled": true,
+            "category": "UMG"
+        },
+        {
             "name": "reparent_widget",
             "description": "Moves a widget to a new parent.",
             "enabled": true,

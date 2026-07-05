@@ -22,6 +22,8 @@
 #include "EditorAssetLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "JsonObjectConverter.h"
+#include "Misc/ScopeLock.h"
+#include "HAL/PlatformProcess.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
@@ -66,6 +68,7 @@
 
 UUmgMcpBridge::UUmgMcpBridge()
 {
+    bCommandQueueProcessing = false;
     AttentionCommands = MakeShared<FUmgMcpAttentionCommands>();
     WidgetCommands = MakeShared<FUmgMcpWidgetCommands>();
     FileTransformationCommands = MakeShared<FUmgMcpFileTransformationCommands>();
@@ -96,6 +99,7 @@ void UUmgMcpBridge::Initialize(FSubsystemCollectionBase& Collection)
     ConnectionSocket = nullptr;
     ServerThread = nullptr;
     Port = MCP_SERVER_PORT_DEFAULT;
+    bCommandQueueProcessing = false;
     FIPv4Address::Parse(MCP_SERVER_HOST_DEFAULT, ServerAddress);
 
     // Start the server automatically
@@ -213,6 +217,7 @@ void UUmgMcpBridge::StopServer()
 
     bIsRunning = false;
     bGlobalServerStarted = false; // Reset global flag
+    bCommandQueueProcessing = false;
 
     // Clean up thread
     if (ServerThread)
@@ -252,35 +257,94 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
     
     // Otherwise, queue execution on Game Thread and wait
     // This ensures thread safety for UObject operations (creating widgets, animations, etc.)
-    UE_LOG(LogUmgMcp, Verbose, TEXT("UmgMcpBridge: Dispatching to GameThread..."));
-    
-    TPromise<FString> Promise;
-    TFuture<FString> Future = Promise.GetFuture();
-    
-    AsyncTask(ENamedThreads::GameThread, [this, CommandType, Params, Promise = MoveTemp(Promise)]() mutable
+    UE_LOG(LogUmgMcp, Verbose, TEXT("UmgMcpBridge: Queueing command for GameThread execution..."));
+
+    FEvent* CompletionEvent = FPlatformProcess::GetSynchEventFromPool(false);
+    if (!CompletionEvent)
     {
-        FString Result = InternalExecuteCommand(CommandType, Params);
-        Promise.SetValue(Result);
-    });
-    
-    // Wait for the result with a timeout to prevent infinite hang
-    // This ensures we return a proper error to the client instead of letting the socket timeout
-    if (Future.WaitFor(FTimespan::FromSeconds(MCP_GAME_THREAD_TIMEOUT_DEFAULT)))
-    {
-        return Future.Get();
-    }
-    else
-    {
-        UE_LOG(LogUmgMcp, Error, TEXT("UmgMcpBridge: GameThread execution timed out (%.1fs) for command: %s"), MCP_GAME_THREAD_TIMEOUT_DEFAULT, *CommandType);
-        
         TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
         ErrorResponse->SetStringField(TEXT("status"), TEXT("error"));
-        ErrorResponse->SetStringField(TEXT("error"), FString::Printf(TEXT("Game Thread Timeout - The editor may be paused or busy (Waited %.1fs)."), MCP_GAME_THREAD_TIMEOUT_DEFAULT));
-        
+        ErrorResponse->SetStringField(TEXT("error"), TEXT("Failed to allocate command completion event."));
+
         FString ResultString;
         TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ResultString);
         FJsonSerializer::Serialize(ErrorResponse.ToSharedRef(), Writer);
         return ResultString;
+    }
+
+    TSharedRef<FQueuedBridgeCommand, ESPMode::ThreadSafe> QueuedCommand = MakeShared<FQueuedBridgeCommand, ESPMode::ThreadSafe>();
+    QueuedCommand->CommandType = CommandType;
+    QueuedCommand->Params = Params;
+    QueuedCommand->CompletionEvent = CompletionEvent;
+
+    bool bShouldScheduleProcessor = false;
+    {
+        FScopeLock CommandLock(&CommandQueueCs);
+        CommandQueue.Add(QueuedCommand);
+        if (!bCommandQueueProcessing)
+        {
+            bCommandQueueProcessing = true;
+            bShouldScheduleProcessor = true;
+        }
+    }
+
+    if (bShouldScheduleProcessor)
+    {
+        AsyncTask(ENamedThreads::GameThread, [this]()
+        {
+            ProcessNextQueuedCommand();
+        });
+    }
+
+    CompletionEvent->Wait();
+    FString Result = QueuedCommand->Response;
+    FPlatformProcess::ReturnSynchEventToPool(CompletionEvent);
+    QueuedCommand->CompletionEvent = nullptr;
+    return Result;
+}
+
+void UUmgMcpBridge::ProcessNextQueuedCommand()
+{
+    check(IsInGameThread());
+
+    TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe> QueuedCommand;
+    {
+        FScopeLock CommandLock(&CommandQueueCs);
+        if (CommandQueue.Num() == 0)
+        {
+            bCommandQueueProcessing = false;
+            return;
+        }
+
+        QueuedCommand = CommandQueue[0];
+        CommandQueue.RemoveAt(0);
+    }
+
+    if (QueuedCommand.IsValid())
+    {
+        QueuedCommand->Response = InternalExecuteCommand(QueuedCommand->CommandType, QueuedCommand->Params);
+        if (QueuedCommand->CompletionEvent)
+        {
+            QueuedCommand->CompletionEvent->Trigger();
+        }
+    }
+
+    bool bHasMoreCommands = false;
+    {
+        FScopeLock CommandLock(&CommandQueueCs);
+        bHasMoreCommands = CommandQueue.Num() > 0;
+        if (!bHasMoreCommands)
+        {
+            bCommandQueueProcessing = false;
+        }
+    }
+
+    if (bHasMoreCommands)
+    {
+        AsyncTask(ENamedThreads::GameThread, [this]()
+        {
+            ProcessNextQueuedCommand();
+        });
     }
 }
 

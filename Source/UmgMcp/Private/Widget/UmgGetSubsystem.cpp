@@ -6,6 +6,7 @@
 // --- Necessary Includes ---
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/Image.h"
 #include "Components/PanelWidget.h"
 #include "Components/PanelSlot.h"
 #include "Components/CanvasPanelSlot.h"
@@ -21,6 +22,163 @@
 // --- End Includes ---
 
 DEFINE_LOG_CATEGORY(LogUmgGet);
+
+namespace
+{
+    static TSharedPtr<FJsonObject> MakeVector2DJson(const FVector2D& Value)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        Json->SetNumberField(TEXT("X"), Value.X);
+        Json->SetNumberField(TEXT("Y"), Value.Y);
+        return Json;
+    }
+
+    static TSharedPtr<FJsonObject> MakeLinearColorJson(const FLinearColor& Value)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        Json->SetNumberField(TEXT("R"), Value.R);
+        Json->SetNumberField(TEXT("G"), Value.G);
+        Json->SetNumberField(TEXT("B"), Value.B);
+        Json->SetNumberField(TEXT("A"), Value.A);
+        Json->SetStringField(TEXT("hex"), Value.ToFColor(true).ToHex());
+        return Json;
+    }
+
+    static TSharedPtr<FJsonObject> MakeMarginJson(const FMargin& Value)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        Json->SetNumberField(TEXT("Left"), Value.Left);
+        Json->SetNumberField(TEXT("Top"), Value.Top);
+        Json->SetNumberField(TEXT("Right"), Value.Right);
+        Json->SetNumberField(TEXT("Bottom"), Value.Bottom);
+        return Json;
+    }
+
+    static TSharedPtr<FJsonObject> MakeAnchorsJson(const FAnchors& Value)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        Json->SetObjectField(TEXT("Minimum"), MakeVector2DJson(Value.Minimum));
+        Json->SetObjectField(TEXT("Maximum"), MakeVector2DJson(Value.Maximum));
+        return Json;
+    }
+
+    static TSharedPtr<FJsonObject> MakeWidgetTransformJson(const FWidgetTransform& Value)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        Json->SetObjectField(TEXT("Translation"), MakeVector2DJson(Value.Translation));
+        Json->SetObjectField(TEXT("Scale"), MakeVector2DJson(Value.Scale));
+        Json->SetObjectField(TEXT("Shear"), MakeVector2DJson(Value.Shear));
+        Json->SetNumberField(TEXT("Angle"), Value.Angle);
+        return Json;
+    }
+
+    static TSharedPtr<FJsonObject> MakeBrushJson(const FSlateBrush& Brush)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        Json->SetNumberField(TEXT("DrawAs"), static_cast<int32>(Brush.DrawAs));
+        Json->SetNumberField(TEXT("Tiling"), static_cast<int32>(Brush.Tiling));
+        Json->SetNumberField(TEXT("Mirroring"), static_cast<int32>(Brush.Mirroring));
+        Json->SetObjectField(TEXT("ImageSize"), MakeVector2DJson(Brush.ImageSize));
+        Json->SetObjectField(TEXT("Margin"), MakeMarginJson(Brush.Margin));
+        Json->SetObjectField(TEXT("TintColor"), MakeLinearColorJson(Brush.TintColor.GetSpecifiedColor()));
+
+        if (UObject* Resource = Brush.GetResourceObject())
+        {
+            Json->SetStringField(TEXT("ResourceObject"), Resource->GetPathName());
+            Json->SetStringField(TEXT("ResourceClass"), Resource->GetClass()->GetName());
+        }
+        else
+        {
+            Json->SetStringField(TEXT("ResourceObject"), TEXT(""));
+        }
+
+        return Json;
+    }
+
+    static TSharedPtr<FJsonObject> MakeSlotJson(UWidget* Widget)
+    {
+        TSharedPtr<FJsonObject> Json = MakeShared<FJsonObject>();
+        if (!Widget || !Widget->Slot)
+        {
+            Json->SetBoolField(TEXT("has_slot"), false);
+            return Json;
+        }
+
+        UPanelSlot* Slot = Widget->Slot;
+        Json->SetBoolField(TEXT("has_slot"), true);
+        Json->SetStringField(TEXT("class"), Slot->GetClass()->GetName());
+        if (UPanelWidget* Parent = Slot->Parent)
+        {
+            Json->SetStringField(TEXT("parent"), Parent->GetName());
+        }
+
+        if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
+        {
+            Json->SetStringField(TEXT("slot_type"), TEXT("CanvasPanelSlot"));
+            Json->SetObjectField(TEXT("Position"), MakeVector2DJson(CanvasSlot->GetPosition()));
+            Json->SetObjectField(TEXT("Size"), MakeVector2DJson(CanvasSlot->GetSize()));
+            Json->SetObjectField(TEXT("Alignment"), MakeVector2DJson(CanvasSlot->GetAlignment()));
+            Json->SetObjectField(TEXT("Anchors"), MakeAnchorsJson(CanvasSlot->GetAnchors()));
+            Json->SetNumberField(TEXT("ZOrder"), CanvasSlot->GetZOrder());
+            Json->SetBoolField(TEXT("AutoSize"), CanvasSlot->GetAutoSize());
+        }
+
+        return Json;
+    }
+
+    static bool TryQueryFastWidgetProperty(UWidget* Widget, const FString& PropPath, TSharedPtr<FJsonValue>& OutValue)
+    {
+        if (!Widget)
+        {
+            return false;
+        }
+
+        if (PropPath.Equals(TEXT("Visibility"), ESearchCase::IgnoreCase))
+        {
+            const UEnum* VisibilityEnum = StaticEnum<ESlateVisibility>();
+            const FString VisibilityName = VisibilityEnum
+                ? VisibilityEnum->GetNameStringByValue(static_cast<int64>(Widget->GetVisibility()))
+                : FString::FromInt(static_cast<int32>(Widget->GetVisibility()));
+            OutValue = MakeShared<FJsonValueString>(VisibilityName);
+            return true;
+        }
+
+        if (PropPath.Equals(TEXT("RenderTransform"), ESearchCase::IgnoreCase))
+        {
+            OutValue = MakeShared<FJsonValueObject>(MakeWidgetTransformJson(Widget->GetRenderTransform()));
+            return true;
+        }
+
+        if (PropPath.Equals(TEXT("RenderTransformPivot"), ESearchCase::IgnoreCase))
+        {
+            OutValue = MakeShared<FJsonValueObject>(MakeVector2DJson(Widget->GetRenderTransformPivot()));
+            return true;
+        }
+
+        if (PropPath.Equals(TEXT("Slot"), ESearchCase::IgnoreCase))
+        {
+            OutValue = MakeShared<FJsonValueObject>(MakeSlotJson(Widget));
+            return true;
+        }
+
+        if (UImage* Image = Cast<UImage>(Widget))
+        {
+            if (PropPath.Equals(TEXT("Brush"), ESearchCase::IgnoreCase))
+            {
+                OutValue = MakeShared<FJsonValueObject>(MakeBrushJson(Image->GetBrush()));
+                return true;
+            }
+
+            if (PropPath.Equals(TEXT("ColorAndOpacity"), ESearchCase::IgnoreCase))
+            {
+                OutValue = MakeShared<FJsonValueObject>(MakeLinearColorJson(Image->GetColorAndOpacity()));
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
 
 // --- Helper function for recursive JSON export ---
 static TSharedPtr<FJsonObject> ExportWidgetToJson(UWidget* Widget)
@@ -238,6 +396,16 @@ FString UUmgGetSubsystem::QueryWidgetProperties(UWidgetBlueprint* WidgetBlueprin
     TSharedPtr<FJsonObject> PropertiesJson = MakeShared<FJsonObject>();
     for (const FString& PropPath : Properties)
     {
+        TSharedPtr<FJsonValue> FastValue;
+        if (TryQueryFastWidgetProperty(FoundWidget, PropPath, FastValue))
+        {
+            if (FastValue.IsValid())
+            {
+                PropertiesJson->SetField(PropPath, FastValue);
+            }
+            continue;
+        }
+
         TArray<FString> Parts;
         PropPath.ParseIntoArray(Parts, TEXT("."));
         

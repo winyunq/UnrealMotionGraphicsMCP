@@ -26,9 +26,16 @@ class UMGSet:
         params = {"widget_name": widget_name, "confirm_delete": confirm_delete}
         return self.client.send_command("delete_widget", params)
 
-    def reparent_widget(self, widget_name: str, new_parent_name: str) -> Dict[str, Any]:
-        """Moves a widget to be a child of a different parent."""
-        params = {"widget_name": widget_name, "new_parent_name": new_parent_name}
+    def reorder_widget_tree(self, tree: Any, root: str = "") -> Dict[str, Any]:
+        """Reorders existing widgets using a partial tree/order specification."""
+        params = {"tree": tree}
+        if root:
+            params["root"] = root
+        return self.client.send_command("reorder_widget_tree", params)
+
+    def reparent_widget(self, widget_name: str, new_parent_widget: Any) -> Dict[str, Any]:
+        """Compatibility structural replacement/wrap command."""
+        params = {"widget_name": widget_name, "new_parent_widget": new_parent_widget}
         return self.client.send_command("reparent_widget", params)
 
     def save_asset(self) -> Dict[str, Any]:

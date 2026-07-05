@@ -491,43 +491,50 @@ bool UUmgSetSubsystem::DeleteWidget(UWidgetBlueprint* WidgetBlueprint, const FSt
     return false;
 }
 
-bool UUmgSetSubsystem::MoveWidget(UWidgetBlueprint* WidgetBlueprint, const FString& TargetParentName, const FString& WidgetName)
+bool UUmgSetSubsystem::ReorderWidgetTree(UWidgetBlueprint* WidgetBlueprint, const FString& RootName, const FString& TreeSpec, TArray<FString>& OutReorderedWidgets, TArray<FString>& OutWarnings, FString& OutError)
 {
-    if (!WidgetBlueprint)
+    OutReorderedWidgets.Reset();
+    OutWarnings.Reset();
+    OutError.Reset();
+
+    if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
     {
-        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: Received a null WidgetBlueprint."));
+        OutError = TEXT("ReorderWidgetTree: Widget blueprint or widget tree is invalid.");
         return false;
     }
 
-    if (!WidgetBlueprint->WidgetTree)
+    if (TreeSpec.TrimStartAndEnd().IsEmpty())
     {
-        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: WidgetTree is null for asset '%s'."), *WidgetBlueprint->GetPathName());
+        OutError = TEXT("ReorderWidgetTree: Missing tree specification.");
         return false;
     }
 
-    UWidget* WidgetToMove = WidgetBlueprint->WidgetTree->FindWidget(FName(*WidgetName));
-    if (!WidgetToMove)
+    FWidgetOrderNode RootOrder;
+    if (!BuildOrderRoot(TreeSpec, RootName, RootOrder, OutError))
     {
-        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: Failed to find widget to move: '%s'"), *WidgetName);
         return false;
     }
 
-    UPanelWidget* NewParentWidget = Cast<UPanelWidget>(WidgetBlueprint->WidgetTree->FindWidget(FName(*TargetParentName)));
-    if (!NewParentWidget)
+    FString EffectiveRootName = RootOrder.Name;
+    if (EffectiveRootName.IsEmpty())
     {
-        UE_LOG(LogUmgSet, Error, TEXT("MoveWidget: Failed to find target parent widget: '%s'"), *TargetParentName);
+        EffectiveRootName = RootName;
+    }
+
+    UPanelWidget* RootPanel = ResolvePanelByName(WidgetBlueprint, EffectiveRootName, OutError);
+    if (!RootPanel)
+    {
         return false;
     }
 
     WidgetBlueprint->Modify();
+    ApplyOrderNode(RootPanel, RootOrder, OutReorderedWidgets, OutWarnings);
 
-    if (WidgetToMove->GetParent())
+    if (OutReorderedWidgets.Num() > 0)
     {
-        WidgetToMove->GetParent()->RemoveChild(WidgetToMove);
+        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     }
 
-    NewParentWidget->AddChild(WidgetToMove);
-    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     return true;
 }
 

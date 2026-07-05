@@ -182,9 +182,16 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
          {
              if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
              {
-                 AttentionSubsystem->SetTargetWidget(WidgetName);
-                 Response->SetBoolField(TEXT("success"), true);
-                 Response->SetStringField(TEXT("widget_name"), WidgetName);
+                 if (AttentionSubsystem->SetTargetWidget(WidgetName))
+                 {
+                     Response->SetBoolField(TEXT("success"), true);
+                     Response->SetStringField(TEXT("widget_name"), WidgetName);
+                 }
+                 else
+                 {
+                     Response->SetBoolField(TEXT("success"), false);
+                     Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Widget '%s' was not found in the current target asset."), *WidgetName));
+                 }
              }
              else
              {
@@ -336,45 +343,65 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("error"), TEXT("Failed to reparent/wrap widget. Check logs for details."));
         }
     }
-    else if (Command == TEXT("move_widget"))
+    else if (Command == TEXT("reorder_widget_tree"))
     {
         UUmgSetSubsystem* SetSubsystem = GEditor->GetEditorSubsystem<UUmgSetSubsystem>();
-        FString TargetParentName, WidgetName;
+        FString RootName;
+        if (!Params->TryGetStringField(TEXT("root"), RootName))
+        {
+            Params->TryGetStringField(TEXT("root_name"), RootName);
+        }
 
-        // 1. widget_name (dragged widget) is required
-        if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) || WidgetName.IsEmpty())
+        FString TreeSpec;
+        TSharedPtr<FJsonValue> TreeValue = Params->TryGetField(TEXT("tree"));
+        if (!TreeValue.IsValid())
         {
             Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Missing required parameter 'widget_name' (the widget to move)."));
+            Response->SetStringField(TEXT("error"), TEXT("Missing required parameter 'tree'."));
             return Response;
         }
 
-        // 2. target (parent to move to) is optional (fallback to focused target)
-        if (!Params->TryGetStringField(TEXT("target"), TargetParentName) || TargetParentName.IsEmpty())
+        if (TreeValue->Type == EJson::String)
         {
-            if (UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
-            {
-                TargetParentName = AttentionSubsystem->GetTargetWidget();
-            }
+            TreeSpec = TreeValue->AsString();
+        }
+        else
+        {
+            TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&TreeSpec);
+            FJsonSerializer::Serialize(TreeValue.ToSharedRef(), TEXT(""), Writer);
+            Writer->Close();
         }
 
-        if (TargetParentName.IsEmpty())
-        {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Target parent name was not specified and no active widget target was focused."));
-            return Response;
-        }
-
-        if (SetSubsystem->MoveWidget(TargetBlueprint, TargetParentName, WidgetName))
+        TArray<FString> ReorderedWidgets;
+        TArray<FString> Warnings;
+        FString Error;
+        if (SetSubsystem->ReorderWidgetTree(TargetBlueprint, RootName, TreeSpec, ReorderedWidgets, Warnings, Error))
         {
             Response->SetBoolField(TEXT("success"), true);
-            Response->SetStringField(TEXT("widget"), WidgetName);
-            Response->SetStringField(TEXT("new_parent"), TargetParentName);
+            if (!RootName.IsEmpty())
+            {
+                Response->SetStringField(TEXT("root"), RootName);
+            }
+
+            TArray<TSharedPtr<FJsonValue>> ReorderedJson;
+            for (const FString& Item : ReorderedWidgets)
+            {
+                ReorderedJson.Add(MakeShared<FJsonValueString>(Item));
+            }
+            Response->SetArrayField(TEXT("reordered_widgets"), ReorderedJson);
+            Response->SetNumberField(TEXT("reordered_count"), ReorderedWidgets.Num());
+
+            TArray<TSharedPtr<FJsonValue>> WarningJson;
+            for (const FString& Warning : Warnings)
+            {
+                WarningJson.Add(MakeShared<FJsonValueString>(Warning));
+            }
+            Response->SetArrayField(TEXT("warnings"), WarningJson);
         }
         else
         {
             Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Failed to move widget. Check logs for details."));
+            Response->SetStringField(TEXT("error"), Error.IsEmpty() ? TEXT("Failed to reorder widget tree.") : Error);
         }
     }
     else if (Command == TEXT("save_asset"))

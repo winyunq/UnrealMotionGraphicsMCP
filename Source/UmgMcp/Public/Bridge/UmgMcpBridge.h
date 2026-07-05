@@ -7,6 +7,8 @@
 #include "SocketSubsystem.h"
 #include "Http.h"
 #include "Json.h"
+#include "HAL/CriticalSection.h"
+#include "HAL/Event.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Interfaces/IPv4/IPv4Endpoint.h"
 #include "Editor/UmgMcpEditorCommands.h"
@@ -57,8 +59,18 @@ public:
 	FString ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
 
 private:
+    struct FQueuedBridgeCommand
+    {
+        FString CommandType;
+        TSharedPtr<FJsonObject> Params;
+        FString Response;
+        FEvent* CompletionEvent = nullptr;
+    };
+
     // Internal helper to execute command logic (thread-agnostic)
     FString InternalExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
+    void ProcessNextQueuedCommand();
+
     TSharedPtr<FUmgMcpEditorCommands> EditorCommands;
     TSharedPtr<FUmgMcpBlueprintCommands> BlueprintCommands;
     TSharedPtr<FUmgMcpAttentionCommands> AttentionCommands;
@@ -74,6 +86,9 @@ private:
     FRunnableThread* ServerThread;
     int32 Port;
     FIPv4Address ServerAddress;
+    FCriticalSection CommandQueueCs;
+    TArray<TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe>> CommandQueue;
+    bool bCommandQueueProcessing;
 
     // Static flag to prevent multiple instances from trying to bind the same port
     static bool bGlobalServerStarted;

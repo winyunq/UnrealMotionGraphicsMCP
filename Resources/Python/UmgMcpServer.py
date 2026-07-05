@@ -554,14 +554,23 @@ async def delete_widget(widget_name: str, confirm_delete: bool = False) -> Dict[
     umg_set_client = UMGSet.UMGSet(conn)
     return await umg_set_client.delete_widget(widget_name, confirm_delete)
 
-@register_tool("reparent_widget", "Moves a widget to a new parent.")
-async def reparent_widget(widget_name: str, new_parent_name: str) -> Dict[str, Any]:
+@register_tool("reorder_widget_tree", "Union-style sibling reorder from a partial widget tree.")
+async def reorder_widget_tree(tree: Any, root: str = "") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
     umg_set_client = UMGSet.UMGSet(conn)
-    return await umg_set_client.reparent_widget(widget_name, new_parent_name)
+    return await umg_set_client.reorder_widget_tree(tree, root)
+
+@register_tool("reparent_widget", "Compatibility structural replacement/wrap command.")
+async def reparent_widget(widget_name: str, new_parent_widget: Any) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    umg_set_client = UMGSet.UMGSet(conn)
+    return await umg_set_client.reparent_widget(widget_name, new_parent_widget)
 
 @register_tool("save_asset", "Saves the UMG asset.")
 async def save_asset() -> Dict[str, Any]:
