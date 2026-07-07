@@ -34,6 +34,30 @@
 | Animation | 为 Render Transform、Opacity、Color 和 Timing 创建 UMG 动画轨道与关键帧 |
 | Editor Bridge | 让外部 MCP 客户端通过 `127.0.0.1:55557` 的本机桥接调用 Unreal Editor |
 
+## 版本边界
+
+UMG MCP 是一个公开项目，但实际使用上有两条路径：
+
+- **开源版**：公开协议、Unreal 编辑器桥接、Python MCP server、工具 schema、测试和协议文档。
+- **Fab / FabServer 版**：闭源打包产品层，面向需要编辑器内 Chat、Provider 配置 UI、审批队列、本地模型和更少手动安装步骤的用户。
+
+| 能力 | 开源版 | Fab / FabServer 版 |
+| --- | --- | --- |
+| 核心 UMG Widget MCP 工具 | 有 | 有 |
+| Widget Tree 读取、属性修改、布局 append/upsert、JSON 导出/回写 | 有 | 有 |
+| Blueprint / BlueCode 协议方向和节点级桥接 | 有 | 有 |
+| Sequencer / UMG 动画工具 | 有 | 有 |
+| Material 与 HLSL 工作流 | 有 | 有 |
+| 面向外部客户端的 Python MCP server | 有，需要手动配置 `Resources/Python` | 共享协议仍可使用，但产品主路径是编辑器内工作流 |
+| 手动 clone/build 工作流 | 有 | 不需要，通过 Fab / Unreal Launcher 安装 |
+| 编辑器内 ChatWithUnreal 面板 | 无 | 有 |
+| FabServer 审批队列与内存直连执行 | 无 | 有 |
+| chat、develop、learning、task 等内置 Agent 模式 | 无 | 有 |
+| Google OAuth、API Key、智谱 AI、OpenAI 兼容端点等 Provider 设置 UI | 无 | 有 |
+| 本地 LiteRT-LM 集成 | 无 | 有 |
+| 上下文压缩 / 生产级对话管理 | 无 | 有 |
+| 最适合 | 开发者、研究者、贡献者、自定义 MCP 管线 | 美术、技术美术、生产团队、希望获得完整编辑器体验的用户 |
+
 ## 为什么需要它
 
 AI 辅助 UI 制作不能只靠截图。UMG 资产是结构化编辑器对象，严肃的自动化需要结构化访问。这个项目给 Agent 一个可以检查、测试和改进的协议表面，而不是把行为藏在黑盒 UI 操作里。
