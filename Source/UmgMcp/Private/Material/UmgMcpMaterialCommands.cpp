@@ -625,6 +625,77 @@ namespace
             Clean.Equals(TEXT("NAME_None"), ESearchCase::IgnoreCase);
     }
 
+    static bool IsReservedHlslOutputName(const FString& Name)
+    {
+        const FString Clean = Name.TrimStartAndEnd();
+        return IsReservedHlslInputName(Clean) ||
+            Clean.Equals(TEXT("return"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("break"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("continue"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("discard"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("if"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("else"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("for"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("while"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("do"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("switch"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("case"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("default"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("struct"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("float"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("float2"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("float3"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("float4"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("int"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("uint"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("bool"), ESearchCase::IgnoreCase) ||
+            Clean.Equals(TEXT("void"), ESearchCase::IgnoreCase);
+    }
+
+    static bool ValidateHlslOutputName(const FString& Name, FString& OutError)
+    {
+        if (!IsValidHlslIdentifier(Name))
+        {
+            OutError = FString::Printf(TEXT("Invalid HLSL output name '%s'. Use a valid HLSL identifier."), *Name);
+            return false;
+        }
+
+        if (IsReservedHlslOutputName(Name))
+        {
+            OutError = FString::Printf(TEXT("Invalid HLSL output name '%s'. This name is reserved by HLSL or the custom-node return contract."), *Name);
+            return false;
+        }
+
+        OutError = TEXT("");
+        return true;
+    }
+
+    static bool ValidateCustomAdditionalOutputNames(UMaterialExpressionCustom* CustomNode, FString& OutError)
+    {
+        if (!CustomNode)
+        {
+            OutError = TEXT("");
+            return true;
+        }
+
+        for (const FCustomOutput& Output : CustomNode->AdditionalOutputs)
+        {
+            const FString Name = Output.OutputName.ToString();
+            if (Output.OutputName.IsNone())
+            {
+                continue;
+            }
+
+            if (!ValidateHlslOutputName(Name, OutError))
+            {
+                return false;
+            }
+        }
+
+        OutError = TEXT("");
+        return true;
+    }
+
     static bool HasMaterialTypeOptions(const TSharedPtr<FJsonObject>& Params)
     {
         return Params.IsValid() &&
@@ -1247,9 +1318,8 @@ namespace
                 Draft.Name = Draft.Target;
             }
 
-            if (!IsValidHlslIdentifier(Draft.Name))
+            if (!ValidateHlslOutputName(Draft.Name, OutError))
             {
-                OutError = FString::Printf(TEXT("Invalid HLSL output name '%s'. Use a valid HLSL identifier."), *Draft.Name);
                 return;
             }
 
@@ -1277,6 +1347,11 @@ namespace
         CustomNode->AdditionalOutputs.Empty();
         for (const FHlslOutputDraft& Output : Outputs)
         {
+            if (!ValidateHlslOutputName(Output.Name, OutError))
+            {
+                return false;
+            }
+
             FCustomOutput NewOutput;
             NewOutput.OutputName = *Output.Name;
             NewOutput.OutputType = Output.Type;
@@ -2340,14 +2415,40 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
     }
     else if (CommandType == TEXT("hlsl_compile"))
     {
+        UMaterialExpressionCustom* CustomNode = FindSingleCustomNode(Subsystem->GetTargetMaterial());
+        FString OutputValidationError;
+        if (!ValidateCustomAdditionalOutputNames(CustomNode, OutputValidationError))
+        {
+            ResultJson->SetBoolField(TEXT("success"), false);
+            ResultJson->SetStringField(TEXT("status"), TEXT("error"));
+            ResultJson->SetBoolField(TEXT("compiled"), false);
+            ResultJson->SetBoolField(TEXT("saved"), false);
+            ResultJson->SetStringField(TEXT("error"), OutputValidationError);
+            ResultJson->SetStringField(TEXT("compile_message"), OutputValidationError);
+            return ResultJson;
+        }
+
         const FString Status = Subsystem->CompileAsset();
-        const bool bOk = !IsErrorStatus(Status);
+        const bool bCompileOk = !IsErrorStatus(Status);
+        bool bSaved = false;
+        if (bCompileOk)
+        {
+            bSaved = Subsystem->SaveTargetMaterial();
+        }
+
+        const bool bOk = bCompileOk && bSaved;
         ResultJson->SetBoolField(TEXT("success"), bOk);
         ResultJson->SetStringField(TEXT("status"), bOk ? TEXT("ok") : TEXT("error"));
+        ResultJson->SetBoolField(TEXT("compiled"), bCompileOk);
+        ResultJson->SetBoolField(TEXT("saved"), bSaved);
         ResultJson->SetStringField(TEXT("compile_message"), Status);
-        if (!bOk)
+        if (!bCompileOk)
         {
             ResultJson->SetStringField(TEXT("error"), Status);
+        }
+        else if (!bSaved)
+        {
+            ResultJson->SetStringField(TEXT("error"), TEXT("Compiled successfully but failed to save material asset."));
         }
     }
     // --- P0: Context & Search ---

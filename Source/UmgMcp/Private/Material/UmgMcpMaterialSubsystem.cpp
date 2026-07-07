@@ -19,6 +19,7 @@
 #include "MaterialGraph/MaterialGraphNode_Root.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "Editor.h" 
+#include "FileHelpers.h"
 #if WITH_EDITOR
 #endif
 #include "EdGraph/EdGraph.h"
@@ -33,6 +34,52 @@
 #include "UObject/SavePackage.h"
 #include "UObject/UnrealType.h"
 #include "JsonObjectConverter.h"
+#include "Misc/PackageName.h"
+
+namespace
+{
+bool ResolveMaterialAssetPath(const FString& InAssetPath, FString& OutPackageName, FString& OutObjectPath, FString& OutAssetName, FString& OutError)
+{
+    FString CleanPath = InAssetPath.TrimStartAndEnd();
+    CleanPath.ReplaceInline(TEXT("\\"), TEXT("/"));
+
+    if (CleanPath.EndsWith(FPackageName::GetAssetPackageExtension()))
+    {
+        CleanPath.LeftChopInline(FPackageName::GetAssetPackageExtension().Len());
+    }
+
+    if (CleanPath.IsEmpty() || !CleanPath.StartsWith(TEXT("/")))
+    {
+        OutError = FString::Printf(TEXT("错误: 无效的资产路径: %s"), *InAssetPath);
+        return false;
+    }
+
+    OutPackageName = FPackageName::ObjectPathToPackageName(CleanPath);
+    if (OutPackageName.IsEmpty())
+    {
+        OutPackageName = CleanPath;
+    }
+
+    FText FailureReason;
+    if (!FPackageName::IsValidLongPackageName(OutPackageName, true, &FailureReason))
+    {
+        OutError = FString::Printf(TEXT("错误: 无效的材质包路径: %s (%s)"), *OutPackageName, *FailureReason.ToString());
+        return false;
+    }
+
+    OutAssetName = FPackageName::GetLongPackageAssetName(OutPackageName);
+    if (OutAssetName.IsEmpty())
+    {
+        OutError = FString::Printf(TEXT("错误: 无效的材质包路径，缺少资产名: %s"), *OutPackageName);
+        return false;
+    }
+
+    OutObjectPath = CleanPath.Contains(TEXT("."))
+        ? CleanPath
+        : FString::Printf(TEXT("%s.%s"), *OutPackageName, *OutAssetName);
+    return true;
+}
+}
 
 void UUmgMcpMaterialSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -50,14 +97,22 @@ FString UUmgMcpMaterialSubsystem::SetTargetMaterial(const FString& AssetPath, bo
     // UE_LOG(LogTemp, Warning, TEXT("[SetTargetMaterial] Called with path: %s"), *AssetPath);
     
     UMaterial* TargetMat = nullptr;
+    FString PackageName;
+    FString ObjectPath;
+    FString AssetName;
+    FString PathError;
+    if (!ResolveMaterialAssetPath(AssetPath, PackageName, ObjectPath, AssetName, PathError))
+    {
+        return PathError;
+    }
     
     // 1. Try to find in open Editor FIRST (UMG pattern)
     if (GEditor)
     {
         if (UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
         {
-            FSoftObjectPath ObjectPath(AssetPath);
-            UObject* AssetObj = ObjectPath.ResolveObject();  // UMG uses ResolveObject, not TryLoad
+            FSoftObjectPath SoftObjectPath(ObjectPath);
+            UObject* AssetObj = SoftObjectPath.ResolveObject();  // UMG uses ResolveObject, not TryLoad
             
             if (AssetObj)
             {
@@ -69,7 +124,7 @@ FString UUmgMcpMaterialSubsystem::SetTargetMaterial(const FString& AssetPath, bo
                     {
                         TargetMaterial = TargetMat;
                         // UE_LOG(LogTemp, Warning, TEXT("[SetTargetMaterial] SUCCESS: Found open editor, using live instance (has Graph)"));
-                        return FString::Printf(TEXT("设置目标材质成功: %s (编辑器实例)"), *AssetPath);
+                        return FString::Printf(TEXT("设置目标材质成功: %s (编辑器实例)"), *ObjectPath);
                     }
                 }
             }
@@ -79,28 +134,20 @@ FString UUmgMcpMaterialSubsystem::SetTargetMaterial(const FString& AssetPath, bo
     // 2. Fallback to LoadObject if not in editor (UMG pattern)
     if (!TargetMat)
     {
-        TargetMat = LoadObject<UMaterial>(nullptr, *AssetPath, nullptr, LOAD_NoWarn);
+        TargetMat = LoadObject<UMaterial>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
     }
     
     if (TargetMat)
     {
         TargetMaterial = TargetMat;
         // UE_LOG(LogTemp, Warning, TEXT("[SetTargetMaterial] SUCCESS: Loaded from disk"));
-        return FString::Printf(TEXT("设置目标材质成功: %s"), *AssetPath);
+        return FString::Printf(TEXT("设置目标材质成功: %s"), *ObjectPath);
     }
     
 
     // 2. Create if Not Found and Allowed
     if (bCreateIfNotFound)
     {
-        FString PackageName = AssetPath;
-        FString AssetName = FPackageName::GetShortName(PackageName);
-        
-        if (!FPackageName::IsValidObjectPath(PackageName))
-        {
-            return FString::Printf(TEXT("错误: 无效的资产路径: %s"), *AssetPath);
-        }
-
         UPackage* Package = CreatePackage(*PackageName);
         UMaterialFactoryNew* Factory = NewObject<UMaterialFactoryNew>();
         
@@ -122,11 +169,11 @@ FString UUmgMcpMaterialSubsystem::SetTargetMaterial(const FString& AssetPath, bo
             FAssetRegistryModule::AssetCreated(NewMat);
             NewMat->MarkPackageDirty();
             TargetMaterial = NewMat;
-            return FString::Printf(TEXT("创建并设置目标材质: %s"), *AssetPath);
+            return FString::Printf(TEXT("创建并设置目标材质: %s"), *ObjectPath);
         }
     }
 
-    return FString::Printf(TEXT("错误: 找不到材质且未允许创建: %s"), *AssetPath);
+    return FString::Printf(TEXT("错误: 找不到材质且未允许创建: %s"), *ObjectPath);
 }
 
 UMaterial* UUmgMcpMaterialSubsystem::GetTargetMaterial() const
@@ -1042,6 +1089,36 @@ FString UUmgMcpMaterialSubsystem::CompileAsset()
         return TEXT("Compiled Successfully");
     }
     return TEXT("Error: No Target Material");
+}
+
+bool UUmgMcpMaterialSubsystem::SaveTargetMaterial()
+{
+    UMaterial* Mat = GetTargetMaterial();
+    if (!Mat)
+    {
+        UE_LOG(LogTemp, Error, TEXT("SaveTargetMaterial: No target material."));
+        return false;
+    }
+
+    UPackage* Package = Mat->GetOutermost();
+    if (!Package)
+    {
+        UE_LOG(LogTemp, Error, TEXT("SaveTargetMaterial: Failed to get package for asset '%s'."), *Mat->GetPathName());
+        return false;
+    }
+
+    TArray<UPackage*> PackagesToSave;
+    PackagesToSave.Add(Package);
+
+    FEditorFileUtils::EPromptReturnCode ReturnCode = FEditorFileUtils::PromptForCheckoutAndSave(PackagesToSave, false, false);
+    if (ReturnCode == FEditorFileUtils::EPromptReturnCode::PR_Success)
+    {
+        UE_LOG(LogTemp, Log, TEXT("SaveTargetMaterial: Successfully saved asset '%s'."), *Mat->GetPathName());
+        return true;
+    }
+
+    UE_LOG(LogTemp, Error, TEXT("SaveTargetMaterial: Failed to save asset '%s'."), *Mat->GetPathName());
+    return false;
 }
 
 FString UUmgMcpMaterialSubsystem::GetNodeInfo(const FString& NodeHandle)

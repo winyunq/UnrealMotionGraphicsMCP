@@ -145,6 +145,39 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("error"), TEXT("Missing 'widget_type' parameter."));
         }
     }
+    else if (Command == TEXT("get_layout_data"))
+    {
+        UUmgGetSubsystem* GetSubsystem = GEditor->GetEditorSubsystem<UUmgGetSubsystem>();
+        int32 ResolutionWidth = 1920;
+        int32 ResolutionHeight = 1080;
+        if (Params.IsValid())
+        {
+            if (Params->HasField(TEXT("resolution_width")))
+            {
+                ResolutionWidth = Params->GetIntegerField(TEXT("resolution_width"));
+            }
+            if (Params->HasField(TEXT("resolution_height")))
+            {
+                ResolutionHeight = Params->GetIntegerField(TEXT("resolution_height"));
+            }
+        }
+
+        FString LayoutJsonString = GetSubsystem->GetLayoutData(TargetBlueprint, ResolutionWidth, ResolutionHeight);
+        TArray<TSharedPtr<FJsonValue>> LayoutArray;
+        TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(LayoutJsonString);
+        if (FJsonSerializer::Deserialize(Reader, LayoutArray))
+        {
+            Response->SetBoolField(TEXT("success"), true);
+            Response->SetArrayField(TEXT("layout_data"), LayoutArray);
+            Response->SetNumberField(TEXT("resolution_width"), ResolutionWidth);
+            Response->SetNumberField(TEXT("resolution_height"), ResolutionHeight);
+        }
+        else
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), TEXT("Failed to get layout data or parse response."));
+        }
+    }
     // ... other GET commands
     
     // --- SET/ACTION COMMANDS ---

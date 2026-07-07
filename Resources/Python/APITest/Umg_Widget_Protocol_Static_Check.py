@@ -49,6 +49,7 @@ def main() -> None:
         "create_widget",
         "set_widget_properties",
         "delete_widget",
+        "reorder_widget_tree",
         "reparent_widget",
         "apply_layout",
         "save_asset",
@@ -86,9 +87,16 @@ def main() -> None:
         raise AssertionError("delete_widget prompt must require confirm_delete=true")
 
     require_text("Resources/Python/UmgMcpServer.py", "async def delete_widget(widget_name: str, confirm_delete: bool = False)")
+    require_text("Resources/Python/UmgMcpServer.py", "async def reorder_widget_tree")
     require_text("Resources/Python/Widget/UMGSet.py", '"confirm_delete": confirm_delete')
+    require_text("Resources/Python/Widget/UMGSet.py", "reorder_widget_tree")
     require_text("Source/UmgMcp/Private/Widget/UmgMcpWidgetCommands.cpp", "Deletion hardened (Issue 15)")
+    require_text("Source/UmgMcp/Private/Widget/UmgMcpWidgetCommands.cpp", "Command == TEXT(\"reorder_widget_tree\")")
+    require_text("Source/UmgMcp/Private/Widget/UmgMcpWidgetCommands.cpp", "Command == TEXT(\"get_layout_data\")")
+    require_text("Source/UmgMcp/Private/Widget/UmgSetSubsystem.cpp", "Removed stale source widget GUID")
+    require_text("Source/UmgMcp/Private/Widget/UmgSetSubsystem.cpp", "WidgetVariableNameToGuidMap.Remove")
     require_text("Document/UmgWidgetMcpProtocol.md", "confirm_delete=true")
+    require_text("Document/UmgWidgetMcpProtocol.md", "reorder_widget_tree")
     require_text("Document/UmgWidgetMcpProtocol.md", "set_widget_properties")
     require_text("README.md", "`delete_widget`")
     require_text("Readme_zh.md", "`delete_widget`")

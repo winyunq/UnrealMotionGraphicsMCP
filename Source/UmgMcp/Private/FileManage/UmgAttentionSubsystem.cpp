@@ -63,6 +63,26 @@ bool CanAutoCreateUmgAsset(const FString& PackageName)
 {
     return PackageName.StartsWith(TEXT("/Game/"));
 }
+
+bool IsSameAssetPackagePath(const FString& LeftPath, const FString& RightPath)
+{
+    FString LeftCleanPath;
+    FString LeftPackageName;
+    FString LeftObjectPath;
+    FString LeftError;
+    FString RightCleanPath;
+    FString RightPackageName;
+    FString RightObjectPath;
+    FString RightError;
+
+    if (!ResolveUmgAssetPath(LeftPath, LeftCleanPath, LeftPackageName, LeftObjectPath, LeftError) ||
+        !ResolveUmgAssetPath(RightPath, RightCleanPath, RightPackageName, RightObjectPath, RightError))
+    {
+        return LeftPath.Equals(RightPath, ESearchCase::IgnoreCase);
+    }
+
+    return LeftPackageName.Equals(RightPackageName, ESearchCase::IgnoreCase);
+}
 }
 
 void UUmgAttentionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -313,7 +333,17 @@ UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
     
     if (CachedTargetWidgetBlueprint.IsValid())
     {
-        return CachedTargetWidgetBlueprint.Get();
+        UWidgetBlueprint* CachedBP = CachedTargetWidgetBlueprint.Get();
+        if (AttentionTargetAssetPath.IsEmpty() || IsSameAssetPackagePath(AttentionTargetAssetPath, CachedBP->GetPathName()))
+        {
+            return CachedBP;
+        }
+
+        UE_LOG(LogUmgAttention, Warning, TEXT("Cached target object '%s' does not match attention target '%s'. Discarding stale cache."),
+            *CachedBP->GetPathName(),
+            *AttentionTargetAssetPath);
+        UUmgAttentionSubsystem* MutableThis = const_cast<UUmgAttentionSubsystem*>(this);
+        MutableThis->CachedTargetWidgetBlueprint = nullptr;
     }
 
     // If there's no explicit target, maybe the last edited one is what we want.

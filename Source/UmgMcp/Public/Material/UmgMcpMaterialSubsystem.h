@@ -148,6 +148,11 @@ public:
      **/
     FString CompileAsset();
 
+    /**
+     * Save the current target material package.
+     */
+    bool SaveTargetMaterial();
+
 private:
      /**
      * @brief       当前编辑的材质引用（直接从MaterialEditor获取）

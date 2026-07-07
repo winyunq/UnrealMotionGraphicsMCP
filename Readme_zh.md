@@ -223,6 +223,7 @@ flowchart LR
 | **动作与修改**     | `create_widget`                  |   ✅   | 创建新的控件。                                                                                  |
 |                    | `delete_widget`                  |   ✅   | 显式删除指定控件；必须传入 `confirm_delete=true`。                                              |
 |                    | `set_widget_properties`          |   ✅   | 设置控件属性（widget_name 缺省时默认修改当前 target；采用并集覆盖写入）。                        |
+|                    | `reorder_widget_tree`            |   ✅   | 按局部树重排已存在的同父级控件，不创建也不删除控件。                                            |
 |                    | `reparent_widget`                |   ✅   | 转换/移动控件，并尽可能保留子控件；可能丢失子控件的场景会失败。                                 |
 |                    | `save_asset`                     |   ✅   | 保存当前活跃的 UMG 资产。                                                                       |
 |                    | `apply_layout`                   |   ✅   | 应用整盘的 HTML/JSON 布局代码。                                                                 |

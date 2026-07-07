@@ -224,6 +224,7 @@ This project has been developed with significant assistance from **Gemini, an AI
 | **Actions & Modifications** | `create_widget`                  |   ✅    | Create a new widget.                                                                             |
 |                             | `delete_widget`                  |   ✅    | Explicitly delete a widget; requires `confirm_delete=true`.                                      |
 |                             | `set_widget_properties`          |   ✅    | Set properties of a widget (omit widget_name to target active widget; union write fashion).      |
+|                             | `reorder_widget_tree`            |   ✅    | Reorder existing siblings from a partial tree without creating or deleting widgets.              |
 |                             | `reparent_widget`                |   ✅    | Convert/move a widget while preserving children where possible; child-loss cases fail.           |
 |                             | `save_asset`                     |   ✅    | Save the active UMG asset.                                                                       |
 |                             | `apply_layout`                   |   ✅    | Apply bulk layout definition (HTML/JSON).                                                        |

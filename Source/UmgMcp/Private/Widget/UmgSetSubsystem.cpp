@@ -9,7 +9,9 @@
 #include "Components/PanelWidget.h"
 #include "JsonObjectConverter.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "FileHelpers.h"
@@ -17,6 +19,456 @@
 #include "Components/CanvasPanelSlot.h"
 
 DEFINE_LOG_CATEGORY(LogUmgSet);
+
+namespace
+{
+    struct FWidgetOrderNode
+    {
+        FString Name;
+        TArray<FWidgetOrderNode> Children;
+    };
+
+    static bool GetStringFieldAny(const TSharedPtr<FJsonObject>& Object, const TArray<FString>& Keys, FString& OutValue)
+    {
+        if (!Object.IsValid())
+        {
+            return false;
+        }
+
+        for (const FString& Key : Keys)
+        {
+            if (Object->TryGetStringField(Key, OutValue))
+            {
+                OutValue.TrimStartAndEndInline();
+                return !OutValue.IsEmpty();
+            }
+        }
+
+        return false;
+    }
+
+    static bool ParseOrderNodeValue(const TSharedPtr<FJsonValue>& Value, FWidgetOrderNode& OutNode, FString& OutError);
+
+    static bool ParseOrderNodeArray(const TArray<TSharedPtr<FJsonValue>>& Values, TArray<FWidgetOrderNode>& OutNodes, FString& OutError)
+    {
+        for (const TSharedPtr<FJsonValue>& ChildValue : Values)
+        {
+            FWidgetOrderNode ChildNode;
+            if (!ParseOrderNodeValue(ChildValue, ChildNode, OutError))
+            {
+                return false;
+            }
+
+            OutNodes.Add(MoveTemp(ChildNode));
+        }
+
+        return true;
+    }
+
+    static bool TryGetChildrenArray(const TSharedPtr<FJsonObject>& Object, const TArray<TSharedPtr<FJsonValue>>*& OutChildren)
+    {
+        return Object.IsValid() &&
+            (Object->TryGetArrayField(TEXT("children"), OutChildren) ||
+             Object->TryGetArrayField(TEXT("widgets"), OutChildren) ||
+             Object->TryGetArrayField(TEXT("tree"), OutChildren));
+    }
+
+    static bool ParseOrderNodeObject(const TSharedPtr<FJsonObject>& Object, FWidgetOrderNode& OutNode, FString& OutError)
+    {
+        GetStringFieldAny(Object, {TEXT("name"), TEXT("widget_name"), TEXT("widget"), TEXT("root")}, OutNode.Name);
+
+        const TArray<TSharedPtr<FJsonValue>>* Children = nullptr;
+        if (TryGetChildrenArray(Object, Children))
+        {
+            if (!ParseOrderNodeArray(*Children, OutNode.Children, OutError))
+            {
+                return false;
+            }
+        }
+
+        if (OutNode.Name.IsEmpty() && OutNode.Children.Num() == 0)
+        {
+            OutError = TEXT("Tree object must contain a widget name or children array.");
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool ParseOrderNodeValue(const TSharedPtr<FJsonValue>& Value, FWidgetOrderNode& OutNode, FString& OutError)
+    {
+        if (!Value.IsValid())
+        {
+            OutError = TEXT("Tree contains an invalid/null entry.");
+            return false;
+        }
+
+        if (Value->Type == EJson::String)
+        {
+            OutNode.Name = Value->AsString();
+            OutNode.Name.TrimStartAndEndInline();
+            if (OutNode.Name.IsEmpty())
+            {
+                OutError = TEXT("Tree contains an empty widget name.");
+                return false;
+            }
+            return true;
+        }
+
+        if (Value->Type == EJson::Object)
+        {
+            return ParseOrderNodeObject(Value->AsObject(), OutNode, OutError);
+        }
+
+        OutError = TEXT("Tree entries must be widget-name strings or objects with name/children.");
+        return false;
+    }
+
+    static FString NormalizeTreeLine(const FString& RawLine)
+    {
+        FString Line = RawLine.TrimStartAndEnd();
+        while (Line.StartsWith(TEXT("-")) || Line.StartsWith(TEXT("*")))
+        {
+            Line.RightChopInline(1);
+            Line.TrimStartAndEndInline();
+        }
+        return Line;
+    }
+
+    static int32 CountLeadingIndent(const FString& RawLine)
+    {
+        int32 Indent = 0;
+        for (TCHAR Ch : RawLine)
+        {
+            if (Ch == TEXT(' '))
+            {
+                ++Indent;
+            }
+            else if (Ch == TEXT('\t'))
+            {
+                Indent += 4;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return Indent;
+    }
+
+    struct FTreeLine
+    {
+        int32 Indent = 0;
+        FString Name;
+    };
+
+    static bool ParseTextTree(const FString& Text, const FString& RootName, FWidgetOrderNode& OutRoot, FString& OutError)
+    {
+        TArray<FString> RawLines;
+        Text.Replace(TEXT("\r"), TEXT("")).ParseIntoArrayLines(RawLines, true);
+
+        TArray<FTreeLine> Lines;
+        for (const FString& RawLine : RawLines)
+        {
+            FString Name = NormalizeTreeLine(RawLine);
+            if (!Name.IsEmpty())
+            {
+                FTreeLine& Line = Lines.AddDefaulted_GetRef();
+                Line.Indent = CountLeadingIndent(RawLine);
+                Line.Name = MoveTemp(Name);
+            }
+        }
+
+        if (Lines.Num() == 0)
+        {
+            OutError = TEXT("Tree text is empty.");
+            return false;
+        }
+
+        int32 StartIndex = 0;
+        int32 RootIndent = -1;
+        if (!RootName.IsEmpty())
+        {
+            OutRoot.Name = RootName;
+            if (Lines[0].Name.Equals(RootName, ESearchCase::IgnoreCase))
+            {
+                RootIndent = Lines[0].Indent;
+                StartIndex = 1;
+            }
+        }
+        else
+        {
+            OutRoot.Name = Lines[0].Name;
+            RootIndent = Lines[0].Indent;
+            StartIndex = 1;
+        }
+
+        if (OutRoot.Name.IsEmpty())
+        {
+            OutError = TEXT("Tree root is empty. Provide root or a first tree line.");
+            return false;
+        }
+
+        TArray<TPair<int32, FWidgetOrderNode*>> Stack;
+        Stack.Add(TPair<int32, FWidgetOrderNode*>(RootIndent, &OutRoot));
+
+        for (int32 Index = StartIndex; Index < Lines.Num(); ++Index)
+        {
+            const FTreeLine& Line = Lines[Index];
+            while (Stack.Num() > 1 && Line.Indent <= Stack.Last().Key)
+            {
+                Stack.Pop();
+            }
+
+            FWidgetOrderNode* ParentNode = Stack.Last().Value;
+            FWidgetOrderNode& NewNode = ParentNode->Children.AddDefaulted_GetRef();
+            NewNode.Name = Line.Name;
+            Stack.Add(TPair<int32, FWidgetOrderNode*>(Line.Indent, &NewNode));
+        }
+
+        return true;
+    }
+
+    static bool BuildOrderRoot(const FString& TreeSpec, const FString& RootName, FWidgetOrderNode& OutRoot, FString& OutError)
+    {
+        TSharedPtr<FJsonValue> ParsedValue;
+        TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(TreeSpec);
+        if (FJsonSerializer::Deserialize(Reader, ParsedValue) && ParsedValue.IsValid())
+        {
+            if (ParsedValue->Type == EJson::Array)
+            {
+                OutRoot.Name = RootName;
+                return ParseOrderNodeArray(ParsedValue->AsArray(), OutRoot.Children, OutError);
+            }
+
+            if (ParsedValue->Type == EJson::Object)
+            {
+                FWidgetOrderNode ParsedNode;
+                if (!ParseOrderNodeObject(ParsedValue->AsObject(), ParsedNode, OutError))
+                {
+                    return false;
+                }
+
+                if (!RootName.IsEmpty() && ParsedNode.Name.IsEmpty())
+                {
+                    OutRoot.Name = RootName;
+                    OutRoot.Children = MoveTemp(ParsedNode.Children);
+                }
+                else if (RootName.IsEmpty() || ParsedNode.Name.Equals(RootName, ESearchCase::IgnoreCase))
+                {
+                    OutRoot = MoveTemp(ParsedNode);
+                }
+                else
+                {
+                    OutRoot.Name = RootName;
+                    OutRoot.Children.Add(MoveTemp(ParsedNode));
+                }
+                return true;
+            }
+
+            if (ParsedValue->Type == EJson::String)
+            {
+                return ParseTextTree(ParsedValue->AsString(), RootName, OutRoot, OutError);
+            }
+
+            OutError = TEXT("Tree must be an array, object, string, or outline text.");
+            return false;
+        }
+
+        return ParseTextTree(TreeSpec, RootName, OutRoot, OutError);
+    }
+
+    static UPanelWidget* ResolvePanelByName(UWidgetBlueprint* WidgetBlueprint, const FString& PanelName, FString& OutError)
+    {
+        if (!WidgetBlueprint || !WidgetBlueprint->WidgetTree)
+        {
+            OutError = TEXT("Widget blueprint or widget tree is invalid.");
+            return nullptr;
+        }
+
+        UWidget* Widget = nullptr;
+        if (!PanelName.IsEmpty())
+        {
+            Widget = WidgetBlueprint->WidgetTree->FindWidget(FName(*PanelName));
+        }
+
+        if (!Widget && (PanelName.IsEmpty() || PanelName.Equals(TEXT("root"), ESearchCase::IgnoreCase)))
+        {
+            Widget = WidgetBlueprint->WidgetTree->RootWidget;
+        }
+
+        if (!Widget)
+        {
+            OutError = FString::Printf(TEXT("Tree parent '%s' was not found."), *PanelName);
+            return nullptr;
+        }
+
+        UPanelWidget* Panel = Cast<UPanelWidget>(Widget);
+        if (!Panel)
+        {
+            OutError = FString::Printf(TEXT("Tree parent '%s' is not a panel widget."), *Widget->GetName());
+            return nullptr;
+        }
+
+        return Panel;
+    }
+
+    static bool EnsureSourceWidgetGuids(UWidgetBlueprint* WidgetBlueprint)
+    {
+#if WITH_EDITORONLY_DATA
+        if (!WidgetBlueprint)
+        {
+            return false;
+        }
+
+        bool bModifiedBlueprint = false;
+        bool bChanged = false;
+        TSet<FName> SourceWidgetNames;
+        WidgetBlueprint->ForEachSourceWidget([WidgetBlueprint, &bModifiedBlueprint, &bChanged, &SourceWidgetNames](UWidget* Widget)
+        {
+            if (!Widget)
+            {
+                return;
+            }
+
+            const FName WidgetName = Widget->GetFName();
+            if (WidgetName.IsNone())
+            {
+                return;
+            }
+
+            SourceWidgetNames.Add(WidgetName);
+            FGuid* ExistingGuid = WidgetBlueprint->WidgetVariableNameToGuidMap.Find(WidgetName);
+            if (!ExistingGuid || !ExistingGuid->IsValid())
+            {
+                if (!bModifiedBlueprint)
+                {
+                    WidgetBlueprint->Modify();
+                    bModifiedBlueprint = true;
+                }
+
+                WidgetBlueprint->WidgetVariableNameToGuidMap.Add(WidgetName, FGuid::NewGuid());
+                bChanged = true;
+                UE_LOG(LogUmgSet, Verbose, TEXT("Ensured GUID for source widget '%s' in '%s'."), *WidgetName.ToString(), *WidgetBlueprint->GetPathName());
+            }
+        });
+
+        TArray<FName> StaleNames;
+        for (const TPair<FName, FGuid>& Pair : WidgetBlueprint->WidgetVariableNameToGuidMap)
+        {
+            if (!SourceWidgetNames.Contains(Pair.Key))
+            {
+                StaleNames.Add(Pair.Key);
+            }
+        }
+
+        for (const FName& StaleName : StaleNames)
+        {
+            if (!bModifiedBlueprint)
+            {
+                WidgetBlueprint->Modify();
+                bModifiedBlueprint = true;
+            }
+
+            WidgetBlueprint->WidgetVariableNameToGuidMap.Remove(StaleName);
+            bChanged = true;
+            UE_LOG(LogUmgSet, Log, TEXT("Removed stale source widget GUID '%s' from '%s'."), *StaleName.ToString(), *WidgetBlueprint->GetPathName());
+        }
+
+        return bChanged;
+#else
+        return false;
+#endif
+    }
+
+    static UWidget* FindDirectChildByName(UPanelWidget* ParentPanel, const FString& ChildName, int32& OutIndex)
+    {
+        OutIndex = INDEX_NONE;
+        if (!ParentPanel)
+        {
+            return nullptr;
+        }
+
+        for (int32 Index = 0; Index < ParentPanel->GetChildrenCount(); ++Index)
+        {
+            UWidget* Child = ParentPanel->GetChildAt(Index);
+            if (Child && Child->GetName().Equals(ChildName, ESearchCase::IgnoreCase))
+            {
+                OutIndex = Index;
+                return Child;
+            }
+        }
+
+        return nullptr;
+    }
+
+    static void ApplyOrderNode(UPanelWidget* ParentPanel, const FWidgetOrderNode& ParentOrder, TArray<FString>& OutReorderedWidgets, TArray<FString>& OutWarnings)
+    {
+        if (!ParentPanel)
+        {
+            return;
+        }
+
+        TSet<FString> SeenNames;
+        int32 TargetIndex = 0;
+        for (const FWidgetOrderNode& ChildOrder : ParentOrder.Children)
+        {
+            if (ChildOrder.Name.IsEmpty())
+            {
+                continue;
+            }
+
+            const FString Key = ChildOrder.Name.ToLower();
+            if (SeenNames.Contains(Key))
+            {
+                OutWarnings.Add(FString::Printf(TEXT("Duplicate child '%s' under '%s' ignored."), *ChildOrder.Name, *ParentPanel->GetName()));
+                continue;
+            }
+            SeenNames.Add(Key);
+
+            int32 CurrentIndex = INDEX_NONE;
+            UWidget* Child = FindDirectChildByName(ParentPanel, ChildOrder.Name, CurrentIndex);
+            if (!Child)
+            {
+                OutWarnings.Add(FString::Printf(TEXT("Child '%s' is not a direct child of '%s'; skipped."), *ChildOrder.Name, *ParentPanel->GetName()));
+                continue;
+            }
+
+            if (CurrentIndex != TargetIndex)
+            {
+                ParentPanel->Modify();
+                Child->Modify();
+                if (Child->Slot)
+                {
+                    Child->Slot->Modify();
+                }
+                ParentPanel->ShiftChild(TargetIndex, Child);
+                OutReorderedWidgets.Add(FString::Printf(TEXT("%s -> %s[%d]"), *Child->GetName(), *ParentPanel->GetName(), TargetIndex));
+            }
+
+            ++TargetIndex;
+        }
+
+        for (const FWidgetOrderNode& ChildOrder : ParentOrder.Children)
+        {
+            if (ChildOrder.Children.Num() == 0)
+            {
+                continue;
+            }
+
+            int32 ChildIndex = INDEX_NONE;
+            UWidget* Child = FindDirectChildByName(ParentPanel, ChildOrder.Name, ChildIndex);
+            UPanelWidget* ChildPanel = Cast<UPanelWidget>(Child);
+            if (!ChildPanel)
+            {
+                OutWarnings.Add(FString::Printf(TEXT("Child '%s' under '%s' has nested order entries but is not a panel."), *ChildOrder.Name, *ParentPanel->GetName()));
+                continue;
+            }
+
+            ApplyOrderNode(ChildPanel, ChildOrder, OutReorderedWidgets, OutWarnings);
+        }
+    }
+}
 
 void UUmgSetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -447,13 +899,7 @@ FString UUmgSetSubsystem::CreateWidget(UWidgetBlueprint* WidgetBlueprint, const 
         UE_LOG(LogUmgSet, Log, TEXT("CreateWidget: Successfully created '%s' as child of '%s'."), *WidgetName, *ActualParentName);
     }
 
-    // CRITICAL FIX: Register the new widget with a GUID in the Blueprint
-    // The UMG Compiler expects every variable widget to have a mapped GUID.
-    if (NewWidget->bIsVariable)
-    {
-        FGuid NewGuid = FGuid::NewGuid();
-        WidgetBlueprint->WidgetVariableNameToGuidMap.Add(NewWidget->GetFName(), NewGuid);
-    }
+    EnsureSourceWidgetGuids(WidgetBlueprint);
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     return NewWidget->GetName();
@@ -484,6 +930,7 @@ bool UUmgSetSubsystem::DeleteWidget(UWidgetBlueprint* WidgetBlueprint, const FSt
 
     if (WidgetBlueprint->WidgetTree->RemoveWidget(FoundWidget))
     {
+        EnsureSourceWidgetGuids(WidgetBlueprint);
         FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
         return true;
     }
@@ -737,10 +1184,7 @@ TArray<FString> UUmgSetSubsystem::ReparentWidget(UWidgetBlueprint* WidgetBluepri
         FinalName = WidgetName;
     }
 
-    if (NewWidget->bIsVariable)
-    {
-        WidgetBlueprint->WidgetVariableNameToGuidMap.Add(NewWidget->GetFName(), FGuid::NewGuid());
-    }
+    EnsureSourceWidgetGuids(WidgetBlueprint);
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBlueprint);
     AffectedWidgets.Add(FinalName); // The converted widget itself is affected
