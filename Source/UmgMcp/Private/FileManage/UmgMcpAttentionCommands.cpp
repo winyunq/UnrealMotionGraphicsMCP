@@ -6,6 +6,42 @@
 #include "Serialization/JsonSerializer.h"
 #include "WidgetBlueprint.h" // Added based on UmgAttentionSubsystem.cpp
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Misc/PackageName.h"
+
+namespace
+{
+FString ToAssetRegistryObjectPath(const FString& InAssetPath)
+{
+    FString CleanPath = InAssetPath.TrimStartAndEnd();
+    CleanPath.ReplaceInline(TEXT("\\"), TEXT("/"));
+
+    if (CleanPath.EndsWith(FPackageName::GetAssetPackageExtension()))
+    {
+        CleanPath.LeftChopInline(FPackageName::GetAssetPackageExtension().Len());
+    }
+
+    const FString PackageName = FPackageName::ObjectPathToPackageName(CleanPath);
+    if (CleanPath.Contains(TEXT(".")) || PackageName.IsEmpty())
+    {
+        return CleanPath;
+    }
+
+    const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
+    if (AssetName.IsEmpty())
+    {
+        return CleanPath;
+    }
+
+    return FString::Printf(TEXT("%s.%s"), *PackageName, *AssetName);
+}
+
+bool CanAutoCreateFromPath(const FString& InAssetPath)
+{
+    const FString ObjectPath = ToAssetRegistryObjectPath(InAssetPath);
+    const FString PackageName = FPackageName::ObjectPathToPackageName(ObjectPath);
+    return PackageName.StartsWith(TEXT("/Game/"));
+}
+}
 
 TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& Command, const TSharedPtr<FJsonObject>& Params)
 {
@@ -78,13 +114,14 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
             FString AssetPath = AssetPathInput;
             // Use AssetRegistry to check existence without loading the asset
             IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
-            bool bAlreadyExists = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(AssetPath)).IsValid();
+            bool bAlreadyExists = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(ToAssetRegistryObjectPath(AssetPath))).IsValid();
+            bool bCanAutoCreate = CanAutoCreateFromPath(AssetPath);
             bool bSuccess = AttentionSubsystem->SetTargetUmgAsset(AssetPath);
             if (bSuccess)
             {
                 Response->SetBoolField(TEXT("success"), true);
                 Response->SetStringField(TEXT("asset_path"), AssetPath);
-                Response->SetStringField(TEXT("action"), bAlreadyExists ? TEXT("loaded") : TEXT("created"));
+                Response->SetStringField(TEXT("action"), (bAlreadyExists || !bCanAutoCreate) ? TEXT("loaded") : TEXT("created"));
 
                 if (!WidgetTarget.IsEmpty())
                 {

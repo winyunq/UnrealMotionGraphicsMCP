@@ -372,12 +372,15 @@ async def get_recently_edited_umg_assets(max_count: int = 5) -> Dict[str, Any]:
 
 def normalize_project_path(path: str) -> str:
     """
-    Normalizes a project path to the Unreal /Game/ format, actively
-    combating directory traversal (../) and enforcing valid roots.
-    Example: 'Content/MyWidget' -> '/Game/MyWidget'
+    Normalizes user-friendly project paths without changing explicit package
+    mount roots. Relative paths still default to /Game, but absolute Unreal
+    paths such as /FogOfWar/... must remain in their requested namespace.
     """
     import posixpath
     path = path.replace('\\', '/')
+    if any(segment == '..' for segment in path.split('/')):
+        raise ValueError("Unreal asset paths must not contain '..' segments.")
+
     if path.startswith('Content/'):
         path = '/Game/' + path[8:]
         
@@ -387,10 +390,6 @@ def normalize_project_path(path: str) -> str:
     resolved = posixpath.normpath(path)
     if not resolved.startswith('/'):
         resolved = '/' + resolved
-        
-    valid_roots = ('/Game/', '/Engine/', '/Script/', '/Plugin/')
-    if not any(resolved.startswith(root) for root in valid_roots):
-        resolved = '/Game/' + resolved.lstrip('/')
         
     return resolved
 

@@ -9,9 +9,61 @@
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "WidgetBlueprintFactory.h"
+#include "Misc/PackageName.h"
 
 // Define a log category for easy debugging.
 DEFINE_LOG_CATEGORY_STATIC(LogUmgAttention, Log, All);
+
+namespace
+{
+bool ResolveUmgAssetPath(const FString& InAssetPath, FString& OutCleanPath, FString& OutPackageName, FString& OutObjectPath, FString& OutError)
+{
+    OutCleanPath = InAssetPath.TrimStartAndEnd();
+    OutCleanPath.ReplaceInline(TEXT("\\"), TEXT("/"));
+
+    if (OutCleanPath.EndsWith(FPackageName::GetAssetPackageExtension()))
+    {
+        OutCleanPath.LeftChopInline(FPackageName::GetAssetPackageExtension().Len());
+    }
+
+    if (OutCleanPath.IsEmpty() || !OutCleanPath.StartsWith(TEXT("/")))
+    {
+        OutError = FString::Printf(TEXT("Invalid AssetPath '%s'. Must start with '/'."), *InAssetPath);
+        return false;
+    }
+
+    OutPackageName = FPackageName::ObjectPathToPackageName(OutCleanPath);
+    if (OutPackageName.IsEmpty())
+    {
+        OutPackageName = OutCleanPath;
+    }
+
+    FText FailureReason;
+    if (!FPackageName::IsValidLongPackageName(OutPackageName, true, &FailureReason))
+    {
+        OutError = FString::Printf(TEXT("Invalid package path '%s': %s"), *OutPackageName, *FailureReason.ToString());
+        return false;
+    }
+
+    const FString AssetName = FPackageName::GetLongPackageAssetName(OutPackageName);
+    if (AssetName.IsEmpty())
+    {
+        OutError = FString::Printf(TEXT("Invalid package path '%s': missing asset name."), *OutPackageName);
+        return false;
+    }
+
+    OutObjectPath = OutCleanPath.Contains(TEXT("."))
+        ? OutCleanPath
+        : FString::Printf(TEXT("%s.%s"), *OutPackageName, *AssetName);
+
+    return true;
+}
+
+bool CanAutoCreateUmgAsset(const FString& PackageName)
+{
+    return PackageName.StartsWith(TEXT("/Game/"));
+}
+}
 
 void UUmgAttentionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -75,12 +127,13 @@ void UUmgAttentionSubsystem::HandleAssetOpened(UObject* Asset, class IAssetEdito
 
 bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
 {
-    // Validation: Strict check for package path format
-    // Must start with /Game, /Engine, or /PluginName (usually /Script or others, but for UMG it's mostly /Game)
-    // To be safe, we check if it starts with /
-    if (AssetPath.IsEmpty() || !AssetPath.StartsWith(TEXT("/")))
+    FString CleanAssetPath;
+    FString PackageName;
+    FString ObjectPath;
+    FString PathError;
+    if (!ResolveUmgAssetPath(AssetPath, CleanAssetPath, PackageName, ObjectPath, PathError))
     {
-        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: Invalid AssetPath '%s'. Must start with '/'. Clearing target."), *AssetPath);
+        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: %s Clearing target."), *PathError);
         AttentionTargetAssetPath.Empty();
         CachedTargetWidgetBlueprint = nullptr;
         return false;
@@ -93,8 +146,8 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
     {
         if (UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
         {
-             FSoftObjectPath ObjectPath(AssetPath);
-             UObject* AssetObj = ObjectPath.ResolveObject();
+             FSoftObjectPath SoftObjectPath(ObjectPath);
+             UObject* AssetObj = SoftObjectPath.ResolveObject();
              
              if (AssetObj)
              {
@@ -104,7 +157,7 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
                      TargetBP = Cast<UWidgetBlueprint>(AssetObj);
                      if (TargetBP)
                      {
-                         UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Found open editor for %s. Using live instance."), *AssetPath);
+                         UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Found open editor for %s. Using live instance."), *ObjectPath);
                      }
                  }
              }
@@ -115,21 +168,23 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
     if (!TargetBP)
     {
         // Use LoadObject but handle failure gracefully without blocking ensure
-        TargetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath, nullptr, LOAD_NoWarn);
+        TargetBP = LoadObject<UWidgetBlueprint>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
     }
 
     // 3. Conditional Creation
     // Only create if it looks like a valid path but just missing
     if (!TargetBP)
     {
-        // Basic sanity check before creating: does it look like a valid package path?
-        if (FPackageName::IsValidPath(AssetPath))
+        if (!CanAutoCreateUmgAsset(PackageName))
         {
-            UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Asset '%s' not found. Creating new WidgetBlueprint..."), *AssetPath);
+            UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: Asset '%s' was not found. Automatic creation is only supported under /Game; refusing to create under package root '%s'."), *ObjectPath, *PackageName);
+        }
+        else
+        {
+            UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Asset '%s' not found. Creating new WidgetBlueprint..."), *ObjectPath);
             
-            FString PackageName = AssetPath;
-            FString AssetName = FPaths::GetBaseFilename(AssetPath);
-            FString PackagePath = FPaths::GetPath(AssetPath);
+            FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
+            FString PackagePath = FPaths::GetPath(PackageName);
 
             // Ensure AssetTools module is loaded
             IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
@@ -142,37 +197,33 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
             
             if (TargetBP)
             {
-                 UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Successfully created new asset '%s'."), *AssetPath);
+                 UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Successfully created new asset '%s'."), *ObjectPath);
             }
             else
             {
-                 UE_LOG(LogUmgAttention, Error, TEXT("SetTargetUmgAsset: Failed to create asset '%s'."), *AssetPath);
+                 UE_LOG(LogUmgAttention, Error, TEXT("SetTargetUmgAsset: Failed to create asset '%s'."), *ObjectPath);
             }
-        }
-        else
-        {
-             UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: Path '%s' is not a valid package path. Skipping creation."), *AssetPath);
         }
     }
 
     if (TargetBP)
     {
         // SUCCESS: The path is valid and the object was loaded/found.
-        UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *AssetPath);
-        AttentionTargetAssetPath = AssetPath;
+        UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *CleanAssetPath);
+        AttentionTargetAssetPath = CleanAssetPath;
         CachedTargetWidgetBlueprint = TargetBP;
         CurrentWidgetName.Empty(); // Clear stale widget scope when switching assets unless explicitly set later.
 
         // Also treat setting a target as an 'edit' action to update the history, ensuring consistency.
-        UmgAssetHistory.Remove(AssetPath);
-        UmgAssetHistory.Insert(AssetPath, 0);
+        UmgAssetHistory.Remove(CleanAssetPath);
+        UmgAssetHistory.Insert(CleanAssetPath, 0);
         UE_LOG(LogUmgAttention, Log, TEXT("Successfully cached UMG asset object."));
         return true;
     }
     else
     {
         // FAILURE: The path was invalid. Clear any existing target to prevent errors.
-        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load or create UMG asset from path: %s. Clearing attention target."), *AssetPath);
+        UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load or create UMG asset from path: %s. Clearing attention target."), *CleanAssetPath);
         AttentionTargetAssetPath.Empty();
         CachedTargetWidgetBlueprint = nullptr;
         return false;
@@ -188,7 +239,19 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
     if (!AttentionTargetAssetPath.IsEmpty() && !CachedTargetWidgetBlueprint.IsValid())
     {
         UE_LOG(LogUmgAttention, Log, TEXT("Cached target object is invalid. Attempting to reload from path: %s"), *AttentionTargetAssetPath);
-        UWidgetBlueprint* ReloadedBP = LoadObject<UWidgetBlueprint>(nullptr, *AttentionTargetAssetPath);
+        FString CleanAssetPath;
+        FString PackageName;
+        FString ObjectPath;
+        FString PathError;
+        UWidgetBlueprint* ReloadedBP = nullptr;
+        if (ResolveUmgAssetPath(AttentionTargetAssetPath, CleanAssetPath, PackageName, ObjectPath, PathError))
+        {
+            ReloadedBP = LoadObject<UWidgetBlueprint>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
+        }
+        else
+        {
+            UE_LOG(LogUmgAttention, Warning, TEXT("Failed to normalize cached target path: %s"), *PathError);
+        }
         if (ReloadedBP)
         {
             UE_LOG(LogUmgAttention, Log, TEXT("Successfully reloaded and re-cached UMG asset object."));
