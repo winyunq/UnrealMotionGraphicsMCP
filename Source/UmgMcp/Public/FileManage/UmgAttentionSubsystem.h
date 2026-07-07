@@ -76,8 +76,9 @@ public:
 	/**
 	 * Sets the name of the widget currently being focused on.
 	 * @param WidgetName The name of the widget.
+     * @return True if the focus is empty/root or resolves inside the current target asset.
 	 */
-	void SetTargetWidget(const FString& WidgetName);
+	bool SetTargetWidget(const FString& WidgetName);
 
 	/**
 	 * Gets the name of the currently focused widget.

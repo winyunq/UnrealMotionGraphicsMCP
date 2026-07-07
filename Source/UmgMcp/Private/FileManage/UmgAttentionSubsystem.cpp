@@ -401,10 +401,36 @@ FString UUmgAttentionSubsystem::GetTargetAnimation() const
 	return CurrentAnimationName;
 }
 
-void UUmgAttentionSubsystem::SetTargetWidget(const FString& WidgetName)
+bool UUmgAttentionSubsystem::SetTargetWidget(const FString& WidgetName)
 {
-	CurrentWidgetName = WidgetName;
-	UE_LOG(LogUmgAttention, Log, TEXT("Context: Focused Widget set to '%s'"), *CurrentWidgetName);
+    FString CleanWidgetName = WidgetName.TrimStartAndEnd();
+    if (CleanWidgetName.IsEmpty() || CleanWidgetName.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
+    {
+        CurrentWidgetName.Empty();
+        UE_LOG(LogUmgAttention, Log, TEXT("Context: Focused Widget cleared; root scope will be used."));
+        return true;
+    }
+
+    UWidgetBlueprint* WidgetBP = GetCachedTargetWidgetBlueprint();
+    if (!WidgetBP || !WidgetBP->WidgetTree)
+    {
+        CurrentWidgetName.Empty();
+        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetWidget: Cannot focus '%s' because no valid target widget blueprint is loaded."), *CleanWidgetName);
+        return false;
+    }
+
+    if (!WidgetBP->WidgetTree->FindWidget(FName(*CleanWidgetName)))
+    {
+        CurrentWidgetName.Empty();
+        UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetWidget: Widget '%s' was not found in target asset '%s'. Focus cleared."),
+            *CleanWidgetName,
+            *WidgetBP->GetPathName());
+        return false;
+    }
+
+	CurrentWidgetName = CleanWidgetName;
+	UE_LOG(LogUmgAttention, Log, TEXT("Context: Focused Widget set to '%s' in '%s'"), *CurrentWidgetName, *WidgetBP->GetPathName());
+    return true;
 }
 
 FString UUmgAttentionSubsystem::GetTargetWidget() const

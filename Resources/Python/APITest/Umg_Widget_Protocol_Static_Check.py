@@ -93,6 +93,8 @@ def main() -> None:
     require_text("Source/UmgMcp/Private/Widget/UmgMcpWidgetCommands.cpp", "Deletion hardened (Issue 15)")
     require_text("Source/UmgMcp/Private/Widget/UmgMcpWidgetCommands.cpp", "Command == TEXT(\"reorder_widget_tree\")")
     require_text("Source/UmgMcp/Private/Widget/UmgMcpWidgetCommands.cpp", "Command == TEXT(\"get_layout_data\")")
+    require_text("Source/UmgMcp/Public/FileManage/UmgAttentionSubsystem.h", "bool SetTargetWidget")
+    require_text("Source/UmgMcp/Private/FileManage/UmgAttentionSubsystem.cpp", "bool UUmgAttentionSubsystem::SetTargetWidget")
     require_text("Source/UmgMcp/Private/Widget/UmgSetSubsystem.cpp", "Removed stale source widget GUID")
     require_text("Source/UmgMcp/Private/Widget/UmgSetSubsystem.cpp", "WidgetVariableNameToGuidMap.Remove")
     require_text("Document/UmgWidgetMcpProtocol.md", "confirm_delete=true")
