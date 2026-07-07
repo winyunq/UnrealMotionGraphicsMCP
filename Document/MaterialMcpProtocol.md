@@ -1,6 +1,6 @@
 # Material MCP Protocol Draft
 
-本文记录当前开源 Material MCP 的精简协议原则。范围限定为 UE 5.8；不修改 FabServer。
+本文记录当前开源 Material MCP 的精简协议原则。范围限定为 UE 5.8；不引入商业版服务依赖。
 
 ## 设计原则
 
@@ -146,4 +146,4 @@ await hlsl_compile()
 
 ## 兼容层
 
-传统 `material_*` 低阶图编辑工具暂时保留作为兼容层，但 Material ToolMode 不建议使用。后续协议清理时应逐个判断是否合并、下线或转为内部实现细节。
+传统 `material_*` 低阶图编辑工具保留为后端兼容层，但默认 MCP prompts 与 Material ToolMode 均隐藏这些工具。AI 应只看到并使用 HLSL 文本编辑闭环；需要图级调试时再由维护者显式开启兼容工具。
