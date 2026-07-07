@@ -1440,6 +1440,37 @@
 
     <section class="stats" id="stats" aria-label="Product facts"></section>
 
+    <section class="section" id="edition-boundary">
+      <div class="section-header">
+        <p class="section-kicker">Edition boundary / 版本边界</p>
+        <h2 class="section-title">Open source gives the protocol. FabServer gives the finished editor product layer.</h2>
+        <p class="section-text">This documentation site is public because the UMG MCP protocol and tool surface are public. The Fab package is paid because it adds the private in-editor product layer: ChatWithUnreal, FabServer approval flow, provider setup, local LiteRT-LM, task agents, and production context handling.</p>
+      </div>
+      <div class="comparison">
+        <table>
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>Open-source UMG MCP</th>
+              <th>Fab / FabServer package</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Core Widget, Blueprint, Sequencer, Material, and HLSL MCP tools</td><td>Included</td><td>Included</td></tr>
+            <tr><td>Python MCP server for external AI clients</td><td>Included, manual setup</td><td>Shares the same protocol; main product path is editor-first</td></tr>
+            <tr><td>Manual clone and source-level debugging</td><td>Included</td><td>Not the primary workflow</td></tr>
+            <tr><td>Unreal Launcher / Fab installation</td><td>Not included</td><td>Included</td></tr>
+            <tr><td>ChatWithUnreal in-editor chat panel</td><td>Not included</td><td>Included</td></tr>
+            <tr><td>FabServer approval cards and direct in-memory execution</td><td>Not included</td><td>Included</td></tr>
+            <tr><td>Agent modes: chat, develop, learning, task</td><td>Not included</td><td>Included</td></tr>
+            <tr><td>Provider settings UI: Google OAuth, API key providers, ZhipuAI, OpenAI-compatible endpoints</td><td>Not included</td><td>Included</td></tr>
+            <tr><td>Local LiteRT-LM runtime</td><td>Not included</td><td>Included</td></tr>
+            <tr><td>Best buyer/user fit</td><td>Developers and teams building custom MCP pipelines</td><td>Artists, technical artists, and production teams who want the complete editor experience</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="section alt" id="index">
       <div class="section-header">
         <p class="section-kicker" data-i18n="productIndex.kicker">Product index</p>

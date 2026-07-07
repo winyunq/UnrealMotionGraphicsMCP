@@ -34,6 +34,30 @@ The open-source plugin is the protocol and editor bridge. It is meant to be read
 | Animation | Create UMG animation tracks and keyframes for render transform, opacity, color, and timing |
 | Editor bridge | Let external MCP clients call Unreal Editor through a local loopback bridge on `127.0.0.1:55557` |
 
+## Edition Boundary
+
+There is one public UMG MCP project, and two practical ways to use it:
+
+- **Open-source edition**: the public protocol, Unreal editor bridge, Python MCP server, tool schemas, tests, and protocol documents.
+- **Fab / FabServer edition**: the private packaged product layer for users who want the in-editor chat product, provider setup UI, approval workflow, local model integration, and less manual installation.
+
+| Capability | Open-source edition | Fab / FabServer edition |
+| --- | --- | --- |
+| Core UMG widget MCP tools | Yes | Yes |
+| Widget tree readback, property edits, layout append/upsert, JSON export/import | Yes | Yes |
+| Blueprint / BlueCode protocol direction and node-level bridge | Yes | Yes |
+| Sequencer / UMG animation tools | Yes | Yes |
+| Material and HLSL workflow | Yes | Yes |
+| Python MCP server for external clients | Yes, manual setup through `Resources/Python` | Packaged users can still rely on the shared protocol, but the product workflow is editor-first |
+| Manual clone/build workflow | Yes | No, installed through Fab / Unreal Launcher flow |
+| In-editor ChatWithUnreal panel | No | Yes |
+| FabServer approval queue and direct in-memory execution | No | Yes |
+| Built-in agent modes such as chat, develop, learning, and task | No | Yes |
+| Model provider settings UI: Google OAuth, API keys, ZhipuAI, OpenAI-compatible endpoints | No | Yes |
+| Local LiteRT-LM integration | No | Yes |
+| Context compression / production conversation management | No | Yes |
+| Best fit | Developers, researchers, contributors, custom MCP pipelines | Artists, technical artists, and production teams who want the finished editor experience |
+
 ## Why It Exists
 
 AI-assisted UI work needs more than screenshots. UMG assets are structured editor objects, and serious automation needs structured access. This project gives agents a protocol surface they can inspect, test, and improve without hiding behavior behind a black-box UI.
