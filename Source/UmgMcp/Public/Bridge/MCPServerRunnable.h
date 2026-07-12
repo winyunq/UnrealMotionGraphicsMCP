@@ -5,6 +5,7 @@
 #include "HAL/Runnable.h"
 #include "Sockets.h"
 #include "Interfaces/IPv4/IPv4Address.h"
+#include "HAL/CriticalSection.h"
 
 class UUmgMcpBridge;
 
@@ -37,5 +38,8 @@ private:
 	UUmgMcpBridge* Bridge;
 	TSharedPtr<FSocket> ListenerSocket;
 	TSharedPtr<FSocket> ClientSocket;
-	bool bRunning;
-}; 
+	TAtomic<bool> bRunning;
+	TAtomic<int32> ActiveConnectionCount;
+	FCriticalSection ActiveSocketsCs;
+	TArray<TSharedPtr<FSocket>> ActiveSockets;
+};

@@ -58,7 +58,8 @@ public class UmgMcp : ModuleRules
 				"Projects",
 				"AssetRegistry",
 				"UMGEditor", // Moved from PublicDependencyModuleNames
-				"MaterialEditor" // For Material Editing Libraries
+				"MaterialEditor", // For Material Editing Libraries
+				"WorkspaceMenuStructure"
 
 			}
 		);

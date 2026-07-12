@@ -23,6 +23,8 @@ import logging
 import asyncio
 import json
 import os
+import uuid
+from pathlib import Path
 
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, Optional, List
@@ -62,26 +64,75 @@ def debug_socket(message: str) -> None:
 class UnrealConnection:
     """Manages the async socket connection to the UmgMcp plugin running inside Unreal Engine."""
     def __init__(self):
-        logger.info(f"Unreal Motion Graphics UI Designer Mode Context Process Launching... Connecting to UmgMcp plugin at {UNREAL_HOST}:{UNREAL_PORT}...")
+        self.host = os.environ.get("UMG_MCP_HOST", UNREAL_HOST)
+        self.port = int(os.environ.get("UMG_MCP_PORT", UNREAL_PORT))
+        self.client_id = os.environ.get("UMG_MCP_CLIENT_ID", str(uuid.uuid4()))
+        self.display_name = os.environ.get("UMG_MCP_CLIENT_NAME", f"AI-{self.client_id[:8]}")
+        self.exclusive = os.environ.get("UMG_MCP_EXCLUSIVE", "true").lower() not in ("0", "false", "no")
+        self._connected = False
+        self._command_lock = asyncio.Lock()
+        logger.info(f"Unreal Motion Graphics UI Designer Mode Context Process Launching... Connecting to UmgMcp plugin at {self.host}:{self.port} as {self.client_id}...")
 
     def disconnect(self) -> None:
         """Short-lived socket connections are closed per command."""
         return None
+
+    async def connect_to(self, host: str, port: int, target: Optional[str] = None,
+                         exclusive: bool = True, display_name: Optional[str] = None) -> Dict[str, Any]:
+        """Atomically move this AI session to a selected UE editor instance."""
+        async with self._command_lock:
+            if self._connected:
+                await self._send_command_unlocked("disconnect", {})
+            self.host = host
+            self.port = int(port)
+            self.exclusive = exclusive
+            if display_name:
+                self.display_name = display_name
+            payload = {
+                "display_name": self.display_name,
+                "exclusive": self.exclusive,
+            }
+            if target:
+                payload["target"] = target
+            response = await self._send_command_unlocked("connect", payload)
+            self._connected = bool(response and response.get("status") != "error")
+            return response
     
     async def send_command(self, command: str, params: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """Send a command to Unreal Engine and get the response (Async Short-Lived)."""
+        async with self._command_lock:
+            if command != "connect" and not self._connected:
+                connected = await self._send_command_unlocked("connect", {
+                    "display_name": self.display_name,
+                    "exclusive": self.exclusive,
+                })
+                if not connected or connected.get("status") == "error":
+                    return connected or {"status": "error", "error": "Unable to establish an UmgMcp session"}
+                self._connected = True
+            response = await self._send_command_unlocked(command, params)
+            if command == "connect" and response and response.get("status") != "error":
+                self._connected = True
+            elif command == "disconnect":
+                self._connected = False
+            return response
+
+    async def _send_command_unlocked(self, command: str, params: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+        """Wire-level request. Caller holds _command_lock so request order is deterministic."""
         reader = None
         writer = None
         
         try:
-            logger.info(f"Connecting to Unreal at {UNREAL_HOST}:{UNREAL_PORT}...")
+            logger.info(f"Connecting to Unreal at {self.host}:{self.port}...")
             # Async Open Connection (IOCP on Windows)
-            reader, writer = await asyncio.open_connection(UNREAL_HOST, UNREAL_PORT)
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(self.host, self.port), timeout=SOCKET_TIMEOUT)
             
             # Match Unity's command format exactly
             command_obj = {
                 "command": command,
-                "params": params or {}
+                "params": params or {},
+                "client_id": self.client_id,
+                "request_id": str(uuid.uuid4())
             }
             
             # Send with null delimiter
@@ -107,7 +158,7 @@ class UnrealConnection:
             chunks = []
             while True:
                 # Read chunk
-                chunk = await reader.read(4096)
+                chunk = await asyncio.wait_for(reader.read(4096), timeout=max(SOCKET_TIMEOUT, 30))
                 if not chunk:
                     break # EOF
                 
@@ -296,6 +347,64 @@ def register_tool(name: str, default_desc: str):
             # Do not register, just return the function
             return func
     return decorator
+
+
+def _discover_instance_records() -> List[Dict[str, Any]]:
+    """Read discovery records published by local UE editors."""
+    candidates: List[Path] = []
+    configured = os.environ.get("UMG_MCP_DISCOVERY_DIR")
+    if configured:
+        candidates.append(Path(configured))
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if any(parent.glob("*.uproject")):
+            candidates.append(parent / "Saved" / "UmgMcp" / "instances")
+            break
+
+    records: List[Dict[str, Any]] = []
+    seen = set()
+    for directory in candidates:
+        if not directory.exists():
+            continue
+        for record_file in directory.glob("*.json"):
+            try:
+                record = json.loads(record_file.read_text(encoding="utf-8"))
+                key = record.get("server_instance_id") or str(record_file)
+                if key not in seen:
+                    record["discovery_file"] = str(record_file)
+                    records.append(record)
+                    seen.add(key)
+            except (OSError, ValueError) as exc:
+                logger.warning("Ignoring invalid UmgMcp discovery record %s: %s", record_file, exc)
+    return records
+
+
+@mcp.tool(name="list_umg_mcp_servers", description="Lists local UE editor UmgMcp instances available for an explicit connection.")
+async def list_umg_mcp_servers() -> Dict[str, Any]:
+    return {"status": "success", "servers": _discover_instance_records()}
+
+
+@mcp.tool(name="connect_umg_mcp", description="Connects this AI to one UE UmgMcp endpoint and optionally binds an exclusive target.")
+async def connect_umg_mcp(host: str = "127.0.0.1", port: int = UNREAL_PORT,
+                          target: Optional[str] = None, exclusive: bool = True,
+                          display_name: Optional[str] = None) -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    response = await conn.connect_to(host, port, target, exclusive, display_name)
+    if response.get("status") != "error" and target:
+        target_response = await conn.send_command("set_target_umg_asset", {"asset_path": target})
+        if target_response.get("status") == "error":
+            return target_response
+        context_manager.set_target(target)
+        response["target"] = target
+    return response
+
+
+@mcp.tool(name="get_umg_mcp_connection", description="Shows this AI's active UE endpoint, session id, and server-side connection state.")
+async def get_umg_mcp_connection() -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    state = await conn.send_command("server_info", {})
+    state.update({"host": conn.host, "port": conn.port, "client_id": conn.client_id})
+    return state
 
 # =============================================================================
 #  Category: Introspection (Knowledge Base)

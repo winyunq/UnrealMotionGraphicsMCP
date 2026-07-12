@@ -12,11 +12,14 @@
 #include "JsonObjectConverter.h"
 #include "Misc/ScopeLock.h"
 #include "HAL/PlatformTime.h"
+#include "Async/Async.h"
+#include "Misc/ScopeLock.h"
 
 FMCPServerRunnable::FMCPServerRunnable(UUmgMcpBridge* InBridge, TSharedPtr<FSocket> InListenerSocket)
     : Bridge(InBridge)
     , ListenerSocket(InListenerSocket)
     , bRunning(true)
+    , ActiveConnectionCount(0)
 {
     // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Created server runnable"));
 }
@@ -44,13 +47,35 @@ uint32 FMCPServerRunnable::Run()
         {
             // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Client connection pending, accepting..."));
             
-            ClientSocket = MakeShareable(ListenerSocket->Accept(TEXT("MCPClient")));
+            ClientSocket = MakeShareable(
+                ListenerSocket->Accept(TEXT("MCPClient")),
+                [](FSocket* Socket)
+                {
+                    if (Socket) ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(Socket);
+                });
             if (ClientSocket.IsValid())
             {
                 // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Client connection accepted"));
                 
-                // Use the robust handler that supports large payloads and delimiters
-                HandleClientConnection(ClientSocket);
+                // Each socket is read on a worker. Commands themselves are still forced through
+                // UUmgMcpBridge's single FIFO, so clients may connect concurrently without ever
+                // mutating editor state concurrently.
+                TSharedPtr<FSocket> AcceptedSocket = ClientSocket;
+                ActiveConnectionCount++;
+                {
+                    FScopeLock Lock(&ActiveSocketsCs);
+                    ActiveSockets.Add(AcceptedSocket);
+                }
+                Async(EAsyncExecution::ThreadPool, [this, AcceptedSocket]()
+                {
+                    HandleClientConnection(AcceptedSocket);
+                    AcceptedSocket->Close();
+                    {
+                        FScopeLock Lock(&ActiveSocketsCs);
+                        ActiveSockets.Remove(AcceptedSocket);
+                    }
+                    ActiveConnectionCount--;
+                });
             }
             else
             {
@@ -69,6 +94,25 @@ uint32 FMCPServerRunnable::Run()
 void FMCPServerRunnable::Stop()
 {
     bRunning = false;
+    TArray<TSharedPtr<FSocket>> SocketsToClose;
+    {
+        FScopeLock Lock(&ActiveSocketsCs);
+        SocketsToClose = ActiveSockets;
+    }
+    for (const TSharedPtr<FSocket>& Socket : SocketsToClose)
+    {
+        if (Socket.IsValid())
+        {
+            Socket->Close();
+        }
+    }
+
+    // The bridge owns this runnable and waits for the server thread before deleting it.
+    // Let short-lived connection workers leave their lambdas first.
+    while (ActiveConnectionCount.Load() > 0)
+    {
+        FPlatformProcess::Sleep(0.001f);
+    }
 }
 
 void FMCPServerRunnable::Exit()
@@ -170,6 +214,8 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     
     // Extract command type and parameters using MCP protocol format
     FString CommandType;
+    FString ClientId;
+    FString RequestId;
     TSharedPtr<FJsonObject> Params = MakeShareable(new FJsonObject());
     
     if (!JsonMessage->TryGetStringField(TEXT("command"), CommandType))
@@ -177,6 +223,9 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
         UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Message missing 'command' field"));
         return;
     }
+
+    JsonMessage->TryGetStringField(TEXT("client_id"), ClientId);
+    JsonMessage->TryGetStringField(TEXT("request_id"), RequestId);
     
     // Parameters are optional in MCP protocol
     if (JsonMessage->HasField(TEXT("params")))
@@ -191,23 +240,30 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     // UE_LOG(LogUmgMcp, Display, TEXT("MCPServerRunnable: Executing command: %s"), *CommandType);
     
     // Execute command
-    FString Response = Bridge->ExecuteCommand(CommandType, Params);
+    FString Response = Bridge->ExecuteCommand(CommandType, Params, ClientId, RequestId, Message);
     
     // Send response
-    int32 BytesSent = 0;
-    
     // Convert to UTF8
     FTCHARToUTF8 Utf8Response(*Response);
-    
-    // Send the string content
-    if (Utf8Response.Length() > 0)
+
+    // FSocket::Send may perform a partial write. Keep sending until the complete
+    // response and its frame delimiter are on the wire.
+    int32 Offset = 0;
+    while (Offset < Utf8Response.Length())
     {
-        Client->Send((const uint8*)Utf8Response.Get(), Utf8Response.Length(), BytesSent);
+        int32 BytesSent = 0;
+        if (!Client->Send(reinterpret_cast<const uint8*>(Utf8Response.Get()) + Offset,
+            Utf8Response.Length() - Offset, BytesSent) || BytesSent <= 0)
+        {
+            UE_LOG(LogUmgMcp, Warning, TEXT("MCPServerRunnable: Response send failed after %d/%d bytes."), Offset, Utf8Response.Length());
+            return;
+        }
+        Offset += BytesSent;
     }
-    
-    // Send the null delimiter
+
     uint8 Delimiter = 0;
-    Client->Send(&Delimiter, 1, BytesSent);
+    int32 DelimiterBytesSent = 0;
+    Client->Send(&Delimiter, 1, DelimiterBytesSent);
     
     UE_LOG(LogUmgMcp, Display, TEXT("[UMGMCP-Message] Sent response: %s"), *Response);
 }

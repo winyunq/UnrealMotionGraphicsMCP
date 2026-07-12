@@ -1,27 +1,38 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "UmgMcp.h"
-#include "Bridge/UmgMcpConfig.h" // Include our config header
+#include "Bridge/UmgMcpConfig.h"
+#include "Debug/SUmgMcpDebugPanel.h"
+#include "Widgets/Docking/SDockTab.h"
+#include "WorkspaceMenuStructure.h"
+#include "WorkspaceMenuStructureModule.h"
 
 DEFINE_LOG_CATEGORY(LogUmgMcp);
 
 #define LOCTEXT_NAMESPACE "FUmgMcpModule"
 
+static const FName UmgMcpDebugTabName("UmgMcpDebug");
+
 void FUmgMcpModule::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
-	UE_LOG(LogUmgMcp, Warning, TEXT("UMG agent Start!"));
+    UE_LOG(LogUmgMcp, Warning, TEXT("UMG agent Start!"));
+    UE_LOG(LogUmgMcp, Display, TEXT("UmgMcp is running at default port: %d"), MCP_SERVER_PORT_DEFAULT);
 
-	// The UmgAttentionSubsystem is automatically initialized by the engine.
-
-	// Use the hardcoded default port from UmgMcpConfig.h
-	int32 Port = MCP_SERVER_PORT_DEFAULT;
-	UE_LOG(LogUmgMcp, Display, TEXT("UmgMcp is running at: %d"), Port);
+    FGlobalTabmanager::Get()->RegisterNomadTabSpawner(UmgMcpDebugTabName, FOnSpawnTab::CreateLambda([](const FSpawnTabArgs& Args)
+    {
+        return SNew(SDockTab)
+            .TabRole(ETabRole::NomadTab)
+            [
+                SNew(SUmgMcpDebugPanel)
+            ];
+    }))
+    .SetDisplayName(LOCTEXT("UmgMcpDebugTabTitle", "UMG MCP Debug Console"))
+    .SetTooltipText(LOCTEXT("UmgMcpDebugTooltip", "Inspect and simulate raw AI protocol messages"))
+    .SetGroup(WorkspaceMenu::GetMenuStructure().GetToolsCategory());
 }
 
 void FUmgMcpModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
+    FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(UmgMcpDebugTabName);
 }
 
 #undef LOCTEXT_NAMESPACE
