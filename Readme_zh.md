@@ -74,7 +74,7 @@ git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp
 
 ## 连接 MCP 客户端
 
-外部 MCP 客户端会启动 `Resources/Python` 下的 Python server。请先打开 Unreal Editor，让插件在本机 `127.0.0.1:55557` 上启动编辑器桥接。
+外部 MCP 客户端会启动 `Resources/Python` 下的 Python server。每个 Unreal Editor 实例都会绑定由操作系统分配的本机端口，并发布到共享的 UmgMcp 发现目录。只有一个编辑器时 Python 前端会自动选择；存在多个编辑器时，用 `list_umg_mcp_servers` 和 `connect_umg_mcp` 选择项目。
 
 把下面配置加入客户端设置中的 `mcpServers`，并把路径替换为你机器上的插件绝对路径：
 
@@ -128,7 +128,7 @@ uv run python APITest\Animation_Protocol_Static_Check.py
 uv run python APITest\UE5_Editor_Imitation.py
 ```
 
-如果编辑器侧测试无法连接，先确认插件已启用，并检查是否有其他进程占用了 `55557` 端口。
+如果编辑器侧测试无法连接，先确认插件已启用，再用 `list_umg_mcp_servers` 确认它的动态端点可以被发现。
 
 ## 文档导航
 
@@ -172,7 +172,7 @@ uv run python APITest\UE5_Editor_Imitation.py
 
 | 现象 | 处理方式 |
 | --- | --- |
-| MCP 客户端报 `ConnectionRefusedError`、`WinError 10061` 或 `WinError 1225` | 先打开 Unreal Editor，启用 `UmgMcp`，重启编辑器，再重新连接 MCP 客户端。编辑器桥接监听 `127.0.0.1:55557`。 |
+| MCP 客户端报 `ConnectionRefusedError`、`WinError 10061` 或 `WinError 1225` | 先打开 Unreal Editor并启用 `UmgMcp`，再调用 `list_umg_mcp_servers`。每个编辑器使用唯一的系统分配端口，请连接其有效发现记录中的端点。 |
 | 系统找不到 `uv` | 安装 `uv` 后重开终端，或使用上面的本地虚拟环境流程。 |
 | 复制到其他项目后插件无法编译 | 确认项目使用 UE 5.8 Win64，清理该插件/项目的旧生成产物，然后让 Unreal 重新构建。 |
 | 工具调用成功但改错了 Widget | 先设置当前 UMG 目标，或直接传完整资产路径，例如 `/Game/UI/WBP_LoginPanel.WBP_LoginPanel`。 |

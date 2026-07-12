@@ -141,7 +141,7 @@ bool UUmgMcpBridge::bGlobalServerStarted = false;
 // Start the MCP server
 void UUmgMcpBridge::StartServer()
 {
-    UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Attempting to start server on port %d..."), Port);
+    UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Attempting to start server on port %d (0 = OS assigned)..."), Port);
 
     if (bIsRunning)
     {
@@ -211,11 +211,19 @@ void UUmgMcpBridge::StartServer()
             return;
         }
 
-        TSharedRef<FInternetAddr> BoundAddress = SocketSubsystem->CreateInternetAddr();
-        NewListenerSocket->GetAddress(*BoundAddress);
-        Port = BoundAddress->GetPort();
-        UE_LOG(LogUmgMcp, Warning, TEXT("UmgMcpBridge: Default port unavailable; bound dynamic port %d."), Port);
     }
+
+    // Bind(0) succeeds with an OS-selected port. Always query the socket before
+    // publishing discovery data; keeping Port == 0 would make the record unusable.
+    TSharedRef<FInternetAddr> BoundAddress = SocketSubsystem->CreateInternetAddr();
+    NewListenerSocket->GetAddress(*BoundAddress);
+    if (BoundAddress->GetPort() <= 0)
+    {
+        UE_LOG(LogUmgMcp, Error, TEXT("UmgMcpBridge: Failed to resolve the assigned listener port."));
+        return;
+    }
+    Port = BoundAddress->GetPort();
+    UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Assigned unique listener port %d."), Port);
 
     // Start listening
     if (!NewListenerSocket->Listen(5))
@@ -234,7 +242,7 @@ void UUmgMcpBridge::StartServer()
 
     // Publish a small discovery record. Clients validate records with server_info, so a
     // stale file after a crash is harmless and will be ignored.
-    const FString DiscoveryDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("UmgMcp"), TEXT("instances"));
+    const FString DiscoveryDir = FPaths::Combine(FPlatformProcess::UserSettingsDir(), TEXT("UmgMcp"), TEXT("instances"));
     IFileManager::Get().MakeDirectory(*DiscoveryDir, true);
     DiscoveryFilePath = FPaths::Combine(DiscoveryDir, ServerInstanceId + TEXT(".json"));
     TSharedRef<FJsonObject> Discovery = MakeShared<FJsonObject>();
@@ -242,6 +250,7 @@ void UUmgMcpBridge::StartServer()
     Discovery->SetStringField(TEXT("host"), ServerAddress.ToString());
     Discovery->SetNumberField(TEXT("port"), Port);
     Discovery->SetStringField(TEXT("project"), FApp::GetProjectName());
+    Discovery->SetStringField(TEXT("project_file"), FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath()));
     Discovery->SetNumberField(TEXT("process_id"), FPlatformProcess::GetCurrentProcessId());
     Discovery->SetStringField(TEXT("started_at"), FDateTime::UtcNow().ToIso8601());
     FString DiscoveryJson;

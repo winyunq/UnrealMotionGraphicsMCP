@@ -582,7 +582,7 @@
                         <strong>内置直接直连回路（零网络）</strong>：当您直接在编辑器右侧的 UMG MCP 对话面板中向 Agent 提问并点击 <code class="text-cyan-400">Accept</code> 审批时，前述指令是 <strong>100% 内存级直连</strong> 执行的。它直接调用 C++ 底层指针派发，<strong>绝对不通过</strong> 任何网络端口或回环 IP，不存在网络代理延时，具有极致的绝对安全与性能！
                     </li>
                     <li>
-                        <strong>外部桥接回路（TCP 55557 监听）</strong>：仅当您需要用外部的 AI 工具（例如 Claude Desktop 或您自己的外部 Python 代理进程）来接管虚幻时，插件的底层后台才会在子线程启动一个轻量级套接字监听端口（默认 <code class="text-cyan-400">TCP 55557</code>）。它仅供外部 AI 读写 JSON 指令进行虚幻引擎的同步遥控。两者物理隔离，安全无虞。
+                        <strong>外部桥接回路（可发现的动态 TCP 监听）</strong>：需要由外部 AI 工具接管虚幻时，每个 UE 进程都会绑定唯一的系统分配回环端口并发布发现记录。底层子线程读取 JSON 指令，再通过串行 Game Thread 队列安全执行。
                     </li>
                 </ul>
             </div>
@@ -593,7 +593,7 @@
                 <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
                     <i data-lucide="network" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
                     <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: UmgMcp C++ Subsystem Dual-Loop Connection Architecture]</p>
-                    <p class="text-xs text-slate-600 mt-1">这里可绘制一张架构拓扑图，展示内部 Slate/Subsystem 内存直连（零网络环回）与外部 Python TCP 55557 遥控的物理隔离双回路机制。</p>
+                    <p class="text-xs text-slate-600 mt-1">这里可绘制一张架构拓扑图，展示内部 Slate/Subsystem 内存直连与外部 Python/Codex 动态 TCP 发现桥接的双回路机制。</p>
                 </div>
             </div>
         </div>

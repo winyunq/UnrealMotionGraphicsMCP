@@ -121,6 +121,19 @@ class UnrealConnection:
         """Wire-level request. Caller holds _command_lock so request order is deterministic."""
         reader = None
         writer = None
+
+        if self.port <= 0:
+            servers = await _discover_live_instances()
+            if len(servers) == 1:
+                self.host = str(servers[0]["host"])
+                self.port = int(servers[0]["port"])
+            else:
+                return {
+                    "status": "error",
+                    "code": "endpoint_selection_required",
+                    "error": "No unique UmgMcp endpoint is selected. Call list_umg_mcp_servers and connect_umg_mcp with the chosen port.",
+                    "servers": servers,
+                }
         
         try:
             logger.info(f"Connecting to Unreal at {self.host}:{self.port}...")
@@ -356,6 +369,9 @@ def _discover_instance_records() -> List[Dict[str, Any]]:
     configured = os.environ.get("UMG_MCP_DISCOVERY_DIR")
     if configured:
         candidates.append(Path(configured))
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidates.append(Path(local_app_data) / "UmgMcp" / "instances")
     here = Path(__file__).resolve()
     for parent in here.parents:
         if any(parent.glob("*.uproject")):
@@ -380,15 +396,70 @@ def _discover_instance_records() -> List[Dict[str, Any]]:
     return records
 
 
+async def _probe_instance(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Validate a discovery record against the server that currently owns it."""
+    host = str(record.get("host") or "127.0.0.1")
+    try:
+        port = int(record.get("port") or 0)
+    except (TypeError, ValueError):
+        return None
+    if port <= 0:
+        return None
+    writer = None
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=SOCKET_TIMEOUT)
+        request = {
+            "command": "server_info",
+            "params": {},
+            "client_id": "discovery-probe",
+            "request_id": str(uuid.uuid4()),
+        }
+        writer.write(json.dumps(request).encode("utf-8") + b"\0")
+        await writer.drain()
+        raw = await asyncio.wait_for(reader.readuntil(b"\0"), timeout=SOCKET_TIMEOUT)
+        state = json.loads(raw[:-1].decode("utf-8"))
+        expected = record.get("server_instance_id")
+        if state.get("status") == "error" or (expected and state.get("server_instance_id") != expected):
+            return None
+        live = dict(record)
+        live.update({"host": host, "port": port, "available": True})
+        return live
+    except (OSError, asyncio.TimeoutError, asyncio.IncompleteReadError, ValueError):
+        return None
+    finally:
+        if writer is not None:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except OSError:
+                pass
+
+
+async def _discover_live_instances() -> List[Dict[str, Any]]:
+    probes = await asyncio.gather(*(_probe_instance(record) for record in _discover_instance_records()))
+    return [record for record in probes if record is not None]
+
+
 @mcp.tool(name="list_umg_mcp_servers", description="Lists local UE editor UmgMcp instances available for an explicit connection.")
 async def list_umg_mcp_servers() -> Dict[str, Any]:
-    return {"status": "success", "servers": _discover_instance_records()}
+    return {"status": "success", "servers": await _discover_live_instances()}
 
 
 @mcp.tool(name="connect_umg_mcp", description="Connects this AI to one UE UmgMcp endpoint and optionally binds an exclusive target.")
 async def connect_umg_mcp(host: str = "127.0.0.1", port: int = UNREAL_PORT,
                           target: Optional[str] = None, exclusive: bool = True,
                           display_name: Optional[str] = None) -> Dict[str, Any]:
+    if port <= 0:
+        servers = await _discover_live_instances()
+        if len(servers) != 1:
+            return {
+                "status": "error",
+                "code": "endpoint_selection_required",
+                "error": "Discovery did not resolve exactly one UE editor; select a server and pass its port.",
+                "servers": servers,
+            }
+        host = str(servers[0]["host"])
+        port = int(servers[0]["port"])
     conn = get_unreal_connection()
     response = await conn.connect_to(host, port, target, exclusive, display_name)
     if response.get("status") != "error" and target:

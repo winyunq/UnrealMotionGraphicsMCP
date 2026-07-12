@@ -582,7 +582,7 @@
                         <strong>Built-in Direct Connection Loop (Zero Network Loops)</strong>: When asking the built-in Agent directly inside the Unreal Editor panel and selecting <code class="text-cyan-400">Accept</code>, commands are executed **100% in memory**. The panel communicates via direct C++ pointers with the subsystem, bypassing **any** loopback IP or socket layers. This delivers absolute local execution speeds and zero port leaks.
                     </li>
                     <li>
-                        <strong>External Bridge Loop (TCP 55557 Port Listener)</strong>: Only when exposing the editor control to external AI clients (like Claude Desktop or custom script nodes) does the C++ background thread initialize a socket listening on port <code class="text-cyan-400">TCP 55557</code> (configured default). It safely reads JSON packet blocks and feeds them back strictly under main thread locks.
+                        <strong>External Bridge Loop (Discovered Dynamic TCP Listener)</strong>: When exposing editor control to external AI clients, each UE process binds a unique OS-assigned loopback port and publishes a discovery record. The C++ background thread safely reads JSON packet blocks and feeds them back strictly through the serialized Game Thread queue.
                     </li>
                 </ul>
             </div>
@@ -593,7 +593,7 @@
                 <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
                     <i data-lucide="network" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
                     <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: UmgMcp C++ Subsystem Dual-Loop Connection Architecture]</p>
-                    <p class="text-xs text-slate-600 mt-1">Provide a system topology rendering, visually showcasing the memory connection (zero loopback network overhead) of Slate Chat UI alongside the TCP 55557 external Python daemon bridging loop.</p>
+                    <p class="text-xs text-slate-600 mt-1">Provide a system topology rendering that shows the Slate memory connection alongside the discovered dynamic TCP bridge used by external Python/Codex clients.</p>
                 </div>
             </div>
         </div>

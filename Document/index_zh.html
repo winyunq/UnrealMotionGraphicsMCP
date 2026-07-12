@@ -85,7 +85,7 @@
 
             <div class="mx-4 mb-4 rounded-lg border border-line bg-slate-50 p-4 text-xs leading-5 text-slate-600">
                 <p class="font-semibold text-ink">当前包信息</p>
-                <p class="mt-1">Unreal Engine 5.8 · Win64 · 本机编辑器桥接端口 <code>127.0.0.1:55557</code>。</p>
+                <p class="mt-1">Unreal Engine 5.8 · Win64 · 每个编辑器使用独立的系统分配本机端口。</p>
             </div>
         </aside>
 
@@ -168,7 +168,7 @@ git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp</code></
                         <i data-lucide="plug-zap" class="h-6 w-6 text-brand"></i>
                         <h2 class="text-2xl font-semibold text-ink">连接 MCP 客户端</h2>
                     </div>
-                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">先打开 Unreal Editor。插件监听 <code>127.0.0.1:55557</code>，Python MCP server 会把工具调用转发到这个编辑器桥接。</p>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">先打开 Unreal Editor。每个编辑器会发布独立的系统分配端点，Python MCP server 会发现并连接所选编辑器桥接。</p>
                     <pre class="mt-6 rounded-lg bg-slate-950 p-5 text-sm text-slate-100"><code>{
   "mcpServers": {
     "UmgMcp": {

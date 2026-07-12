@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 
 # Configure basic logging
@@ -11,7 +12,7 @@ logging.basicConfig(
 logger = logging.getLogger("MockUE5")
 
 HOST = "127.0.0.1"
-PORT = 55557  # Standard port as per mcp_config.py logic
+PORT = int(os.environ.get("UMG_MCP_MOCK_PORT", "0"))
 
 async def handle_client(reader, writer):
     addr = writer.get_extra_info('peername')
@@ -74,10 +75,10 @@ async def handle_client(reader, writer):
         logger.info(f"🔒 Socket closed for {addr}")
 
 async def main():
-    logger.info(f"🚀 Mock Unreal Engine Server starting on {HOST}:{PORT}")
-    logger.info("Waiting for incoming connections from UmgMcpServer...")
-    
     server = await asyncio.start_server(handle_client, HOST, PORT)
+    assigned_port = server.sockets[0].getsockname()[1]
+    logger.info(f"🚀 Mock Unreal Engine Server listening on {HOST}:{assigned_port}")
+    logger.info("Set UMG_MCP_PORT to this value for a direct mock connection.")
     
     async with server:
         await server.serve_forever()

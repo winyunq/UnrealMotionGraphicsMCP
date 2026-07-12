@@ -19,11 +19,13 @@ TCP 层允许多个客户端同时接入，但所有会修改或读取 UE Editor
 
 ## 多 UE 实例与连接
 
-UE 实例优先监听 `127.0.0.1:55557`。端口被占用时，会绑定由操作系统分配的动态端口，并在项目的 `Saved/UmgMcp/instances` 目录发布发现记录。正常退出时记录会删除；异常退出产生的旧记录应通过 `server_info` 验证。
+UE 实例的缺省端口是 `0`：不尝试占用固定端口，而是直接由操作系统为每个编辑器分配唯一动态端口。实例会在用户级共享目录 `%LOCALAPPDATA%/UmgMcp/instances` 发布实际端点，因此一个 Python/Codex 前端能发现同时运行的不同项目。正常退出时记录会删除；Python 前端也会用 `server_info` 验证记录，自动忽略异常退出留下的失效记录。
+
+可以把模型理解为“人、笔、纸”：AI 是人；连接会话和它持有的 Attention 是笔；UE 项目是纸。同一个项目可以同时存在多支笔，不同 AI 的笔分别保留自己的 target/graph/cursor 上下文，而底层 UObject 命令仍由全局 FIFO 顺序执行。
 
 Python MCP 前端始终提供三个基础工具：
 
-- `list_umg_mcp_servers`：读取本地 UE 实例发现记录。
+- `list_umg_mcp_servers`：读取并验证用户级 UE 实例发现记录，只返回当前可连接的实例。
 - `connect_umg_mcp(host, port, target?, exclusive?)`：把当前 AI 会话绑定到指定 UE 实例，可同时绑定 target。
 - `get_umg_mcp_connection`：查询当前端点、客户端 ID 和 UE 侧连接状态。
 

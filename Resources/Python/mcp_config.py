@@ -6,9 +6,10 @@
 # '127.0.0.1' is the standard for local machine communication.
 UNREAL_HOST = "127.0.0.1"
 
-# The port that the UmgMcp plugin is listening on.
-# Ensure this matches the port configured in the Unreal Engine plugin settings.
-UNREAL_PORT = 55557 # Changed to a more unique port for our project
+# Port 0 means "discover an active UE editor". Each editor binds its own
+# OS-assigned ephemeral port and publishes that actual port in the shared
+# UmgMcp instance registry.
+UNREAL_PORT = 0
 
 # Socket timeout in seconds.
 # Increase this if you experience timeouts during heavy operations or over slower networks (VPN).

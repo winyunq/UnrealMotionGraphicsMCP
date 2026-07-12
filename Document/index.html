@@ -85,7 +85,7 @@
 
             <div class="mx-4 mb-4 rounded-lg border border-line bg-slate-50 p-4 text-xs leading-5 text-slate-600">
                 <p class="font-semibold text-ink">Current package</p>
-                <p class="mt-1">Unreal Engine 5.8 · Win64 · local editor bridge on <code>127.0.0.1:55557</code>.</p>
+                <p class="mt-1">Unreal Engine 5.8 · Win64 · per-editor OS-assigned local bridge port.</p>
             </div>
         </aside>
 
@@ -168,7 +168,7 @@ git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp</code></
                         <i data-lucide="plug-zap" class="h-6 w-6 text-brand"></i>
                         <h2 class="text-2xl font-semibold text-ink">Connect An MCP Client</h2>
                     </div>
-                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Start Unreal Editor first. The plugin listens on <code>127.0.0.1:55557</code>, and the Python MCP server forwards tool calls to that editor bridge.</p>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Start Unreal Editor first. Each editor publishes its unique OS-assigned endpoint, and the Python MCP server discovers the selected editor bridge.</p>
                     <pre class="mt-6 rounded-lg bg-slate-950 p-5 text-sm text-slate-100"><code>{
   "mcpServers": {
     "UmgMcp": {

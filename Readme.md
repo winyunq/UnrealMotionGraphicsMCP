@@ -74,7 +74,7 @@ Then open the project in Unreal Engine 5.8 and allow Unreal Build Tool to compil
 
 ## Connect An MCP Client
 
-External MCP clients use the Python server under `Resources/Python`. Start Unreal Editor first so the plugin can bind the local bridge on `127.0.0.1:55557`.
+External MCP clients use the Python server under `Resources/Python`. Each Unreal Editor instance binds an OS-assigned local port and publishes it to the shared UmgMcp discovery registry. With one editor, the Python front end selects it automatically; with several editors, use `list_umg_mcp_servers` and `connect_umg_mcp` to choose the project.
 
 Add this to the `mcpServers` section of your client settings, replacing the path with your own absolute plugin path:
 
@@ -128,7 +128,7 @@ Run an editor smoke test after Unreal Editor is open:
 uv run python APITest\UE5_Editor_Imitation.py
 ```
 
-If the editor-side test cannot connect, check that the plugin is enabled and that no other process owns port `55557`.
+If the editor-side test cannot connect, check that the plugin is enabled and use `list_umg_mcp_servers` to confirm its dynamically assigned endpoint is discoverable.
 
 ## Documentation Map
 
@@ -172,7 +172,7 @@ and summarize which MCP tools changed the asset.
 
 | Symptom | Fix |
 | --- | --- |
-| MCP client reports `ConnectionRefusedError`, `WinError 10061`, or `WinError 1225` | Open Unreal Editor first, enable `UmgMcp`, restart the editor, then reconnect the MCP client. The editor bridge listens on `127.0.0.1:55557`. |
+| MCP client reports `ConnectionRefusedError`, `WinError 10061`, or `WinError 1225` | Open Unreal Editor first, enable `UmgMcp`, then call `list_umg_mcp_servers`. Each editor uses a unique OS-assigned port; reconnect to the endpoint in its live discovery record. |
 | `uv` is not recognized | Install `uv`, restart the terminal, or use the optional local virtual environment setup above. |
 | Plugin does not compile after copying between projects | Confirm the project is using UE 5.8 Win64, remove stale generated build output for this plugin/project, then let Unreal rebuild. |
 | Tool calls succeed but edit the wrong widget | Set the active UMG target first or pass the full asset path, for example `/Game/UI/WBP_LoginPanel.WBP_LoginPanel`. |
