@@ -50,7 +50,6 @@ def main() -> None:
         "set_widget_properties",
         "delete_widget",
         "reorder_widget_tree",
-        "reparent_widget",
         "apply_layout",
         "save_asset",
         "list_assets",

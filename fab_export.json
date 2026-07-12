@@ -1,0 +1,69 @@
+{
+  "descriptor": {
+    "FileVersion": 3,
+    "Version": 5,
+    "VersionName": "1.0.4",
+    "FriendlyName": "UmgMcp",
+    "Description": "UmgMcp Focus: Core UMG protocol is Open-Source; Fab Edition provides 'Context Compression' and high-performance reliability.",
+    "Category": "Editor",
+    "CreatedBy": "Winyunq",
+    "CreatedByURL": "",
+    "DocsURL": "https://github.com/winyunq/UnrealMotionGraphicsMCP",
+    "FabURL": "com.epicgames.launcher://ue/Fab/product/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71",
+    "MarketplaceURL": "",
+    "SupportURL": "",
+    "EngineVersion": "5.7.0",
+    "CanContainContent": true,
+    "IsBetaVersion": false,
+    "IsExperimentalVersion": false,
+    "Installed": false,
+    "Modules": [
+      {
+        "Name": "UmgMcp",
+        "Type": "Editor",
+        "LoadingPhase": "Default",
+        "PlatformAllowList": [
+          "Win64"
+        ]
+      }
+    ],
+    "Plugins": []
+  },
+  "export": {
+    "uplugin_name": "UmgMcp.uplugin",
+    "zip_name_prefix": "UmgMcp_FabRelease",
+    "technical_filename": "FabTechnicalInformation.md",
+    "auto_increment_version": true,
+    "cloud_drive_path": "G:\\My Drive\\FabPublish\\UnrealMotionGraphicsMCP",
+    "disable_unity_build": true,
+    "module_build_cs": "Source/UmgMcp/UmgMcp.Build.cs",
+    "prune_extensions": [
+      ".md"
+    ],
+    "include_dirs": [
+      "Config",
+      "Resources",
+      "Source"
+    ],
+    "filter_plugin_paths": [
+      "/Config/...",
+      "/Resources/...",
+      "/Source/..."
+    ],
+    "copyright_header": "// Copyright (c) 2025-2026 Winyunq. All rights reserved."
+  },
+  "technical_information": {
+    "features": [
+      "Focused UMG & UI Optimization: Dedicated strictly to Unreal Motion Graphics (UMG) and its derivative systems, solving layout and UI complexities through modular strategy instead of generic bloat.",
+      "Tailored for High-Efficiency AI Tool Use: Designed explicitly to make tool interfaces incredibly easy and efficient for AI agents. By optimizing schema structures, even pure text-based LLMs can seamlessly drive UI tasks without relying on massive parameter brute-forcing.",
+      "Multi-Dimensional UMG Control: Professional out-of-the-box pipeline for layout orchestration, blueprints, materials, and UI automation.",
+      "Built-in LiteRT-LM: Integrated LiteRT-LM framework supporting local AI workflows, providing offline privacy, ultra-low latency, and independence from external cloud APIs.",
+      "Zero-Friction User Experience & Custom AI Integration: Engineered to be virtually foolproof—designed so that even blind setup and random configurations just work. If your preferred AI platform is not supported out of the box, contact the developer directly via email to have your platform custom-integrated into the tool."
+    ],
+    "code_modules": "UmgMcp (Editor), LiteRTLMUnreal (Runtime)",
+    "number_of_blueprints": 0,
+    "supported_dev_platforms": "Win64",
+    "supported_target_platforms": "Win64",
+    "documentation": "https://github.com/winyunq/UnrealMotionGraphicsMCP"
+  }
+}

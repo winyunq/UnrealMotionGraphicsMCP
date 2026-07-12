@@ -1,0 +1,11 @@
+Binaries/
+!Source/ThirdParty/**/Binaries/
+!Source/ThirdParty/**/Binaries/**
+Intermediate/
+DerivedDataCache/
+Saved/
+.vscode/
+.vs/
+*.sln
+*.suo
+*.profraw

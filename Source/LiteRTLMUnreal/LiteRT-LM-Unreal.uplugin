@@ -1,0 +1,28 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "LiteRT-LM",
+	"Description": "High-performance, local LLM inference integration for Unreal Engine 5.",
+	"Category": "AI",
+	"CreatedBy": "Winyunq",
+	"CreatedByURL": "",
+	"DocsURL": "https://github.com/Winyunq/LiteRT-LM-Unreal",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "LiteRTLMUnreal",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac"
+			]
+		}
+	]
+}

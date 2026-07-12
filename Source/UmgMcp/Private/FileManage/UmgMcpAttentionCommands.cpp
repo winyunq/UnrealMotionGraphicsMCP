@@ -55,7 +55,7 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         return Response;
     }
 
-	if (Command == TEXT("get_target_umg_asset"))
+	if (Command == TEXT("get_target_umg_asset") || Command == TEXT("get_target_blueprint_asset"))
 	{
         FString AssetPath = AttentionSubsystem->GetTargetUmgAsset();
         Response->SetBoolField(TEXT("success"), true);
@@ -84,8 +84,9 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         Response->SetBoolField(TEXT("success"), true);
         Response->SetArrayField(TEXT("assets"), JsonAssets);
 	}
-    else if (Command == TEXT("set_target_umg_asset"))
+    else if (Command == TEXT("set_target_umg_asset") || Command == TEXT("set_target_blueprint_asset"))
     {
+        const bool bGenericBlueprintTarget = Command == TEXT("set_target_blueprint_asset");
         FString AssetPathInput;
         FString WidgetTarget;
 
@@ -116,7 +117,9 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
             IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
             bool bAlreadyExists = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(ToAssetRegistryObjectPath(AssetPath))).IsValid();
             bool bCanAutoCreate = CanAutoCreateFromPath(AssetPath);
-            bool bSuccess = AttentionSubsystem->SetTargetUmgAsset(AssetPath);
+            bool bSuccess = bGenericBlueprintTarget
+                ? AttentionSubsystem->SetTargetBlueprintAsset(AssetPath)
+                : AttentionSubsystem->SetTargetUmgAsset(AssetPath);
             if (bSuccess)
             {
                 Response->SetBoolField(TEXT("success"), true);
@@ -125,14 +128,21 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
 
                 if (!WidgetTarget.IsEmpty())
                 {
-                    AttentionSubsystem->SetTargetWidget(WidgetTarget);
-                    Response->SetStringField(TEXT("widget_name"), WidgetTarget);
+                    if (AttentionSubsystem->SetTargetWidget(WidgetTarget))
+                    {
+                        Response->SetStringField(TEXT("widget_name"), WidgetTarget);
+                    }
+                    else
+                    {
+                        Response->SetBoolField(TEXT("success"), false);
+                        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset target was set to '%s', but widget '%s' was not found in that asset."), *AssetPath, *WidgetTarget));
+                    }
                 }
             }
             else
             {
                 Response->SetBoolField(TEXT("success"), false);
-                Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Failed to set target. Asset '%s' not found or invalid."), *AssetPath));
+                Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Failed to set target. Blueprint asset '%s' not found or invalid."), *AssetPath));
             }
         }
         else if (!WidgetTarget.IsEmpty())
@@ -146,11 +156,19 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
             }
             else
             {
-                AttentionSubsystem->SetTargetWidget(WidgetTarget);
-                Response->SetBoolField(TEXT("success"), true);
-                Response->SetStringField(TEXT("asset_path"), ExistingAsset);
-                Response->SetStringField(TEXT("widget_name"), WidgetTarget);
-                Response->SetStringField(TEXT("action"), TEXT("focus-updated"));
+                if (AttentionSubsystem->SetTargetWidget(WidgetTarget))
+                {
+                    Response->SetBoolField(TEXT("success"), true);
+                    Response->SetStringField(TEXT("asset_path"), ExistingAsset);
+                    Response->SetStringField(TEXT("widget_name"), WidgetTarget);
+                    Response->SetStringField(TEXT("action"), TEXT("focus-updated"));
+                }
+                else
+                {
+                    Response->SetBoolField(TEXT("success"), false);
+                    Response->SetStringField(TEXT("asset_path"), ExistingAsset);
+                    Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Widget '%s' was not found in active target asset '%s'."), *WidgetTarget, *ExistingAsset));
+                }
             }
         }
         else
@@ -164,9 +182,16 @@ TSharedPtr<FJsonObject> FUmgMcpAttentionCommands::HandleCommand(const FString& C
         FString WidgetName;
         if (Params && Params->TryGetStringField(TEXT("widget_name"), WidgetName) && !WidgetName.IsEmpty())
         {
-            AttentionSubsystem->SetTargetWidget(WidgetName);
-            Response->SetBoolField(TEXT("success"), true);
-            Response->SetStringField(TEXT("widget_name"), WidgetName);
+            if (AttentionSubsystem->SetTargetWidget(WidgetName))
+            {
+                Response->SetBoolField(TEXT("success"), true);
+                Response->SetStringField(TEXT("widget_name"), WidgetName);
+            }
+            else
+            {
+                Response->SetBoolField(TEXT("success"), false);
+                Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Widget '%s' was not found in the current target asset."), *WidgetName));
+            }
         }
         else
         {

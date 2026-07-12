@@ -19,6 +19,7 @@
 #include "Engine/PointLight.h"
 #include "Engine/SpotLight.h"
 #include "Camera/CameraActor.h"
+#include "Editor.h"
 #include "EditorAssetLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "JsonObjectConverter.h"
@@ -335,7 +336,7 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
         return MakeErrorResponse(TEXT("UmgMcp server is not running."), TEXT("server_stopped"));
     }
     
-    // If we are already on the GameThread (e.g. internal call or test), execute directly
+    // If we are already on the GameThread (e.g. called from FabServer or test), execute directly
     if (IsInGameThread())
     {
         UE_LOG(LogUmgMcp, Verbose, TEXT("UmgMcpBridge: Already on GameThread, executing directly."));
@@ -568,7 +569,7 @@ bool UUmgMcpBridge::RestoreSessionContext(const FString& ClientId, FString& OutE
 
     if (UUmgAttentionSubsystem* Attention = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
     {
-        if (!Session.TargetAsset.IsEmpty() && !Attention->SetTargetUmgAsset(Session.TargetAsset))
+        if (!Session.TargetAsset.IsEmpty() && !Attention->SetTargetBlueprintAsset(Session.TargetAsset))
         {
             OutError = FString::Printf(TEXT("Could not restore target '%s' for client '%s'."), *Session.TargetAsset, *ClientId);
             return false;
@@ -636,7 +637,7 @@ bool UUmgMcpBridge::ValidateTargetLease(const FString& ClientId, const FString& 
         return true;
     }
     FString RequestedTarget;
-    if (CommandType == TEXT("set_target_umg_asset"))
+    if (CommandType == TEXT("set_target_umg_asset") || CommandType == TEXT("set_target_blueprint_asset"))
     {
         Params->TryGetStringField(TEXT("asset_path"), RequestedTarget);
         FString Left, Right;
@@ -807,9 +808,11 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
         else if (CommandType == TEXT("get_last_edited_umg_asset") ||
                  CommandType == TEXT("get_recently_edited_umg_assets") ||
                  CommandType == TEXT("get_target_umg_asset") ||
+                 CommandType == TEXT("get_target_blueprint_asset") ||
                  CommandType == TEXT("get_target_widget") ||
                  CommandType == TEXT("set_target_widget") ||
-                 CommandType == TEXT("set_target_umg_asset"))
+                 CommandType == TEXT("set_target_umg_asset") ||
+                 CommandType == TEXT("set_target_blueprint_asset"))
         {
             ResultJson = AttentionCommands->HandleCommand(CommandType, Params);
         }
@@ -839,13 +842,14 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                            {
                                // Function Creation / Event Binding Logic
                                UUmgBlueprintFunctionSubsystem* BPSystem = GEditor->GetEditorSubsystem<UUmgBlueprintFunctionSubsystem>();
-                               UWidgetBlueprint* TargetBP = AttentionSystem->GetCachedTargetWidgetBlueprint();
+                               UBlueprint* TargetBP = AttentionSystem->GetCachedTargetBlueprint();
                                
                                if (BPSystem && TargetBP)
                                {
-                                   FString TargetNodeId;
-                                   FString ActualGraphName;
-                                   FString FunctionStatus;
+                                    FString TargetNodeId;
+                                    FString ActualGraphName;
+                                    FString FunctionStatus;
+                                    bool bSupportedTarget = true;
 
                                    FString ComponentName;
                                    FString EventName;
@@ -854,8 +858,17 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                                    if (GraphName.Split(TEXT("."), &ComponentName, &EventName))
                                    {
                                         // It's a Component Event!
-                                        TargetNodeId = BPSystem->EnsureComponentEventExists(TargetBP, ComponentName, EventName, FunctionStatus);
-                                        ActualGraphName = TEXT("EventGraph");
+                                        if (UWidgetBlueprint* WidgetTarget = Cast<UWidgetBlueprint>(TargetBP))
+                                        {
+                                            TargetNodeId = BPSystem->EnsureComponentEventExists(WidgetTarget, ComponentName, EventName, FunctionStatus);
+                                            ActualGraphName = TEXT("EventGraph");
+                                        }
+                                        else
+                                        {
+                                             ResultJson->SetBoolField(TEXT("success"), false);
+                                             ResultJson->SetStringField(TEXT("error"), TEXT("Component.Event targets require a Widget Blueprint. Use a graph/function name for general Blueprints."));
+                                             bSupportedTarget = false;
+                                        }
                                    }
                                    else
                                    {
@@ -878,17 +891,20 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                                        }
                                    }
 
-                                   // Set Context
-                                   AttentionSystem->SetTargetGraph(ActualGraphName);
-                                   if (!TargetNodeId.IsEmpty())
-                                   {
-                                       AttentionSystem->SetCursorNode(TargetNodeId);
-                                   }
-                                   
-                                   ResultJson->SetStringField(TEXT("target_graph"), ActualGraphName);
-                                   ResultJson->SetStringField(TEXT("cursor_node"), TargetNodeId);
-                                   ResultJson->SetStringField(TEXT("status"), FunctionStatus); // Found, Created, Inherited
-                                   ResultJson->SetBoolField(TEXT("success"), true);
+                                    if (bSupportedTarget)
+                                    {
+                                        // Set Context
+                                        AttentionSystem->SetTargetGraph(ActualGraphName);
+                                        if (!TargetNodeId.IsEmpty())
+                                        {
+                                            AttentionSystem->SetCursorNode(TargetNodeId);
+                                        }
+
+                                        ResultJson->SetStringField(TEXT("target_graph"), ActualGraphName);
+                                        ResultJson->SetStringField(TEXT("cursor_node"), TargetNodeId);
+                                        ResultJson->SetStringField(TEXT("status"), FunctionStatus); // Found, Created, Inherited
+                                        ResultJson->SetBoolField(TEXT("success"), true);
+                                    }
                                }
                                else
                                {
@@ -935,6 +951,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                  CommandType == TEXT("set_widget_properties") ||
                  CommandType == TEXT("delete_widget") ||
                  CommandType == TEXT("reparent_widget") ||
+                 CommandType == TEXT("reorder_widget_tree") ||
                  CommandType == TEXT("save_asset") ||
                  CommandType == TEXT("get_widget_schema"))
         {
@@ -1016,7 +1033,7 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                      // 1. Resolve Target Blueprint
                      // We *should* use the one from Attention System if not specified? 
                      // Or just pass the Attention System's cached one.
-                     UWidgetBlueprint* TargetBP = AttentionSystem->GetCachedTargetWidgetBlueprint();
+                     UBlueprint* TargetBP = AttentionSystem->GetCachedTargetBlueprint();
                      
                      // Fallback: Check if payload specifies an asset?
                      // For now, Strict Stateful mode: Must have target set in Attention.
@@ -1052,7 +1069,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                          
                          // Auto-Layout & Auto-Connect
                          if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param") ||
-                             SubAction == TEXT("add_function_step") || SubAction == TEXT("add_step_param"))
+                             SubAction == TEXT("add_function_step") || SubAction == TEXT("add_step_param") ||
+                             SubAction == TEXT("bluecode_apply"))
                          {
                              if (!Params->HasField(TEXT("x")) || !Params->HasField(TEXT("y")))
                              {
@@ -1097,7 +1115,8 @@ FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const 
                          if (ResultJson.IsValid() && ResultJson->GetBoolField(TEXT("success")))
                          {
                              if (SubAction == TEXT("create_node") || SubAction == TEXT("add_node") || SubAction == TEXT("add_param") ||
-                                 SubAction == TEXT("add_function_step"))
+                                 SubAction == TEXT("add_function_step") ||
+                                 SubAction == TEXT("bluecode_apply"))
                              {
                                  FString NewNodeId;
                                  if (ResultJson->TryGetStringField(TEXT("nodeId"), NewNodeId))

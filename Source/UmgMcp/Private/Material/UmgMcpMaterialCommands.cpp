@@ -4,6 +4,7 @@
 #include "Editor.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
+#include "MaterialDomain.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialExpression.h"
 #include "Materials/MaterialExpressionCustom.h"
@@ -2689,17 +2690,6 @@ TSharedPtr<FJsonObject> FUmgMcpMaterialCommands::HandleCommand(const FString& Co
         }
     }
     // --- Lifecycle ---
-    else if (CommandType == TEXT("material_compile_asset"))
-    {
-        FString Status = Subsystem->CompileAsset();
-        bool bCompileSuccess = !Status.StartsWith(TEXT("Error"));
-        ResultJson->SetStringField(TEXT("compile_status"), Status);
-        ResultJson->SetBoolField(TEXT("success"), bCompileSuccess);
-        if (!bCompileSuccess)
-        {
-            ResultJson->SetStringField(TEXT("error"), Status);
-        }
-    }
     else
     {
         ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Unknown Material Command: %s"), *CommandType));

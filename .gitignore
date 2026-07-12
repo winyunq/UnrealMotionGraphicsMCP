@@ -4,6 +4,7 @@ Build/
 Intermediate/
 Saved/
 DerivedDataCache/
+Testing/
 
 # Visual Studio files
 .vs/
@@ -29,6 +30,10 @@ DerivedDataCache/
 
 # Other
 *.DS_Store
+*.pdf
+*.zip
+install.bat
+status.txt
 
 # Python generated files
 __pycache__/
@@ -36,8 +41,22 @@ __pycache__/
 *.pyo
 Resources/Python/APITest/Artifacts/*.jsonl
 
-# Gemini Temporary Files
-Gemini_*
+# Gemini Temporary Tools (Local only)
+Gemini_FabExport.py
+Gemini_ApplyCopyright.py
+Gemini_DiffFiles.py
+Gemini_FabExportConfig.json
+Gemini_ApplyCopyrightPublic.py
+Gemini_CopyrightManager.py
+Gemini_FabCopyright.py
+Gemini_PrivateFiles.txt
+Gemini_PublicCopyright.py
+Gemini_PublicFiles.txt
+Gemini_AllFiles.txt
+Gemini.md
+gemini.md
+Gemini_FetchUpstream.bat
+FetchUpstream.bat
 
 # Doxygen / Documentation generated files
 Document/html/
@@ -46,3 +65,7 @@ Document/latex/
 # Plugin internal configs
 UmgMcpConfig.json
 Gemini_FabExportConfig.json
+
+# Models
+*.gguf
+Resources/Models/

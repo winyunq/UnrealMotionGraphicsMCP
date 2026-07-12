@@ -258,6 +258,59 @@ namespace
         return PropertyFilter.Equals(TEXT("RenderTransform"), ESearchCase::IgnoreCase)
             || PropertyFilter.Equals(ToTransformPropertyName(Component), ESearchCase::IgnoreCase);
     }
+
+    bool HasGeneratedVariable(const UWidgetBlueprint* Blueprint, FName VariableName)
+    {
+        if (!Blueprint || VariableName.IsNone())
+        {
+            return false;
+        }
+
+        return Blueprint->GeneratedVariables.ContainsByPredicate([VariableName](const FBPVariableDescription& VarDesc) {
+            return VarDesc.VarName == VariableName;
+        });
+    }
+
+    bool EnsureAnimationVariable(UWidgetBlueprint* Blueprint, UWidgetAnimation* Animation)
+    {
+        if (!Blueprint || !Animation)
+        {
+            return false;
+        }
+
+        const FName AnimationName = Animation->GetFName();
+        bool bChanged = false;
+
+        if (!HasGeneratedVariable(Blueprint, AnimationName))
+        {
+            Blueprint->Modify();
+            Blueprint->OnVariableAdded(AnimationName);
+            bChanged = true;
+        }
+
+        if (!Blueprint->WidgetVariableNameToGuidMap.Contains(AnimationName))
+        {
+            Blueprint->Modify();
+            Blueprint->WidgetVariableNameToGuidMap.Add(AnimationName, FGuid::NewGuid());
+            bChanged = true;
+        }
+
+        return bChanged;
+    }
+
+    void RefreshAnimationPlaybackRange(UMovieScene* MovieScene, TRange<FFrameNumber> Range)
+    {
+        if (!MovieScene || Range.IsEmpty())
+        {
+            return;
+        }
+
+        MovieScene->SetPlaybackRange(Range);
+
+        const FFrameRate TickResolution = MovieScene->GetTickResolution();
+        MovieScene->GetEditorData().WorkStart = TickResolution.AsSeconds(Range.GetLowerBoundValue());
+        MovieScene->GetEditorData().WorkEnd = TickResolution.AsSeconds(Range.GetUpperBoundValue());
+    }
 }
 
 FUmgMcpSequencerCommands::FUmgMcpSequencerCommands()
@@ -397,7 +450,11 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::SetWidgetScope(const TSharedPt
         UUmgAttentionSubsystem* AttentionSubsystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
         if (AttentionSubsystem)
         {
-            AttentionSubsystem->SetTargetWidget(WidgetName);
+            if (!AttentionSubsystem->SetTargetWidget(WidgetName))
+            {
+                return FUmgMcpCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' was not found in the current target asset."), *WidgetName));
+            }
+
             TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
             Data->SetStringField(TEXT("widget_name"), WidgetName);
             return FUmgMcpCommonUtils::CreateSuccessResponse(Data);
@@ -1280,6 +1337,13 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
         if (Animation && Animation->GetName() == AnimationName)
         {
             UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Animation '%s' already exists. Setting focus."), *AnimationName);
+            const bool bVariableHealed = EnsureAnimationVariable(Blueprint, Animation);
+            if (bVariableHealed)
+            {
+                FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+                FKismetEditorUtilities::CompileBlueprint(Blueprint);
+            }
+
             // Focus and return
             if (GEditor)
             {
@@ -1295,20 +1359,20 @@ TSharedPtr<FJsonObject> FUmgMcpSequencerCommands::CreateAnimation(const TSharedP
 
     UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Creating new UWidgetAnimation object..."));
     UWidgetAnimation* NewAnimation = NewObject<UWidgetAnimation>(Blueprint, FName(*AnimationName), RF_Public | RF_Transactional);
-    NewAnimation->MovieScene = NewObject<UMovieScene>(NewAnimation, FName("MovieScene"), RF_Transactional);
-    
-    // Ensure MovieScene has a valid display name (though UMG usually uses the Animation name)
-    // NewAnimation->MovieScene->SetDisplayLabel(AnimationName);
+    NewAnimation->SetDisplayLabel(AnimationName);
+    NewAnimation->MovieScene = NewObject<UMovieScene>(NewAnimation, FName(*AnimationName), RF_Transactional);
+    NewAnimation->MovieScene->SetDisplayRate(FFrameRate(20, 1));
+    RefreshAnimationPlaybackRange(
+        NewAnimation->MovieScene,
+        TRange<FFrameNumber>(
+            FFrameNumber(0),
+            (5.0 * NewAnimation->MovieScene->GetTickResolution()).RoundToFrame() + FFrameNumber(1)));
 
     Blueprint->Modify();
     Blueprint->Animations.Add(NewAnimation);
-    
-    // CRITICAL FIX: Assign a GUID to the new animation so it's recognized as a variable.
-    // This prevents "Ensure condition failed: WidgetBP->WidgetVariableNameToGuidMap.Contains(Animation->GetFName())"
-    FGuid NewAnimGuid = FGuid::NewGuid();
-    Blueprint->WidgetVariableNameToGuidMap.Add(NewAnimation->GetFName(), NewAnimGuid);
-    
-    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Animation added to Blueprint with GUID %s. Notifying Editor..."), *NewAnimGuid.ToString());
+    EnsureAnimationVariable(Blueprint, NewAnimation);
+
+    UE_LOG(LogUmgSequencer, Log, TEXT("CreateAnimation: Animation added to Blueprint. Notifying Editor..."));
 
     // Notify Editor
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);

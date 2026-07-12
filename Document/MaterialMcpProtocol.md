@@ -19,7 +19,7 @@
 | `hlsl_get()` | 读取当前 HLSL、参数列表和输出契约。 |
 | `hlsl_set(hlsl?, parameters?, outputs?)` | 并集式写入 HLSL、参数与材质输出。不会删除。 |
 | `hlsl_delete(names, confirm_delete=true, kind?)` | 显式删除 HLSL 参数或输出。名称歧义时补 `kind="parameter"` 或 `kind="output"`。 |
-| `hlsl_compile()` | 编译当前材质并返回精简诊断。 |
+| `hlsl_compile()` | 编译并保存当前材质，返回精简诊断。 |
 
 ## `hlsl_set_target` 类型参数
 

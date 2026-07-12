@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2. 怎么对话 (4种Agent) - UMG MCP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#030712',
+                            card: '#0b0f19',
+                            border: '#1e293b',
+                            neonBlue: '#00f0ff',
+                            neonPurple: '#d946ef',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #0d1527 0%, #030712 100%);
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-border-hover:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .sidebar-link-active {
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(217, 70, 239, 0.02) 100%);
+            border-left: 3px solid #00f0ff;
+            color: #00f0ff;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex">
+
+    <!-- 侧边栏 Sidebar -->
+    <aside class="w-80 glass-panel border-r border-slate-800 flex flex-col shrink-0">
+        <!-- Logo / Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-cyan-500 to-fuchsia-500 p-[2px]">
+                    <div class="w-full h-full bg-cyber-bg rounded-[6px] flex items-center justify-center">
+                        <i data-lucide="layout" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-cyber-text tracking-wide text-lg">UMG MCP</h1>
+                    <p class="text-xs text-slate-500">Winyunq 终极智造</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between text-sm">
+            <span class="text-slate-500">语言 / Language</span>
+            <a href="chat_dialogue.html" class="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                <span>English</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="index_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 transition-all">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span>快速开始 / 导航厅</span>
+            </a>
+            <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">核心主题</div>
+            <a href="model_config_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>1. 怎么配置模型 (四选一)</span>
+            </a>
+            <a href="chat_dialogue_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-all font-medium sidebar-link-active">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>2. 怎么对话 (4种Agent)</span>
+            </a>
+            <a href="mcp_support_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>3. 支持哪些 MCP (C++)</span>
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-800">
+            <div class="text-xs text-slate-500">
+                <p>© 2026 Winyunq. 保留所有权利。</p>
+                <p class="mt-1 flex items-center text-slate-600">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i>
+                    双回路极速直连安全保护
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <!-- Top bar -->
+        <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 bg-cyber-bg/30 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="text-slate-500">Official Docs</span>
+                <span class="text-slate-500">/</span>
+                <span class="text-slate-400 text-sm">AI 对话交互</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <p class="text-xs text-slate-500">当前 Agent 模式活跃</p>
+                    <p class="text-xs text-fuchsia-400 font-semibold">C++ Subsystem 直连</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="px-10 py-12 max-w-5xl w-full mx-auto space-y-12">
+            <!-- Header -->
+            <div class="space-y-4">
+                <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center">
+                    <i data-lucide="message-square" class="w-8 h-8 text-cyan-400 mr-3"></i>
+                    第二章：怎么对话（4 种内置 Agent 模式）
+                </h2>
+                <p class="text-slate-400 text-base leading-relaxed">
+                    在虚幻编辑器右侧内置的 UMG MCP 对话面板中，AI 的对话并不是单一死板的。基于不同的场景与开发阶段，本插件在 C++ 底层划分了 <strong>chat, develop, learning, task</strong> 四种精密的 Agent 对话状态。
+                </p>
+            </div>
+
+            <!-- 四种 Agent 运作机制 -->
+            <div class="space-y-8">
+                <h3 class="text-xl font-bold text-white flex items-center border-b border-slate-800 pb-3">
+                    <i data-lucide="brain" class="w-5 h-5 text-fuchsia-400 mr-2"></i>
+                    1. 四大 Agent 运作机理与 C++ 机制
+                </h3>
+
+                <div class="space-y-6">
+                    <!-- Agent 1 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="message-circle" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Chat 模式 (默认会话 Agent - <code class="text-cyan-400 text-sm">FUmgMcpDefaultChatAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Chat</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>定位：</strong> 通用的上下文感知对话，适合基础的技术交流、方案推演与概念澄清。
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ 运转机理：</strong> 每次开始提问互动时，调用 <code class="text-fuchsia-400">RestoreConversationContext()</code>，从当前的本地会话持久化存储中，完整拉取上一轮互动的 Substance（历史 JSON 消息快照），作为本轮提问的历史前缀提交至 LLM 供应商，保证上下文不丢失。
+                        </p>
+                    </div>
+
+                    <!-- Agent 2 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="wrench" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Develop 模式 (动态开发 Agent - <code class="text-cyan-400 text-sm">FUmgMcpDevelopAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Develop</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>定位：</strong> 高情境感知的 UI 编写与修改模式，专注于高精度的 UI 操纵与控件生成。
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ 运转机理：</strong> 在触发互动时，会调用独有的 <code class="text-fuchsia-400">DynamicallyUpdatePromptAndTools()</code>。它检测虚幻编辑器当前正在编辑的活跃 UI 资产，动态重构当前会话的 System Instruction（系统提示词），并根据当前被激活选中的控件类型，动态过滤允许调用的 MCP 工具列表。例如，只选中 CanvasPanel 时才暴露出 Canvas Slot 相关的偏置调整工具，极大收窄了 AI 的生成边界，提高了工具调用的成功率。
+                        </p>
+                    </div>
+
+                    <!-- Agent 3 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="glasses" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Learning 模式 (只读感知 Agent - <code class="text-cyan-400 text-sm">FUmgMcpLearningAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Learning</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>定位：</strong> 对复杂的已有 UMG 控件树进行只读式深度剖析、结构感知与教学引导。
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ 运转机理：</strong> 插件会自动在后台加载内置的 <code class="text-cyan-400">learning.json</code> 工具配置。在每次接收提问时，它调用 <code class="text-fuchsia-400">ResolveTargetAndTreeContext()</code> 进行无冗余优化设计：实时计算并对比当前编辑器视口中控件树的 Hash 值。**只有**当您手动修改了 UI 导致 Hash 发生物理改变时，它才会将最新的树结构重新打包成上下文发送；若无修改，则继续复用之前的只读缓存，从物理上杜绝了对同一个 UMG 树进行重复网络查询带来的巨大 Token 开销与响应卡顿。
+                        </p>
+                    </div>
+
+                    <!-- Agent 4 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="check-square" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Task 模式 (任务接管 Agent - <code class="text-cyan-400 text-sm">FUmgMcpTaskAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Task</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>定位：</strong> 执行有始有终的、具备强一致性与完整保护的安全独立开发任务包。
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ 运转机理：</strong> 任务接管流的逻辑具备极高的工程严密性。当 AI 从会话中接收到特殊的 <code class="text-cyan-400">task_begin</code> 工具调用时，触发 <code class="text-fuchsia-400">AcceptTask()</code>，它会将您编辑器当前的活跃编辑资产路径（如 `PreviousWidget`）强制暂存至私有变量 <code class="text-fuchsia-400">CapturedPreviousTarget</code> 中，并把当前任务专属的 UMG 资产强行推上舞台供 AI 独立编辑，在此期间物理屏蔽任何其他杂乱输入。直到接收到对应的终止命令 <code class="text-cyan-400">task_end</code> 工具调用时，触发 <code class="text-fuchsia-400">TaskEnd()</code>，释放资产锁定并完美的把您编辑器的编辑目标物归原主，物还原貌。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UI 对话与审批工作流 -->
+            <div class="space-y-6">
+                <h3 class="text-xl font-bold text-white flex items-center border-b border-slate-800 pb-3">
+                    <i data-lucide="shield-check" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                    🎨 内置 Chat UI 审批工作流 (Sslate/Slate 交互)
+                </h3>
+
+                <div class="glass-panel rounded-xl p-8 border border-slate-800 space-y-6">
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        当内置 Agent 在对话中试图发起任何可能会修改您 UMG 资产的动作时（例如“创建一个按钮”或“删除一个布局”），插件底层的 <code class="text-cyan-400">SUmgMcpMcpApprovalQueue</code> (审批队列) 控件就会立即在消息气泡中以高亮卡片的形式挂载。
+                    </p>
+
+                    <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-6 space-y-4">
+                        <h5 class="text-white font-semibold text-sm">💡 对话交互体验流程：</h5>
+                        <ol class="list-decimal pl-5 text-xs text-slate-400 space-y-2">
+                            <li><strong>发出提问</strong>：您在底栏输入：<code class="text-cyan-400">“在 Canvas 下帮我新建一个名为 WinyunqButton 的按钮”</code>。</li>
+                            <li><strong>AI 析出动作</strong>：内置 Agent 回复，并将工具执行动作（如 <code class="text-cyan-400">create_widget</code>）以卡片形式静默投递到您的聊天时间轴中。</li>
+                            <li><strong>呈现 Accept / Reject 按钮</strong>：气泡卡片底部呈现蓝色的 <code class="text-cyan-400">Accept (接受)</code> 和灰色的 <code class="text-slate-400">Reject (拒绝)</code> 按钮。</li>
+                            <li><strong>内存直连执行</strong>：当您点击 <code class="text-cyan-400 font-bold">Accept</code> 后，动作会绕过任何网络接口直接被投向 <code class="text-fuchsia-400">FFabServerHttpClient::ExecuteTool</code> 并以极速内存直连的方式在虚幻主线程瞬间生成完毕，并在右侧视口立即刷新，给您极致丝滑的“手势化智造”开发体验！</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 物理占位截图卡片 Placeholder -->
+            <div class="space-y-4">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase tracking-wider font-mono">📸 物理截图占位</h4>
+                <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
+                    <i data-lucide="image" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
+                    <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: Unreal UMG MCP Built-in Chat Panel Window Layout]</p>
+                    <p class="text-xs text-slate-600 mt-1">请截图虚幻编辑器右侧停靠的 UMG MCP 对话面板窗口（包含底栏 Selector），以展示 chat/develop/learning/task 选择状态。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

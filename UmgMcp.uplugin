@@ -1,29 +1,51 @@
 {
-	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0",
-	"FriendlyName": "UmgMcp",
-	"Description": "Open-source MCP bridge for AI-assisted Unreal UMG authoring, inspection, and structured UI asset editing.",
-	"Category": "Editor",
-	"CreatedBy": "Winyunq",
-	"CreatedByURL": "",
-	"DocsURL": "https://winyunq.github.io/UnrealMotionGraphicsMCP/",
-	"MarketplaceURL": "",
-	"SupportURL": "",
-	"EngineVersion": "5.8.0",
-	"CanContainContent": true,
-	"IsBetaVersion": false,
-	"IsExperimentalVersion": false,
-	"Installed": false,
-	"Modules": [
-		{
-			"Name": "UmgMcp",
-			"Type": "Editor",
-			"LoadingPhase": "Default",
-			"PlatformAllowList": [
-				"Win64"
-			]
-		}
-	],
-	"Plugins": []
+  "FileVersion": 3,
+  "Version": 8,
+  "VersionName": "1.0.12",
+  "FriendlyName": "UmgMcp",
+  "Description": "UmgMcp Focus: Core UMG protocol is Open-Source; Fab Edition provides 'Context Compression' and high-performance reliability.",
+  "Category": "Editor",
+  "CreatedBy": "Winyunq",
+  "CreatedByURL": "",
+  "DocsURL": "https://winyunq.github.io/UnrealMotionGraphicsMCP/",
+  "FabURL": "com.epicgames.launcher://ue/Fab/product/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "EngineVersion": "5.8.0",
+  "CanContainContent": true,
+  "IsBetaVersion": false,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "UmgMcp",
+      "Type": "Editor",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64"
+      ]
+    },
+    {
+      "Name": "LiteRTLMUnreal",
+      "Type": "Runtime",
+      "LoadingPhase": "PreDefault",
+      "PlatformAllowList": [
+        "Win64"
+      ]
+    },
+    {
+      "Name": "ChatWithUnreal",
+      "Type": "Editor",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64"
+      ]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "EditorScriptingUtilities",
+      "Enabled": true
+    }
+  ]
 }

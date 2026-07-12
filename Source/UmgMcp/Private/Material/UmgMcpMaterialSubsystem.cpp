@@ -3,6 +3,7 @@
 #include "Bridge/UmgMcpJsonCompat.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Factories/MaterialFactoryNew.h"
+#include "MaterialDomain.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialExpression.h"
 #include "Materials/MaterialExpressionCustom.h"

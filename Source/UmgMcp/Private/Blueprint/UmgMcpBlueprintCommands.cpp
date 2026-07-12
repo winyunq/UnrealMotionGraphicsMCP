@@ -28,9 +28,43 @@
 #include "UObject/FieldPath.h"
 #include "EditorAssetLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Editor.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "FileHelpers.h"
+
+namespace
+{
+    bool SaveBlueprintPackage(UBlueprint* Blueprint)
+    {
+        if (!Blueprint)
+        {
+            UE_LOG(LogTemp, Error, TEXT("SaveBlueprintPackage: No blueprint."));
+            return false;
+        }
+
+        UPackage* Package = Blueprint->GetOutermost();
+        if (!Package)
+        {
+            UE_LOG(LogTemp, Error, TEXT("SaveBlueprintPackage: Failed to get package for asset '%s'."), *Blueprint->GetPathName());
+            return false;
+        }
+
+        TArray<UPackage*> PackagesToSave;
+        PackagesToSave.Add(Package);
+
+        FEditorFileUtils::EPromptReturnCode ReturnCode = FEditorFileUtils::PromptForCheckoutAndSave(PackagesToSave, false, false);
+        if (ReturnCode == FEditorFileUtils::EPromptReturnCode::PR_Success)
+        {
+            UE_LOG(LogTemp, Log, TEXT("SaveBlueprintPackage: Successfully saved asset '%s'."), *Blueprint->GetPathName());
+            return true;
+        }
+
+        UE_LOG(LogTemp, Error, TEXT("SaveBlueprintPackage: Failed to save asset '%s'."), *Blueprint->GetPathName());
+        return false;
+    }
+}
 
 FUmgMcpBlueprintCommands::FUmgMcpBlueprintCommands()
 {
@@ -402,7 +436,7 @@ TSharedPtr<FJsonObject> FUmgMcpBlueprintCommands::HandleCompileBlueprint(const T
         UUmgAttentionSubsystem* AttentionSystem = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>();
         if (AttentionSystem)
         {
-             Blueprint = AttentionSystem->GetCachedTargetWidgetBlueprint();
+             Blueprint = AttentionSystem->GetCachedTargetBlueprint();
              if (Blueprint)
              {
                  BlueprintName = Blueprint->GetName();
@@ -418,10 +452,26 @@ TSharedPtr<FJsonObject> FUmgMcpBlueprintCommands::HandleCompileBlueprint(const T
 
     // Compile the blueprint
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    const bool bCompileSuccess = Blueprint->Status != BS_Error;
+    bool bSaved = false;
+    if (bCompileSuccess)
+    {
+        bSaved = SaveBlueprintPackage(Blueprint);
+    }
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), bCompileSuccess && bSaved);
     ResultObj->SetStringField(TEXT("name"), BlueprintName);
-    ResultObj->SetBoolField(TEXT("compiled"), true);
+    ResultObj->SetBoolField(TEXT("compiled"), bCompileSuccess);
+    ResultObj->SetBoolField(TEXT("saved"), bSaved);
+    if (!bCompileSuccess)
+    {
+        ResultObj->SetStringField(TEXT("error"), TEXT("Blueprint compile failed; asset was not saved."));
+    }
+    else if (!bSaved)
+    {
+        ResultObj->SetStringField(TEXT("error"), TEXT("Blueprint compiled successfully but failed to save asset."));
+    }
     return ResultObj;
 }
 

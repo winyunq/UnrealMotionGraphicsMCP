@@ -519,16 +519,10 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     
     // 2. Extract and expand aliases in NormalizedProperties
     TArray<FString> CurrentKeys;
-    auto RefreshCurrentKeys = [&CurrentKeys, &NormalizedProperties]()
+    for (const auto& Pair : NormalizedProperties->Values)
     {
-        CurrentKeys.Reset();
-        for (const auto& Field : NormalizedProperties->Values)
-        {
-            CurrentKeys.Add(UmgMcpJsonCompat::KeyToString(Field.Key));
-        }
-    };
-
-    RefreshCurrentKeys();
+        CurrentKeys.Add(UmgMcpJsonCompat::KeyToString(Pair.Key));
+    }
     for (const FString& Key : CurrentKeys)
     {
         if (Key.StartsWith(TEXT("Slot."), ESearchCase::IgnoreCase))
@@ -558,8 +552,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             if (Key.Equals(TEXT("Slot.Position"), ESearchCase::IgnoreCase))
             {
                 TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
-                if (!Val.IsValid()) continue;
-                if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                if (Val.IsValid() && Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Left"), Val->AsArray()[0]);
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Top"), Val->AsArray()[1]);
                     NormalizedProperties->RemoveField(Key);
@@ -568,8 +561,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             else if (Key.Equals(TEXT("Slot.Size"), ESearchCase::IgnoreCase))
             {
                 TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
-                if (!Val.IsValid()) continue;
-                if (Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
+                if (Val.IsValid() && Val->Type == EJson::Array && Val->AsArray().Num() >= 2) {
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Right"), Val->AsArray()[0]);
                     NormalizedProperties->SetField(TEXT("Slot.LayoutData.Offsets.Bottom"), Val->AsArray()[1]);
                     NormalizedProperties->RemoveField(Key);
@@ -577,16 +569,18 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
             }
             else if (Key.Equals(TEXT("Slot.Anchors"), ESearchCase::IgnoreCase))
             {
-                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
-                if (!Val.IsValid()) continue;
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), Val);
+                if (TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key))
+                {
+                    NormalizedProperties->SetField(TEXT("Slot.LayoutData.Anchors"), Val);
+                }
                 NormalizedProperties->RemoveField(Key);
             }
             else if (Key.Equals(TEXT("Slot.Alignment"), ESearchCase::IgnoreCase))
             {
-                TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key);
-                if (!Val.IsValid()) continue;
-                NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), Val);
+                if (TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(Key))
+                {
+                    NormalizedProperties->SetField(TEXT("Slot.LayoutData.Alignment"), Val);
+                }
                 NormalizedProperties->RemoveField(Key);
             }
         }
@@ -601,11 +595,21 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
     }
 
     // Re-scan for any dotted keys (including expanded aliases)
-    RefreshCurrentKeys();
+    CurrentKeys.Reset();
+    for (const auto& Pair : NormalizedProperties->Values)
+    {
+        CurrentKeys.Add(UmgMcpJsonCompat::KeyToString(Pair.Key));
+    }
     for (const FString& FullKey : CurrentKeys)
     {
         if (FullKey.Contains(TEXT(".")))
         {
+            TSharedPtr<FJsonValue> SourceValue = NormalizedProperties->TryGetField(FullKey);
+            if (!SourceValue.IsValid())
+            {
+                continue;
+            }
+
             TArray<FString> Parts;
             FullKey.ParseIntoArray(Parts, TEXT("."));
             
@@ -631,9 +635,7 @@ bool UUmgSetSubsystem::SetWidgetProperties(UWidgetBlueprint* WidgetBlueprint, co
                     TargetObj = ConstCastSharedPtr<FJsonObject>(*ExistingObj);
                 }
             }
-            TSharedPtr<FJsonValue> Val = NormalizedProperties->TryGetField(FullKey);
-            if (!Val.IsValid()) continue;
-            TargetObj->SetField(Parts.Last(), Val);
+            TargetObj->SetField(Parts.Last(), SourceValue);
             NormalizedProperties->RemoveField(FullKey);
         }
     }

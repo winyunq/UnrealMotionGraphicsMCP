@@ -1,0 +1,49 @@
+# LiteRT-LM Unreal (v1.0)
+
+High-performance, local LLM inference integration for Unreal Engine 5, powered by **[Google's LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)**.
+
+This plugin provides a clean, zero-dependency C++ API to run Google's LiteRT-LM models with ultra-low latency. Our core mission is to bridge Google's advanced on-device inference with Unreal's high-performance requirements.
+
+## 🌟 Our Logic & Strategy
+
+The **LiteRT-LM-Unreal** plugin is built on three pillars:
+
+1.  **Encapsulation of LiteRT-LM**: We wrap Google's native capabilities for both **One-Shot Tasks** (stateless) and **Conversational Flows** (stateful).
+2.  **Strategic Session Management**: Beyond raw inference, we implemented a **Session/API Key-like** mapping system. By managing  oid* ctx pointers, we give Unreal developers the power to assign, switch, and persist "memories" for individual Agents.
+3.  **High-Performance Bridge**: We implement a C-style "firewall" shared library to digest heavy dependencies (Abseil, Protobuf), ensuring your Unreal project remains lightweight and stable.
+
+---
+
+## 🛠️ API Specification
+
+### 1. Configuration & Lifecycle
+
+#### LiteRtLm_Config
+```cpp
+struct LiteRtLm_Config {
+    const char* model_path;      // Path to the .bin/model file
+    const char* backend;         // "cpu", "gpu" (vulkan/webgpu)
+    int max_num_tokens;          // Context window size (KV Cache pre-allocation)
+    int num_threads;             // CPU threads (for CPU backend)
+    bool enable_benchmark;       // Print performance logs
+    bool optimize_shader;        // Enable shader optimization where supported
+    bool enable_streaming;       // Enable streaming chunk callbacks
+};
+```
+
+| Function | Description |
+| :--- | :--- |
+| **LiteRtLm_GetAutoConfig** | Generates the best LiteRtLm_Config based on VRAM budget. |
+| **LiteRtLm_LoadModel** | Initializes the engine and pre-allocates VRAM pools. |
+| **LiteRtLm_UnloadModel** | Releases all GPU and memory resources. |
+
+---
+
+## ⚡ Performance Guidelines
+
+1.  **Session Mapping**: The plugin uses a TMap<void*, Session*> (internal) to track sessions. This works similarly to an **API Key** or **Session ID**, allowing the engine to recall the exact KV-cache state for each unique Agent.
+2.  **Auto-VRAM Cleanup**: When VRAM is low, the system automatically releases the least recently used (LRU) sessions.
+3.  **Low Latency Switching**: Switching between multiple active Agents takes <1ms on an RTX 4060.
+
+---
+*Open Sourced under MIT License. Developed by Winyunq Core Engineering.*

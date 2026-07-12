@@ -2,14 +2,18 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
+using System.IO;
 
 public class UmgMcp : ModuleRules
 {
 	public UmgMcp(ReadOnlyTargetRules Target) : base(Target)
 	{
+		bool bWithFabServer = Directory.Exists(Path.Combine(ModuleDirectory, "Private", "FabServer"));
+		bUseUnity = false;
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
 		PublicDefinitions.Add("UMGMCP_EXPORTS=1");
+		PublicDefinitions.Add(bWithFabServer ? "WITH_UMGMCP_FABSERVER=1" : "WITH_UMGMCP_FABSERVER=0");
 
 		PublicIncludePaths.AddRange(
 			new string[] {
@@ -19,7 +23,7 @@ public class UmgMcp : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				// ... add other private include paths required here ...
+				ModuleDirectory + "/Private",
 			}
 		);
 		
@@ -38,12 +42,20 @@ public class UmgMcp : ModuleRules
 				"DeveloperSettings",
 				"PhysicsCore",
 				"UnrealEd",
-				"UMG", // Add this line
-				"MovieScene",
+				"UMG",
+                "MovieScene",
 				"MovieSceneTracks",
-				"MaterialEditor"
+				"MaterialEditor",
+                "Slate",
+				"SlateCore"
 			}
 		);
+
+		if (bWithFabServer)
+		{
+			PublicIncludePaths.Add(ModuleDirectory + "/Public/FabServer");
+			PublicDependencyModuleNames.AddRange(new string[] { "LiteRTLMUnreal", "ChatWithUnreal" });
+		}
 		
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
@@ -52,14 +64,18 @@ public class UmgMcp : ModuleRules
 				"EditorSubsystem",
 				"Slate",
 				"SlateCore",
+				"ApplicationCore", // For ClipboardCopy
 				"Kismet",
 				"KismetCompiler",
 				"BlueprintGraph",
 				"Projects",
 				"AssetRegistry",
-				"UMGEditor", // Moved from PublicDependencyModuleNames
-				"MaterialEditor", // For Material Editing Libraries
-				"WorkspaceMenuStructure"
+				"Settings",
+				"UMGEditor",
+				"WorkspaceMenuStructure",
+				"MaterialEditor",
+				"ImageWrapper",
+				"Serialization"
 
 			}
 		);
@@ -69,9 +85,9 @@ public class UmgMcp : ModuleRules
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
 				{
-					"PropertyEditor",      // For property editing
-					"ToolMenus",           // For editor UI
-					"BlueprintEditorLibrary" // For Blueprint utilities
+					"PropertyEditor",
+					"ToolMenus",
+					"BlueprintEditorLibrary"
 				}
 			);
 		}

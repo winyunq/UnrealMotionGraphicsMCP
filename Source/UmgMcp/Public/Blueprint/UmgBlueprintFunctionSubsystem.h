@@ -7,6 +7,7 @@
 #include "UmgBlueprintFunctionSubsystem.generated.h"
 
 class UWidgetBlueprint;
+class UBlueprint;
 
 /**
  * @brief Provides stateless low-level Blueprint Graph manipulation capabilities.
@@ -34,7 +35,7 @@ public:
 	 * @return A JSON object containing the result or error details.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "UMG MCP|Blueprint")
-	FString HandleBlueprintGraphAction(class UWidgetBlueprint* WidgetBlueprint, const FString& Action, const FString& PayloadJson);
+	FString HandleBlueprintGraphAction(class UBlueprint* Blueprint, const FString& Action, const FString& PayloadJson);
 
     /**
      * @brief Checks if a Function/Graph exists, and creates it if missing.
@@ -49,7 +50,7 @@ public:
      * @return The GUID of the Cursor Node (Entry or Tail).
      */
     UFUNCTION(BlueprintCallable, Category = "UMG MCP|Blueprint")
-    FString EnsureFunctionExists(class UWidgetBlueprint* WidgetBlueprint, const FString& FunctionName, FString& OutStatus, const FString& ParametersJson = TEXT("{}"));
+    FString EnsureFunctionExists(class UBlueprint* Blueprint, const FString& FunctionName, FString& OutStatus, const FString& ParametersJson = TEXT("{}"));
 
     /**
      * @brief Checks/Creates a ComponentBoundEvent in the EventGraph.
@@ -67,19 +68,26 @@ private:
     TSharedPtr<FJsonObject> CreateNodeInstance(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params, class UEdGraphNode*& OutNode);
 	TSharedPtr<FJsonObject> ConnectPins(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> GetNodes(UEdGraph* Graph);
+	TSharedPtr<FJsonObject> GetEvents(class UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> ReadBluecodeFunction(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> ApplyBluecode(UEdGraph* Graph, class UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> ApplyBluecodeVariables(class UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> ApplyBluecodeConnect(UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
+	TSharedPtr<FJsonObject> DeleteBluecode(class UBlueprint* Blueprint, UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> DeleteNode(class UBlueprint* Blueprint, UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
 	TSharedPtr<FJsonObject> SetNodeProperty(class UBlueprint* Blueprint, UEdGraph* Graph, const TSharedPtr<FJsonObject>& Params);
-    TSharedPtr<FJsonObject> AddVariable(class UWidgetBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
-    TSharedPtr<FJsonObject> DeleteVariable(class UWidgetBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
-    TSharedPtr<FJsonObject> GetVariables(class UWidgetBlueprint* Blueprint);
-	TSharedPtr<FJsonObject> FindFunctions(const TSharedPtr<FJsonObject>& Params, UWidgetBlueprint* WidgetBlueprint);
+    TSharedPtr<FJsonObject> AddVariable(class UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> DeleteVariable(class UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> GetVariables(class UBlueprint* Blueprint);
+	TSharedPtr<FJsonObject> FindFunctions(const TSharedPtr<FJsonObject>& Params, UBlueprint* Blueprint);
+	TSharedPtr<FJsonObject> SearchNodes(UEdGraph* Graph, class UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Params);
 
     // Helpers
 	class UEdGraphNode* FindNodeByIdOrName(UEdGraph* Graph, const FString& Id);
     UClass* ResolveUClass(const FString& ClassName);
 
     // Internal execution methods
-	FString ExecuteGraphAction(UWidgetBlueprint* WidgetBlueprint, const TSharedPtr<FJsonObject>& Payload);
+	FString ExecuteGraphAction(UBlueprint* Blueprint, const TSharedPtr<FJsonObject>& Payload);
 
     // Fuzzy search helper
     TArray<FString> GetFuzzySuggestions(const FString& SearchName, UClass* WidgetClass);

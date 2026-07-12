@@ -78,9 +78,9 @@ class UMGMaterial:
 
     async def compile_asset(self) -> dict:
         """
-        Compiles the currently targeted material.
+        Compatibility helper. The public MCP command is hlsl_compile.
         """
-        return await self.connection.send_command("material_compile_asset", {})
+        return await self.connection.send_command("hlsl_compile", {})
 
     async def get_node_pins(self, handle: str) -> dict:
         """

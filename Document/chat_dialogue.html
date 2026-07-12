@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2. How to Chat (4 Agent Modes) - UMG MCP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#030712',
+                            card: '#0b0f19',
+                            border: '#1e293b',
+                            neonBlue: '#00f0ff',
+                            neonPurple: '#d946ef',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #0d1527 0%, #030712 100%);
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-border-hover:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .sidebar-link-active {
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(217, 70, 239, 0.02) 100%);
+            border-left: 3px solid #00f0ff;
+            color: #00f0ff;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="w-80 glass-panel border-r border-slate-800 flex flex-col shrink-0">
+        <!-- Logo / Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-cyan-500 to-fuchsia-500 p-[2px]">
+                    <div class="w-full h-full bg-cyber-bg rounded-[6px] flex items-center justify-center">
+                        <i data-lucide="layout" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-cyber-text tracking-wide text-lg">UMG MCP</h1>
+                    <p class="text-xs text-slate-500">Winyunq Ultimate Intel</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between text-sm">
+            <span class="text-slate-500">Language / 语言</span>
+            <a href="chat_dialogue_zh.html" class="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                <span>简体中文</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="index.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 transition-all">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span>Quick Start / Lobby</span>
+            </a>
+            <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">CORE TOPICS</div>
+            <a href="model_config.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>1. Configure Model (4 Options)</span>
+            </a>
+            <a href="chat_dialogue.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-all font-medium sidebar-link-active">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>2. How to Chat (4 Agent Modes)</span>
+            </a>
+            <a href="mcp_support.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>3. Supported MCPs (C++)</span>
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-800">
+            <div class="text-xs text-slate-500">
+                <p>© 2026 Winyunq. All rights reserved.</p>
+                <p class="mt-1 flex items-center text-slate-600">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i>
+                    Dual-Loop Secure Protection
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <!-- Top bar -->
+        <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 bg-cyber-bg/30 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="text-slate-500">Official Docs</span>
+                <span class="text-slate-500">/</span>
+                <span class="text-slate-400 text-sm">AI Chat & Interaction</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <p class="text-xs text-slate-500">Active Agent State</p>
+                    <p class="text-xs text-fuchsia-400 font-semibold">C++ Subsystem Direct Connection</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="px-10 py-12 max-w-5xl w-full mx-auto space-y-12">
+            <!-- Header -->
+            <div class="space-y-4">
+                <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center">
+                    <i data-lucide="message-square" class="w-8 h-8 text-cyan-400 mr-3"></i>
+                    Chapter 2: How to Chat (4 Built-in Agent Modes)
+                </h2>
+                <p class="text-slate-400 text-base leading-relaxed">
+                    Inside the built-in UMG MCP chat panel on the right side of the Unreal Editor, AI communication is not a static one-size-fits-all session. Based on different development phases and contexts, this plugin categorizes AI chat states into four precise Agent modes: <strong>chat, develop, learning, and task</strong> at the C++ subsystem layer.
+                </p>
+            </div>
+
+            <!-- Agent Mechanisms -->
+            <div class="space-y-8">
+                <h3 class="text-xl font-bold text-white flex items-center border-b border-slate-800 pb-3">
+                    <i data-lucide="brain" class="w-5 h-5 text-fuchsia-400 mr-2"></i>
+                    1. The 4 Agent Operational Logic & C++ Mechanisms
+                </h3>
+
+                <div class="space-y-6">
+                    <!-- Agent 1 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="message-circle" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Chat Mode (Default Session Agent - <code class="text-cyan-400 text-sm">FUmgMcpDefaultChatAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Chat</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>Targeting:</strong> General context-aware conversations. Ideal for basic technical inquiries, design brainstorming, and conceptual clarification.
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ Mechanism:</strong> At the start of each query cycle, it triggers <code class="text-fuchsia-400">RestoreConversationContext()</code>, pulling the complete substance of the previous conversation (historical JSON message snap) from local persistent session files. This historical sequence serves as the message context prefix submitted to the LLM provider, guaranteeing zero context fragmentation.
+                        </p>
+                    </div>
+
+                    <!-- Agent 2 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="wrench" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Develop Mode (Dynamic Development Agent - <code class="text-cyan-400 text-sm">FUmgMcpDevelopAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Develop</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>Targeting:</strong> Highly context-sensitive UI authoring and widget editing. Focuses on high-precision UI layout adjustments and programmatic widget generation.
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ Mechanism:</strong> Upon interaction, it calls the unique <code class="text-fuchsia-400">DynamicallyUpdatePromptAndTools()</code> method. It inspects the currently active UMG asset being edited in the Unreal Editor, dynamically re-synthesizes the session's <code class="text-fuchsia-400">System Instruction</code> (system prompts), and filters permitted MCP tools based on the currently selected widget types. For instance, Canvas Slot adjustment tools are only exposed when CanvasPanel itself is selected, greatly narrowing the AI generation scope and boosting tool execution success rates.
+                        </p>
+                    </div>
+
+                    <!-- Agent 3 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="glasses" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Learning Mode (Read-Only Perceptual Agent - <code class="text-cyan-400 text-sm">FUmgMcpLearningAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Learning</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>Targeting:</strong> Deep structural parsing, layout hierarchy perception, and step-by-step guidance on complex, pre-existing UMG widget structures.
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ Mechanism:</strong> The plugin loads the built-in <code class="text-cyan-400">learning.json</code> tool configurations silently. During query evaluation, it executes <code class="text-fuchsia-400">ResolveTargetAndTreeContext()</code> designed specifically for data optimization: it computes and compares the hash value of the current active viewport widget hierarchy. **Only** when you physically alter the layout structure does it bundle and upload the new tree representation to the context. Otherwise, it safely recycles the read-only cache, completely eliminating repetitive structural queries and saving huge token counts/network latency.
+                        </p>
+                    </div>
+
+                    <!-- Agent 4 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <i data-lucide="check-square" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                                Task Mode (Task Handover Agent - <code class="text-cyan-400 text-sm">FUmgMcpTaskAgent</code>)
+                            </h4>
+                            <span class="text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">Task</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>Targeting:</strong> Executing self-contained development tasks with strong consistency and comprehensive transactional safety boundaries.
+                        </p>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            <strong>C++ Mechanism:</strong> The task handover flow runs under rigorous engineering controls. When the AI receives a special <code class="text-cyan-400">task_begin</code> tool call, it fires <code class="text-fuchsia-400">AcceptTask()</code>, saving your current editor focus path (e.g. `PreviousWidget`) into a private backup variable <code class="text-fuchsia-400">CapturedPreviousTarget</code>. It then locks the editor viewport strictly onto the target task asset, masking any other asset modifications. Once the completion trigger <code class="text-cyan-400">task_end</code> is issued, <code class="text-fuchsia-400">TaskEnd()</code> executes, unlocking editing states and returning focus to the original active asset without any distortion.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UI Interaction Workflow -->
+            <div class="space-y-6">
+                <h3 class="text-xl font-bold text-white flex items-center border-b border-slate-800 pb-3">
+                    <i data-lucide="shield-check" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                    🎨 Slate Chat UI Approval Queue & direct Memory execution
+                </h3>
+
+                <div class="glass-panel rounded-xl p-8 border border-slate-800 space-y-6">
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Whenever an active Agent attempts an action that mutates your UMG assets (e.g., "create a button widget" or "delete a slot layout"), the plugin's underlying <code class="text-cyan-400">SUmgMcpMcpApprovalQueue</code> (Slate Approval UI) interceptor activates. It presents an interactive, highlighted authorization card inside your chat timeline.
+                    </p>
+
+                    <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-6 space-y-4">
+                        <h5 class="text-white font-semibold text-sm">💡 Operational Step-by-Step Experience:</h5>
+                        <ol class="list-decimal pl-5 text-xs text-slate-400 space-y-2">
+                            <li><strong>Submit Query</strong>: You input a prompt, e.g. <code class="text-cyan-400">"Create a button widget named WinyunqButton under the Canvas panel"</code>.</li>
+                            <li><strong>AI Plan & Action Formulation</strong>: The Agent processes the request and silently queues the tool execution metadata card (such as <code class="text-cyan-400">create_widget</code>) onto the Slate Chat view.</li>
+                            <li><strong>Approval Prompts</strong>: The interactive bubble displays a blue <code class="text-cyan-400">Accept</code> and a gray <code class="text-slate-400">Reject</code> trigger button.</li>
+                            <li><strong>Zero Network Proxy Direct Connection</strong>: Clicking <code class="text-cyan-400 font-bold">Accept</code> routes the raw instruction directly to <code class="text-fuchsia-400">FFabServerHttpClient::ExecuteTool</code>. It is instantly executed on Unreal's Game Thread in memory, refreshing the Slate Designer View and producing a real-time UMG object. There is <strong>no network loopback</strong> or roundtrip proxy!</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screenshot placeholder -->
+            <div class="space-y-4">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase tracking-wider font-mono">📸 Screenshot Placeholder</h4>
+                <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
+                    <i data-lucide="image" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
+                    <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: Unreal UMG MCP Built-in Chat Panel Window Layout]</p>
+                    <p class="text-xs text-slate-600 mt-1">Please take a screenshot of the UMG MCP chat window docked in the Unreal Editor, displaying the bottom Selector containing the chat/develop/learning/task modes.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

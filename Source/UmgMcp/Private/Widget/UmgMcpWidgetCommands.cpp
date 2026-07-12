@@ -8,6 +8,7 @@
 #include "Editor.h"
 #include "Serialization/JsonSerializer.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "WidgetBlueprint.h"
 #include "Misc/PackageName.h"
 
@@ -178,7 +179,6 @@ TSharedPtr<FJsonObject> FUmgMcpWidgetCommands::HandleCommand(const FString& Comm
             Response->SetStringField(TEXT("error"), TEXT("Failed to get layout data or parse response."));
         }
     }
-    // ... other GET commands
     
     // --- SET/ACTION COMMANDS ---
     else if (Command == TEXT("create_widget"))

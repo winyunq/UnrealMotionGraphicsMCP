@@ -1,0 +1,58 @@
+[
+  {
+    "displayName": "Gemma 4 (E2B) LiteRT-LM - Multimodal",
+    "repoId": "google/gemma-4-E2B-it-litertlm",
+    "fileName": "gemma-4-E2B-it.litertlm",
+    "description": "Lightweight & Multimodal (LiteRT-LM)",
+    "hardware": "8GB RAM",
+    "minRamGB": 4
+  },
+  {
+    "displayName": "Gemma 4 (E4B) LiteRT-LM - Multimodal",
+    "repoId": "google/gemma-4-E4B-it-litertlm",
+    "fileName": "gemma-4-E4B-it.litertlm",
+    "description": "High Fidelity Multimodal (LiteRT-LM)",
+    "hardware": "16GB RAM",
+    "minRamGB": 8
+  },
+  {
+    "displayName": "Gemma 4 (E2B) - Multimodal",
+    "repoId": "bartowski/google_gemma-4-E2B-it-GGUF",
+    "fileName": "google_gemma-4-E2B-it-Q4_K_M.gguf",
+    "projectorRepoId": "bartowski/google_gemma-4-E2B-it-GGUF",
+    "projectorFileName": "mmproj-model-f16.gguf",
+    "description": "Lightweight & Multimodal",
+    "hardware": "8GB RAM",
+    "minRamGB": 4
+  },
+  {
+    "displayName": "Gemma 4 (E4B) - Multimodal",
+    "repoId": "bartowski/google_gemma-4-E4B-it-GGUF",
+    "fileName": "google_gemma-4-E4B-it-Q4_K_M.gguf",
+    "projectorRepoId": "bartowski/google_gemma-4-E4B-it-GGUF",
+    "projectorFileName": "mmproj-model-f16.gguf",
+    "description": "High Fidelity Multimodal",
+    "hardware": "16GB RAM",
+    "minRamGB": 8
+  },
+  {
+    "displayName": "Gemma 4 (26B-MoE) - Large",
+    "repoId": "bartowski/google_gemma-4-26B-A4B-it-GGUF",
+    "fileName": "google_gemma-4-26B-A4B-it-Q4_K_M.gguf",
+    "projectorRepoId": "bartowski/google_gemma-4-26B-A4B-it-GGUF",
+    "projectorFileName": "mmproj-model-f16.gguf",
+    "description": "Fast Mixture-of-Experts",
+    "hardware": "32GB RAM",
+    "minRamGB": 24
+  },
+  {
+    "displayName": "Gemma 4 (31B) - Thinking",
+    "repoId": "bartowski/google_gemma-4-31B-it-GGUF",
+    "fileName": "google_gemma-4-31B-it-Q4_K_M.gguf",
+    "projectorRepoId": "bartowski/google_gemma-4-31B-it-GGUF",
+    "projectorFileName": "mmproj-model-f16.gguf",
+    "description": "Top Tier Reasoning",
+    "hardware": "64GB RAM",
+    "minRamGB": 40
+  }
+]

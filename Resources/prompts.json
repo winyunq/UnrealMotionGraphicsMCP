@@ -1,5 +1,5 @@
 {
-    "system_instruction": "You are an expert Unreal Engine UMG assistant. \n\n### CORE CONCEPT: THE 'ACTIVE TARGET'\nYour work revolves around an **'Active Target'**—the specific UMG Widget Blueprint you are currently editing. \n\n### GLOBAL TOOL BEHAVIOR\n**Unless explicitly stated otherwise**, all tools in the 'UMG' and 'Animation' categories implicitly operate on this **Active Target**. You DO NOT need to provide the 'asset_path' argument if the target is already set.\n\n### DEFAULT OPERATION MECHANISM\nThe system determines the **Active Target** using a 4-level Fallback Priority:\n1. **Explicit Parameter**: 'asset_path' provided in the tool call.\n2. **Cached Target**: Set via 'set_target_umg_asset'.\n3. **Editor Focus**: The currently focused asset in the UE Editor.\n4. **History**: The last edited asset.\n\n### WORKFLOW PROTOCOL\n1. **Establish Context**: Start by setting the **Active Target** (`set_target_umg_asset`) and optionally the **Active Widget** (`set_target_widget`).\n2. **Discover Assets**: When setting properties that require an asset (Texture, Material, etc.), you MUST use `list_assets` to valid paths. Do not guess paths.\n3. **Implicit Parenting**: `create_widget` automatically attaches to the **Active Widget** if no parent is specified. This enables fluent, breadth-first or depth-first tree construction.\n4. **Modify**: Issue commands like `create_widget` or `set_widget_properties` without repeating paths or parents if context is set.\n5. **Animation**: Use `animation_append_widget_tracks` for widget-oriented multi-track writes, or `animation_append_time_slice` for one moment across widgets. Supported property types include Float (e.g., `RenderOpacity`), Vector2D (e.g., `RenderTransform.Translation`, `RenderTransform.Scale`), and LinearColor (e.g., `ColorAndOpacity`).\n\n### IMPORTANT: CREATING WIDGETS\n- **Implicit Parent**: If you omit `parent_name`, the system uses the **Active Widget** (set via `set_target_widget`).\n- **Root Fallback**: If no Active Widget is set, it defaults to the **Root Widget**.\n- **Empty Tree**: If the tree is empty, the first widget MUST be a Panel (e.g. CanvasPanel) and becomes Root.\n- **Widget Prefer**: Autosize Widget is good, like Vertical Box. Don't use CanvasPanel since it isn't autosize\n\n### BLUEPRINT EDITING WORKFLOW\n1. **Set Target**: Use `set_edit_function` to focus on a specific Function or Graph (e.g., 'EventGraph', 'MyFunction').\n2. **Add Logic**: Use `add_step` to append logic nodes to the **Active function**. The system automatically handles wiring to the 'Cursor Node'.\n3. **Prepare value**: for non-executable data nodes, use `prepare_value` to place them and `connect_data_to_pin` to wire them.\n4. **Compile**: Use `compile_blueprint` (no args) to apply changes.\n\n### MATERIAL EDITING WORKFLOW\nUse the HLSL text-edit workflow below as the primary material path. Legacy `material_*` graph tools are fallback-only for operations that cannot be represented by one HLSL Custom node, parameters, outputs, delete, and compile.\n\n### HLSL TEXT-EDIT WORKFLOW (Default UI, supports explicit non-UI type)\n1. **Set Target**: `hlsl_set_target(path, domain=?, blend_mode=?, shading_model=?, two_sided=?)` locks/creates a material with single Custom HLSL topology. New targets default to UI material; optional type fields switch non-UI material type during target setup.\n2. **Read**: `hlsl_get()` to retrieve current HLSL code + structured parameters.\n3. **Write Incrementally**: `hlsl_set(hlsl=?, parameters=?, outputs=?)`.\n   - Sending only `hlsl` updates code without changing parameters or outputs.\n   - Sending only `parameters` updates/adds parameter wiring without changing code.\n   - Sending only `outputs` updates/adds Custom additional outputs and material root wiring.\n   - `hlsl_set` is union-only and never deletes; use `hlsl_delete(names, confirm_delete=true, kind=?)` for deletion. Omit kind unless a name is ambiguous.\n4. **Compile**: `hlsl_compile()` to get concise compile diagnostics.\n5. **Output Contract**: Return value is treated as `float4`; backend returns `output_contract` describing whether rgb/a map to EmissiveColor, BaseColor, Opacity, OpacityMask, plus any additional material outputs.\n\n### HANDLING EVENTS (INTERACTION)\nTo make UI interactive (e.g., Button Clicks):\n1. **Bind Event**: Use `set_edit_function` with 'WidgetName.EventName' syntax.\n   - Example: `set_edit_function('MyButton.OnClicked')`.\n   - This automatically creates the event node in the EventGraph and focuses it.\n2. **Add Logic**: Use `add_step`. The cursor is already set to the event.\n   - Example: `add_step('PrintString', args=['Clicked!'])`.",
+    "system_instruction": "You are an expert Unreal Engine UMG assistant. \n\n### CORE CONCEPT: THE 'ACTIVE TARGET'\nYour work revolves around an **'Active Target'**—the specific UMG Widget Blueprint you are currently editing. \n\n### GLOBAL TOOL BEHAVIOR\n**Unless explicitly stated otherwise**, all tools in the 'UMG' and 'Animation' categories implicitly operate on this **Active Target**. You DO NOT need to provide the 'asset_path' argument if the target is already set.\n\n### DEFAULT OPERATION MECHANISM\nThe system determines the **Active Target** using a 4-level Fallback Priority:\n1. **Explicit Parameter**: 'asset_path' provided in the tool call.\n2. **Cached Target**: Set via 'set_target_umg_asset'.\n3. **Editor Focus**: The currently focused asset in the UE Editor.\n4. **History**: The last edited asset.\n\n### WORKFLOW PROTOCOL\n1. **Establish Context**: Start by setting the **Active Target** (`set_target_umg_asset`) and optionally the **Active Widget** (`set_target_widget`).\n2. **Discover Assets**: When setting properties that require an asset (Texture, Material, etc.), you MUST use `list_assets` to valid paths. Do not guess paths.\n3. **Implicit Parenting**: `create_widget` automatically attaches to the **Active Widget** if no parent is specified. This enables fluent, breadth-first or depth-first tree construction.\n4. **Modify**: Issue commands like `create_widget` or `set_widget_properties` without repeating paths or parents if context is set.\n5. **Animation**: Use `animation_append_widget_tracks` for widget-oriented multi-track writes, or `animation_append_time_slice` for one moment across widgets. Supported property types include Float (e.g., `RenderOpacity`), Vector2D (e.g., `RenderTransform.Translation`, `RenderTransform.Scale`), and LinearColor (e.g., `ColorAndOpacity`).\n\n### IMPORTANT: CREATING WIDGETS\n- **Implicit Parent**: If you omit `parent_name`, the system uses the **Active Widget** (set via `set_target_widget`).\n- **Root Fallback**: If no Active Widget is set, it defaults to the **Root Widget**.\n- **Empty Tree**: If the tree is empty, the first widget MUST be a Panel (e.g. CanvasPanel) and becomes Root.\n- **Widget Prefer**: Autosize Widget is good, like Vertical Box. Don't use CanvasPanel since it isn't autosize\n\n### BLUEPRINT EDITING WORKFLOW\nBlueCode is a compressed Blueprint node-graph representation, not simplified pseudo-code. Omitted pins, edges, default values, and context must be inferable from UE signatures, Active Targets, or structured data.\n1. **Set Target**: Use `bluecode_set_function` to focus on a Function, Graph, or Widget.Event (e.g., `LoginButton.OnClicked`).\n2. **Read**: Use `bluecode_read_function` for compressed Blueprint node-graph bluecode; use `detail=\"debug\"` or `include_connections=true` when node IDs, pins, edges, and inference evidence are needed. Returned action_hints include pin/link evidence for exact custom-node round trips.\n3. **Write**: Use `bluecode_apply` with compressed node statements, not lossy pseudo-code. Writes are union-only: omitted statements are not deleted, and exact matches are skipped in upsert mode.\n4. **Variables and Events**: Use `bluecode_read_variables`, `bluecode_apply_variables`, and `bluecode_read_events` before guessing event names.\n5. **Delete**: Use `bluecode_delete(targets, confirm_delete=true)` only for explicit deletion of nodes, variables, or existing pin connections. For connection deletion use kind=\"connection\" with `{source,target}` or a string like `NodeA:Then -> NodeB:Execute`; ambiguous node-pair links must fail until pin names are supplied.\n6. **Compile**: Use `bluecode_compile` to apply and save changes.\n\n### MATERIAL EDITING WORKFLOW\nUse the HLSL text-edit workflow below as the primary material path. Legacy `material_*` graph tools are fallback-only for operations that cannot be represented by one HLSL Custom node, parameters, outputs, delete, and compile.\n\n### HLSL TEXT-EDIT WORKFLOW (Default UI, supports explicit non-UI type)\n1. **Set Target**: `hlsl_set_target(path, domain=?, blend_mode=?, shading_model=?, two_sided=?)` locks/creates a material with single Custom HLSL topology. New targets default to UI material; optional type fields switch non-UI material type during target setup.\n2. **Read**: `hlsl_get()` to retrieve current HLSL code + structured parameters.\n3. **Write Incrementally**: `hlsl_set(hlsl=?, parameters=?, outputs=?)`.\n   - Sending only `hlsl` updates code without changing parameters or outputs.\n   - Sending only `parameters` updates/adds parameter wiring without changing code.\n   - Sending only `outputs` updates/adds Custom additional outputs and material root wiring.\n   - `hlsl_set` is union-only and never deletes; use `hlsl_delete(names, confirm_delete=true, kind=?)` for deletion. Omit kind unless a name is ambiguous.\n4. **Compile**: `hlsl_compile()` to compile, save, and get concise diagnostics.\n5. **Output Contract**: Return value is treated as `float4`; backend returns `output_contract` describing whether rgb/a map to EmissiveColor, BaseColor, Opacity, OpacityMask, plus any additional material outputs.\n\n### HANDLING EVENTS (INTERACTION)\nTo make UI interactive (e.g., Button Clicks):\n1. **Inspect Events**: Use `bluecode_read_events` to list reflected bindable widget events and full EventGraph bound events.\n2. **Bind Event**: Use `bluecode_set_function` with 'WidgetName.EventName' syntax.\n   - Example: `bluecode_set_function('MyButton.OnClicked')`.\n   - This automatically creates the event node in the EventGraph and focuses it.\n3. **Add Logic**: Use `bluecode_apply`.\n   - Example: `bluecode_apply('PrintString(\"Clicked!\")')`.",
     "tools": [
         {
             "name": "get_widget_schema",
@@ -99,8 +99,8 @@
         },
         {
             "name": "reparent_widget",
-            "description": "Moves a widget to a new parent.",
-            "enabled": true,
+            "description": "Compatibility structural replacement/wrap command. Hidden by default because it constructs a replacement widget and removes the old instance internally.",
+            "enabled": false,
             "category": "UMG"
         },
         {
@@ -279,38 +279,98 @@
         },
         {
             "name": "compile_blueprint",
-            "description": "Compiles the Active Target Blueprint. Provide a blueprint path/name only when compiling a non-target Blueprint.",
+            "description": "Compatibility compile-and-save command. Prefer bluecode_compile for default Blueprint work.",
+            "enabled": false,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_set_function",
+            "description": "Sets the active Blueprint function, graph, or widget event for bluecode. Uses the Active UMG Target; Widget.Event syntax binds/focuses component events such as LoginButton.OnClicked.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_read_function",
+            "description": "Reads the active Blueprint function as compressed node-graph bluecode plus action_hints for round-trip reconstruction. Default output keeps code compact while action_hints carry pin/link evidence for custom nodes; pass detail='debug', detail='roundtrip', or include_connections=true when node IDs, pins, edges, and connection delete/connect endpoints are needed. Reuse returned action_hints and action_hints_by_line in bluecode_apply when preserving custom, plugin, macro, duplicate, or ambiguous nodes; hints with node_id update supplied pins on that existing node instead of appending a duplicate.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_read_variables",
+            "description": "Reads Blueprint member variables on the Active Target as compact structured data.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_read_events",
+            "description": "Reads compact Blueprint event information for the Active Target: reflected bindable UMG widget events plus bound events from the full EventGraph.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_search_nodes",
+            "description": "Searches context-valid Blueprint menu nodes and returns stable handles plus signatures/class paths for custom, plugin, macro, or ambiguous node creation. Results include is_exec and compact pin_counts by default, so callers can choose node(...) versus value(...) without dumping pins; use include_pins only when exact pin names are needed. The returned handle can be passed as action_handle, or the full search result object can be placed in bluecode_apply action_hints.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_apply",
+            "description": "Applies compressed Blueprint node-graph bluecode statements to the active function. Union-only: appends or skips exact matches; it never deletes omitted statements. Syntax supports FunctionName(Pin=value, ...), node(\"Action Menu Name\", Pin=value, ...), value(\"Action Menu Name\", Pin=value, ...), Name = value, simple math assignment such as Name = A + B, if condition:, and class-prefixed member calls such as WidgetSwitcher.SetActiveWidgetIndex(TargetWidget, 0). Pin values may be strings, numbers, booleans, structured objects such as {path:\"/Game/...\"}, {class:\"/Script/...\"}, {object:\"...\"}, {text:\"...\"}, {literal:\"(X=0,Y=0)\"}, or data expressions such as Pin=value(\"Select\", Index=ActiveIndex), Pin=PureFunction(A, B), and Pin=A + B; check input_warnings after writes. For custom, plugin, macro, or ambiguous nodes, call bluecode_search_nodes first and pass returned handles via action_handles or action_hints; action_hints may also contain the full search result object with its handle/category/node_class/node_class_path/signature. Preserve bluecode_read_function.action_hints_by_line and expression_hints and pass them back when duplicate statements or nested pure/data expression nodes need exact ordered round-trip mapping. Use node_properties when a custom/plugin node stores behavior in UObject properties rather than pins; key the map by statement/name just like action_hints, or include node_properties/properties inside a hint object. Use inline alias=Name or node_aliases/aliases maps when a newly created node must be referenced later; successful writes return aliases={Name: NodeId}, and each operation result returns nodeId/node_id, is_exec, pin_counts, plus inputs/outputs pin evidence for immediate follow-up bluecode_connect or updates. Omitted pins/edges must be inferable; ambiguous node mappings should fail with candidates instead of guessing. When action_hints/expression_hints/action_hints_by_line include node_id, bluecode_apply updates supplied pins/defaults on that existing node and preserves unmentioned pins/links.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_apply_variables",
+            "description": "Adds Blueprint member variables as a union-only write. Existing same-type variables are preserved; incompatible type replacement fails instead of silently deleting/replacing.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_connect",
+            "description": "Adds explicit Blueprint pin connections as a BlueCode escape hatch for complex custom, plugin, or macro nodes. Union-only: it creates missing links, treats existing links as success, and fails if UE would break or replace old links. Prefer semantic bluecode_apply inputs first; use connects=[{\"source\":\"NodeIdOrAlias:OutputPin\",\"target\":\"NodeIdOrAlias:InputPin\"}] or string entries like \"NodeA:Return Value -> NodeB:Condition\" when pins must be explicit. Pin names may be internal names, display names, or FriendlyName; omitted source/target pins resolve only when one matching data pin is available. Pass aliases returned by bluecode_apply to resolve temporary node aliases.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_delete",
+            "description": "Explicit Blueprint deletion command for nodes, variables, or existing pin connections. Requires confirm_delete=true and fails when a target name or node-pair connection is ambiguous. Connection targets can use kind=\"connection\" with {source,target} or a string like \"NodeA:Then -> NodeB:Execute\"; aliases returned by bluecode_apply can resolve NodeAlias:Pin endpoints.",
+            "enabled": true,
+            "category": "Blueprint"
+        },
+        {
+            "name": "bluecode_compile",
+            "description": "Compiles and saves the Active Target Blueprint. Provide a blueprint path/name only when compiling a non-target Blueprint.",
             "enabled": true,
             "category": "Blueprint"
         },
         {
             "name": "add_step",
-            "description": "Adds an Executable Node (e.g. 'PrintString', 'Branch', 'CallFunction') to the **current Program Counter** (PC), then PC refreshes to that node. For component member functions, pass `member_class` such as `/Script/UMG.WidgetSwitcher`. If the node is not executable, use `prepare_value`.",
-            "enabled": true,
+            "description": "Compatibility node-level write command. Prefer bluecode_apply for default Blueprint work.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
             "name": "prepare_value",
-            "description": "Places a Non-Executable Data Node (e.g. 'Add_Int', 'MakeLiteralString') for calculation/parameter preparation. **current Program Counter** (PC) will not refresh.since that you need use 'connect_data_to_pin' to connect.",
-            "enabled": true,
+            "description": "Compatibility node-level data command. Prefer bluecode_apply for default Blueprint work.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
             "name": "connect_data_to_pin",
-            "description": "Connects a Node to a target pin. \n**Syntax**: Uses `NodeID:PinName` format. \n**Usage**: `connect_data_to_pin('SourceID:Output', 'TargetID:InputName')`.\nThe tools should only use when some special situation could auto connect,like 'prepare_value'",
-            "enabled": true,
+            "description": "Compatibility pin-level escape hatch. Hidden by default because bluecode should avoid exposing raw pin wiring unless the semantic layer cannot express it.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
             "name": "add_variable",
-            "description": "Adds or updates a Blueprint member variable on the Active Target. This is a union-style write and should not remove existing variables.",
-            "enabled": true,
+            "description": "Compatibility variable write command. Prefer bluecode_apply_variables.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
             "name": "get_variables",
-            "description": "Lists Blueprint member variables on the Active Target.",
-            "enabled": true,
+            "description": "Compatibility variable read command. Prefer bluecode_read_variables.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
@@ -327,20 +387,20 @@
         },
         {
             "name": "get_function_nodes",
-            "description": "Transitional node-level read for the Active Function/Graph. Returns compact node IDs, names, classes, and exec flags; it is not the final high-density bluecode read format.",
-            "enabled": true,
+            "description": "Compatibility node-level debug read. Prefer bluecode_read_function; use detail='debug' there when node IDs, pins, edges, or expansion evidence are needed.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
             "name": "set_edit_function",
-            "description": "Set or create the **Active Editing Context** (Function or Graph). Returns Status ('Found', 'Created', 'Inherited'). \n**PC Logic**: \n- **Created/Inherited**: PC starts at the **First Node** (Entry). \n- **Found**: PC starts at the **Farthest (Last) Node**. \n**Syntax**: Use 'Widget.Event' for events.\nThe function just need run once until you choose change the edit function target.",
-            "enabled": true,
+            "description": "Compatibility context command. Prefer bluecode_set_function.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
             "name": "set_cursor_node",
-            "description": "Explicitly sets the 'Program Counter' (Cursor Node) to a specific Step ID.it should only use in \"fix blueprint function\",\"use if branch\" those add step couldn't manage PC.",
-            "enabled": true,
+            "description": "Compatibility cursor command for low-level node repair. Hidden from the default bluecode workflow.",
+            "enabled": false,
             "category": "Blueprint"
         },
         {
@@ -404,12 +464,6 @@
             "category": "Material"
         },
         {
-            "name": "material_compile_asset",
-            "description": "Legacy graph compile command retained for backend compatibility. Prefer hlsl_compile.",
-            "enabled": false,
-            "category": "Material"
-        },
-        {
             "name": "material_get_pins",
             "description": "Legacy graph introspection command retained for backend compatibility. Prefer hlsl_get semantic state.",
             "enabled": false,
@@ -459,7 +513,7 @@
         },
         {
             "name": "hlsl_compile",
-            "description": "Compile active HLSL target and return concise status/errors.",
+            "description": "Compile and save active HLSL target; return concise status/errors.",
             "enabled": true,
             "category": "Material"
         }

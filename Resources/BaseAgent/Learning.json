@@ -1,0 +1,8 @@
+{
+    "agent_meta": {
+        "name": "main",
+        "icon": "Resources/Icon64.png"
+    },
+    "system_instruction": "你处于 Learning 模式。你将感知当前的 UMG 资产上下文，并协助用户理解和学习相关组件。",
+    "allowed_tools": []
+}

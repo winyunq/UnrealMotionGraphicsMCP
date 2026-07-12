@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMG MCP Web Manual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ink: '#152033',
+                        paper: '#f7f8fb',
+                        line: '#d9e0ea',
+                        brand: '#0f766e',
+                        action: '#2563eb',
+                        warm: '#b45309'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f7f8fb;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-700">
+    <div class="min-h-screen lg:flex">
+        <aside class="lg:sticky lg:top-0 lg:h-screen lg:w-80 border-r border-line bg-white">
+            <div class="p-6 border-b border-line">
+                <div class="flex items-center gap-3">
+                    <img src="../Resources/Icon128.png" alt="UMG MCP" class="h-11 w-11 rounded-lg">
+                    <div>
+                        <h1 class="text-lg font-semibold text-ink">UMG MCP</h1>
+                        <p class="text-xs text-slate-500">Web Manual · UE 5.8</p>
+                    </div>
+                </div>
+                <div class="mt-5 flex gap-2">
+                    <a href="../Readme.md" class="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink hover:border-action hover:text-action">
+                        <i data-lucide="book-open" class="h-4 w-4"></i>
+                        README
+                    </a>
+                    <a href="index_zh.html" class="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink hover:border-action hover:text-action">
+                        <i data-lucide="languages" class="h-4 w-4"></i>
+                        中文
+                    </a>
+                </div>
+            </div>
+
+            <nav class="p-4 text-sm">
+                <a href="#start" class="flex items-center gap-3 rounded-lg bg-teal-50 px-3 py-2.5 font-medium text-brand">
+                    <i data-lucide="compass" class="h-4 w-4"></i>
+                    Start Here
+                </a>
+                <a href="#install" class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-ink">
+                    <i data-lucide="download" class="h-4 w-4"></i>
+                    Install
+                </a>
+                <a href="#mcp-client" class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-ink">
+                    <i data-lucide="plug-zap" class="h-4 w-4"></i>
+                    MCP Client
+                </a>
+                <a href="#tutorials" class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-ink">
+                    <i data-lucide="map" class="h-4 w-4"></i>
+                    Tutorials
+                </a>
+                <a href="#protocols" class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-ink">
+                    <i data-lucide="blocks" class="h-4 w-4"></i>
+                    Protocols
+                </a>
+                <a href="#troubleshooting" class="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-ink">
+                    <i data-lucide="wrench" class="h-4 w-4"></i>
+                    Troubleshooting
+                </a>
+            </nav>
+
+            <div class="mx-4 mb-4 rounded-lg border border-line bg-slate-50 p-4 text-xs leading-5 text-slate-600">
+                <p class="font-semibold text-ink">Current package</p>
+                <p class="mt-1">Unreal Engine 5.8 · Win64 · local editor bridge on <code>127.0.0.1:55557</code>.</p>
+            </div>
+        </aside>
+
+        <main class="flex-1">
+            <section id="start" class="border-b border-line bg-white">
+                <div class="mx-auto max-w-6xl px-6 py-12 lg:px-10">
+                    <div class="grid gap-10 lg:grid-cols-[1fr_320px] lg:items-start">
+                        <div>
+                            <p class="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-sm font-medium text-warm">
+                                <i data-lucide="sparkles" class="h-4 w-4"></i>
+                                AI-assisted UMG workflow
+                            </p>
+                            <h2 class="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-5xl">Create Unreal UMG interfaces through explicit MCP tools.</h2>
+                            <p class="mt-5 max-w-2xl text-lg leading-8 text-slate-600">UMG MCP lets an agent read the real widget tree, modify layout and slots, apply Blueprint logic, edit materials, create UMG animation, and round-trip UI assets as structured JSON.</p>
+                            <div class="mt-7 flex flex-wrap gap-3">
+                                <a href="#install" class="inline-flex items-center gap-2 rounded-lg bg-action px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+                                    <i data-lucide="play" class="h-4 w-4"></i>
+                                    Install in order
+                                </a>
+                                <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" class="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:border-action hover:text-action">
+                                    <i data-lucide="shopping-bag" class="h-4 w-4"></i>
+                                    Fab Marketplace
+                                </a>
+                                <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" class="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:border-action hover:text-action">
+                                    <i data-lucide="github" class="h-4 w-4"></i>
+                                    GitHub
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-line bg-paper p-5">
+                            <h3 class="flex items-center gap-2 font-semibold text-ink">
+                                <i data-lucide="route" class="h-5 w-5 text-brand"></i>
+                                Recommended path
+                            </h3>
+                            <ol class="mt-4 space-y-4 text-sm">
+                                <li class="flex gap-3"><span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-xs font-bold text-brand">1</span><span>Install the Fab package or clone the source into <code>Plugins/UmgMcp</code>.</span></li>
+                                <li class="flex gap-3"><span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-xs font-bold text-brand">2</span><span>Enable the plugin in Unreal Engine 5.8 and restart the editor.</span></li>
+                                <li class="flex gap-3"><span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-xs font-bold text-brand">3</span><span>Configure a model provider or connect an external MCP client.</span></li>
+                                <li class="flex gap-3"><span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-xs font-bold text-brand">4</span><span>Run the smoke test and create a small UMG asset first.</span></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="install" class="border-b border-line">
+                <div class="mx-auto max-w-6xl px-6 py-12 lg:px-10">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="download" class="h-6 w-6 text-action"></i>
+                        <h2 class="text-2xl font-semibold text-ink">Install</h2>
+                    </div>
+                    <div class="mt-6 grid gap-5 lg:grid-cols-2">
+                        <article class="rounded-lg border border-line bg-white p-6">
+                            <h3 class="font-semibold text-ink">Fab edition</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Use this path for the packaged marketplace install and in-editor workflow.</p>
+                            <ol class="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6">
+                                <li>Install UMG MCP from Fab for Unreal Engine 5.8.</li>
+                                <li>Open your project, enable <code>UmgMcp</code>, and restart.</li>
+                                <li>Open plugin settings and choose Google OAuth, Gemini API, ZhipuAI, Custom OpenAI-compatible endpoint, or local mode.</li>
+                                <li>Use the chat panel or connect an external MCP client.</li>
+                            </ol>
+                        </article>
+                        <article class="rounded-lg border border-line bg-white p-6">
+                            <h3 class="font-semibold text-ink">Source edition</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Use this path for protocol work, fixes, or manual integration.</p>
+                            <pre class="mt-4 rounded-lg bg-slate-950 p-4 text-sm text-slate-100"><code>cd D:\UE5Project\YourProject
+mkdir Plugins
+cd Plugins
+git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp</code></pre>
+                            <p class="mt-4 text-sm leading-6 text-slate-600">Open the project in UE 5.8 and let Unreal Build Tool compile the plugin.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <section id="mcp-client" class="border-b border-line bg-white">
+                <div class="mx-auto max-w-6xl px-6 py-12 lg:px-10">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="plug-zap" class="h-6 w-6 text-brand"></i>
+                        <h2 class="text-2xl font-semibold text-ink">Connect An MCP Client</h2>
+                    </div>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Start Unreal Editor first. The plugin listens on <code>127.0.0.1:55557</code>, and the Python MCP server forwards tool calls to that editor bridge.</p>
+                    <pre class="mt-6 rounded-lg bg-slate-950 p-5 text-sm text-slate-100"><code>{
+  "mcpServers": {
+    "UmgMcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "D:\\UE5Project\\YourProject\\Plugins\\UmgMcp\\Resources\\Python",
+        "UmgMcpServer.py"
+      ]
+    }
+  }
+}</code></pre>
+                    <div class="mt-5 grid gap-4 md:grid-cols-3">
+                        <div class="rounded-lg border border-line bg-paper p-4 text-sm leading-6"><strong class="text-ink">Use an absolute path.</strong><br>The directory must be <code>Resources/Python</code>.</div>
+                        <div class="rounded-lg border border-line bg-paper p-4 text-sm leading-6"><strong class="text-ink">Escape Windows paths.</strong><br>Write <code>D:\\Path</code> in JSON.</div>
+                        <div class="rounded-lg border border-line bg-paper p-4 text-sm leading-6"><strong class="text-ink">Verify with tests.</strong><br>Run the APITest scripts before a large task.</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tutorials" class="border-b border-line">
+                <div class="mx-auto max-w-6xl px-6 py-12 lg:px-10">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="map" class="h-6 w-6 text-warm"></i>
+                        <h2 class="text-2xl font-semibold text-ink">Tutorials</h2>
+                    </div>
+                    <div class="mt-6 grid gap-5 md:grid-cols-3">
+                        <a href="model_config.html" class="rounded-lg border border-line bg-white p-5 hover:border-action hover:shadow-sm">
+                            <i data-lucide="sliders" class="h-6 w-6 text-action"></i>
+                            <h3 class="mt-4 font-semibold text-ink">Model Configuration</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Set up local, Google OAuth, API key, ZhipuAI, and custom OpenAI-compatible providers.</p>
+                        </a>
+                        <a href="chat_dialogue.html" class="rounded-lg border border-line bg-white p-5 hover:border-action hover:shadow-sm">
+                            <i data-lucide="message-square" class="h-6 w-6 text-brand"></i>
+                            <h3 class="mt-4 font-semibold text-ink">Chat Dialogue</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Use chat, develop, learning, and task modes inside the editor workflow.</p>
+                        </a>
+                        <a href="mcp_support.html" class="rounded-lg border border-line bg-white p-5 hover:border-action hover:shadow-sm">
+                            <i data-lucide="cpu" class="h-6 w-6 text-warm"></i>
+                            <h3 class="mt-4 font-semibold text-ink">MCP Support</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">See the major command families for widgets, Blueprint, materials, animation, and editor actions.</p>
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <section id="protocols" class="border-b border-line bg-white">
+                <div class="mx-auto max-w-6xl px-6 py-12 lg:px-10">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="blocks" class="h-6 w-6 text-action"></i>
+                        <h2 class="text-2xl font-semibold text-ink">Protocol Reference</h2>
+                    </div>
+                    <div class="mt-6 grid gap-3 md:grid-cols-2">
+                        <a href="UmgWidgetMcpProtocol.md" class="flex items-center justify-between rounded-lg border border-line p-4 hover:border-action"><span>Widget MCP Protocol</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                        <a href="BlueprintBluecodeProtocol.md" class="flex items-center justify-between rounded-lg border border-line p-4 hover:border-action"><span>Blueprint / BlueCode Protocol</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                        <a href="MaterialMcpProtocol.md" class="flex items-center justify-between rounded-lg border border-line p-4 hover:border-action"><span>Material MCP Protocol</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                        <a href="AnimationMcpProtocol.md" class="flex items-center justify-between rounded-lg border border-line p-4 hover:border-action"><span>Animation MCP Protocol</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                        <a href="Google_OAuth_Setup.md" class="flex items-center justify-between rounded-lg border border-line p-4 hover:border-action"><span>Google OAuth Setup</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                        <a href="FabServer_SerialFlow.md" class="flex items-center justify-between rounded-lg border border-line p-4 hover:border-action"><span>FabServer Serial Flow</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                    </div>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <div class="mx-auto max-w-6xl px-6 py-12 lg:px-10">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="wrench" class="h-6 w-6 text-warm"></i>
+                        <h2 class="text-2xl font-semibold text-ink">Troubleshooting</h2>
+                    </div>
+                    <div class="mt-6 overflow-hidden rounded-lg border border-line bg-white">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-ink">
+                                <tr><th class="p-4 font-semibold">Symptom</th><th class="p-4 font-semibold">Action</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-line">
+                                <tr><td class="p-4"><code>ConnectionRefusedError</code> or <code>WinError 10061</code></td><td class="p-4">Open Unreal Editor, enable the plugin, restart, then reconnect the MCP client.</td></tr>
+                                <tr><td class="p-4"><code>uv</code> is not recognized</td><td class="p-4">Install <code>uv</code> or create a local virtual environment under <code>Resources/Python</code>.</td></tr>
+                                <tr><td class="p-4">The wrong widget was edited</td><td class="p-4">Set the active UMG target or pass the full asset path such as <code>/Game/UI/WBP_Login.WBP_Login</code>.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

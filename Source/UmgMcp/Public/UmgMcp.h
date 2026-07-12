@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogUmgMcp, Log, All);
@@ -20,6 +21,29 @@ public:
     virtual void StartupModule() override;
     virtual void ShutdownModule() override;
 
+#if WITH_UMGMCP_FABSERVER
+    DECLARE_DELEGATE_RetVal(TSharedRef<class SWidget>, FOnSpawnChatWindow);
+    static FOnSpawnChatWindow OnSpawnChatWindow;
+
+
+    /** Register menus and toolbar buttons */
+    void RegisterMenus();
+
+private:
+    /** Callback for spawning the plugin tab */
+    TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
+
+    /** Handlers for Asset Editor Integration */
+    void Initialize();
+    void OnAssetEditorOpened(UObject* Asset);
+    void RegisterAssetEditorMenu(class IAssetEditorInstance* Instance);
+    void RegisterAssetEditorFactory(UObject* Asset, TSharedPtr<class FUmgMcpChatTabFactory> Factory);
+
+private:
+	FDelegateHandle PostEngineInitHandle;
+#endif
+
+public:
     /**
      * Singleton-like access to this module's interface.
      * Beware of calling this during the shutdown phase, though.

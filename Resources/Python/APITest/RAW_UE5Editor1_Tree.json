@@ -1,0 +1,1056 @@
+{
+  "status": "success",
+  "widget_name": "RootCanvas",
+  "widget_class": "/Script/UMG.VerticalBox",
+  "properties": {
+    "bOverride_Cursor": true
+  },
+  "children": [
+    {
+      "widget_name": "TopBar_Background",
+      "widget_class": "/Script/UMG.Border",
+      "properties": {
+        "Padding": {
+          "left": 20,
+          "top": 5,
+          "right": 20,
+          "bottom": 5
+        },
+        "BrushColor": {
+          "r": 0.019999999552965164,
+          "g": 0.019999999552965164,
+          "b": 0.019999999552965164,
+          "a": 0.8999999761581421
+        },
+        "Slot": {
+          "VerticalAlignment": "VAlign_Top"
+        }
+      },
+      "children": [
+        {
+          "widget_name": "TopBar_Content",
+          "widget_class": "/Script/UMG.HorizontalBox",
+          "properties": {
+            "Slot": {
+              "Padding": {
+                "left": 20,
+                "top": 5,
+                "right": 20,
+                "bottom": 5
+              }
+            }
+          },
+          "children": [
+            {
+              "widget_name": "Resources_Group",
+              "widget_class": "/Script/UMG.HorizontalBox",
+              "children": [
+                {
+                  "widget_name": "Promote_Res_Gold",
+                  "widget_class": "/Script/UMG.TextBlock",
+                  "properties": {
+                    "Text": "Gold: 1,250"
+                  }
+                },
+                {
+                  "widget_name": "S1",
+                  "widget_class": "/Script/UMG.Spacer",
+                  "properties": {
+                    "Size": {
+                      "x": 20,
+                      "y": 1
+                    }
+                  }
+                },
+                {
+                  "widget_name": "Promote_Res_Wood",
+                  "widget_class": "/Script/UMG.TextBlock",
+                  "properties": {
+                    "Text": "Wood: 800"
+                  }
+                },
+                {
+                  "widget_name": "S2",
+                  "widget_class": "/Script/UMG.Spacer",
+                  "properties": {
+                    "Size": {
+                      "x": 20,
+                      "y": 1
+                    }
+                  }
+                },
+                {
+                  "widget_name": "Promote_Res_Food",
+                  "widget_class": "/Script/UMG.TextBlock",
+                  "properties": {
+                    "Text": "Food: 45/100"
+                  }
+                }
+              ]
+            },
+            {
+              "widget_name": "Spacer_Center",
+              "widget_class": "/Script/UMG.Spacer",
+              "properties": {
+                "Slot": {
+                  "Size": {
+                    "value": 1,
+                    "sizeRule": "Fill"
+                  }
+                }
+              }
+            },
+            {
+              "widget_name": "Game_Timer",
+              "widget_class": "/Script/UMG.TextBlock",
+              "properties": {
+                "Text": "12:45",
+                "Font": {
+                  "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                  "fontMaterial": "None",
+                  "outlineSettings": {
+                    "outlineSize": 0,
+                    "bMiteredCorners": false,
+                    "bSeparateFillAlpha": false,
+                    "bApplyOutlineToDropShadows": false,
+                    "outlineMaterial": "None",
+                    "outlineColor": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0,
+                      "a": 1
+                    }
+                  },
+                  "typefaceFontName": "Bold",
+                  "size": 18,
+                  "letterSpacing": 0,
+                  "skewAmount": 0,
+                  "bForceMonospaced": false,
+                  "bMaterialIsStencil": false,
+                  "monospacedWidth": 1
+                },
+                "Slot": {
+                  "VerticalAlignment": "VAlign_Center"
+                }
+              }
+            },
+            {
+              "widget_name": "Spacer_Right",
+              "widget_class": "/Script/UMG.Spacer",
+              "properties": {
+                "Slot": {
+                  "Size": {
+                    "value": 1,
+                    "sizeRule": "Fill"
+                  }
+                }
+              }
+            },
+            {
+              "widget_name": "Menu_Button",
+              "widget_class": "/Script/UMG.Button",
+              "children": [
+                {
+                  "widget_name": "Menu_Txt",
+                  "widget_class": "/Script/UMG.TextBlock",
+                  "properties": {
+                    "Text": "MENU"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "widget_name": "RTS_HUD_Main",
+      "widget_class": "/Script/UMG.Overlay"
+    },
+    {
+      "widget_name": "Left_Notification_Area",
+      "widget_class": "/Script/UMG.VerticalBox",
+      "properties": {
+        "Slot": {
+          "Size": {
+            "value": 1,
+            "sizeRule": "Fill"
+          },
+          "Padding": {
+            "left": 20,
+            "top": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "HorizontalAlignment": "HAlign_Left"
+        }
+      },
+      "children": [
+        {
+          "widget_name": "Promote_Alert_1",
+          "widget_class": "/Script/UMG.TextBlock",
+          "properties": {
+            "Text": "Under Attack!"
+          }
+        },
+        {
+          "widget_name": "Promote_Alert_2",
+          "widget_class": "/Script/UMG.TextBlock",
+          "properties": {
+            "Text": "Research Complete"
+          }
+        }
+      ]
+    },
+    {
+      "widget_name": "Bottom_Dashboard_Container",
+      "widget_class": "/Script/UMG.VerticalBox",
+      "properties": {
+        "Slot": {
+          "VerticalAlignment": "VAlign_Bottom"
+        }
+      },
+      "children": [
+        {
+          "widget_name": "Dashboard_BG",
+          "widget_class": "/Script/UMG.Border",
+          "properties": {
+            "Padding": {
+              "left": 10,
+              "top": 10,
+              "right": 10,
+              "bottom": 10
+            },
+            "BrushColor": {
+              "r": 0.014999999664723873,
+              "g": 0.014999999664723873,
+              "b": 0.014999999664723873,
+              "a": 0.949999988079071
+            }
+          },
+          "children": [
+            {
+              "widget_name": "Dashboard_Layout",
+              "widget_class": "/Script/UMG.HorizontalBox",
+              "properties": {
+                "Slot": {
+                  "Padding": {
+                    "left": 10,
+                    "top": 10,
+                    "right": 10,
+                    "bottom": 10
+                  }
+                }
+              },
+              "children": [
+                {
+                  "widget_name": "Minimap_Frame",
+                  "widget_class": "/Script/UMG.Border",
+                  "properties": {
+                    "BrushColor": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0,
+                      "a": 1
+                    }
+                  },
+                  "children": [
+                    {
+                      "widget_name": "Promote_Minimap_Visual",
+                      "widget_class": "/Script/UMG.TextBlock",
+                      "properties": {
+                        "Text": "MINIMAP AREA (256x256)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "widget_name": "S3",
+                  "widget_class": "/Script/UMG.Spacer",
+                  "properties": {
+                    "Size": {
+                      "x": 15,
+                      "y": 1
+                    }
+                  }
+                },
+                {
+                  "widget_name": "Selection_Detail_Frame",
+                  "widget_class": "/Script/UMG.Border",
+                  "properties": {
+                    "BrushColor": {
+                      "r": 0.05000000074505806,
+                      "g": 0.05000000074505806,
+                      "b": 0.05000000074505806,
+                      "a": 1
+                    },
+                    "Slot": {
+                      "Size": {
+                        "value": 1,
+                        "sizeRule": "Fill"
+                      }
+                    }
+                  },
+                  "children": [
+                    {
+                      "widget_name": "UnitDetails_Layout",
+                      "widget_class": "/Script/UMG.HorizontalBox",
+                      "children": [
+                        {
+                          "widget_name": "S4_1",
+                          "widget_class": "/Script/UMG.Spacer",
+                          "properties": {
+                            "Size": {
+                              "x": 15,
+                              "y": 1
+                            }
+                          }
+                        },
+                        {
+                          "widget_name": "Portrait_Container",
+                          "widget_class": "/Script/UMG.Border",
+                          "properties": {
+                            "BrushColor": {
+                              "r": 0,
+                              "g": 0,
+                              "b": 0,
+                              "a": 1
+                            },
+                            "Slot": {
+                              "Padding": {
+                                "left": 0,
+                                "top": 0,
+                                "right": 10,
+                                "bottom": 0
+                              }
+                            }
+                          },
+                          "children": [
+                            {
+                              "widget_name": "Unit_Portrait",
+                              "widget_class": "/Script/UMG.Image",
+                              "properties": {
+                                "Brush": {
+                                  "tintColor": {
+                                    "specifiedColor": {
+                                      "r": 1,
+                                      "g": 1,
+                                      "b": 1,
+                                      "a": 1
+                                    },
+                                    "colorUseRule": "UseColor_Specified"
+                                  },
+                                  "drawAs": "Image",
+                                  "tiling": "NoTile",
+                                  "mirroring": "NoMirror",
+                                  "imageType": "NoImage",
+                                  "imageSize": {
+                                    "x": 100,
+                                    "y": 100
+                                  },
+                                  "margin": {
+                                    "left": 0,
+                                    "top": 0,
+                                    "right": 0,
+                                    "bottom": 0
+                                  },
+                                  "resourceObject": "None",
+                                  "outlineSettings": {
+                                    "cornerRadii": {
+                                      "x": 0,
+                                      "y": 0,
+                                      "z": 0,
+                                      "w": 0
+                                    },
+                                    "color": {
+                                      "specifiedColor": {
+                                        "r": 0,
+                                        "g": 0,
+                                        "b": 0,
+                                        "a": 0
+                                      },
+                                      "colorUseRule": "UseColor_Specified"
+                                    },
+                                    "width": 0,
+                                    "roundingType": "HalfHeightRadius",
+                                    "bUseBrushTransparency": false
+                                  },
+                                  "uVRegion": {
+                                    "min": {
+                                      "x": 0,
+                                      "y": 0
+                                    },
+                                    "max": {
+                                      "x": 0,
+                                      "y": 0
+                                    },
+                                    "bIsValid": false
+                                  },
+                                  "bIsDynamicallyLoaded": false,
+                                  "resourceName": "None"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "widget_name": "S4_2",
+                          "widget_class": "/Script/UMG.Spacer",
+                          "properties": {
+                            "Size": {
+                              "x": 15,
+                              "y": 1
+                            },
+                            "Slot": {
+                              "Size": {
+                                "value": 1,
+                                "sizeRule": "Fill"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "widget_name": "Stats_Bars_Container",
+                          "widget_class": "/Script/UMG.VerticalBox",
+                          "properties": {
+                            "Slot": {
+                              "Size": {
+                                "value": 1,
+                                "sizeRule": "Fill"
+                              }
+                            }
+                          },
+                          "children": [
+                            {
+                              "widget_name": "Unit_Name",
+                              "widget_class": "/Script/UMG.TextBlock",
+                              "properties": {
+                                "Text": "Heavy Paladin",
+                                "Font": {
+                                  "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                  "fontMaterial": "None",
+                                  "outlineSettings": {
+                                    "outlineSize": 0,
+                                    "bMiteredCorners": false,
+                                    "bSeparateFillAlpha": false,
+                                    "bApplyOutlineToDropShadows": false,
+                                    "outlineMaterial": "None",
+                                    "outlineColor": {
+                                      "r": 0,
+                                      "g": 0,
+                                      "b": 0,
+                                      "a": 1
+                                    }
+                                  },
+                                  "typefaceFontName": "Bold",
+                                  "size": 16,
+                                  "letterSpacing": 0,
+                                  "skewAmount": 0,
+                                  "bForceMonospaced": false,
+                                  "bMaterialIsStencil": false,
+                                  "monospacedWidth": 1
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "S_Stat1",
+                              "widget_class": "/Script/UMG.Spacer",
+                              "properties": {
+                                "Size": {
+                                  "x": 1,
+                                  "y": 4
+                                },
+                                "Slot": {
+                                  "Size": {
+                                    "value": 1,
+                                    "sizeRule": "Fill"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Health_Bar",
+                              "widget_class": "/Script/UMG.ProgressBar",
+                              "properties": {
+                                "Percent": 0.8500000238418579,
+                                "FillColorAndOpacity": {
+                                  "r": 0.10000000149011612,
+                                  "g": 0.800000011920929,
+                                  "b": 0.10000000149011612,
+                                  "a": 1
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "S_Stat2",
+                              "widget_class": "/Script/UMG.Spacer",
+                              "properties": {
+                                "Size": {
+                                  "x": 1,
+                                  "y": 2
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Mana_Bar",
+                              "widget_class": "/Script/UMG.ProgressBar",
+                              "properties": {
+                                "Percent": 0.4000000059604645,
+                                "FillColorAndOpacity": {
+                                  "r": 0.10000000149011612,
+                                  "g": 0.4000000059604645,
+                                  "b": 0.8999999761581421,
+                                  "a": 1
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "S_Stat3",
+                              "widget_class": "/Script/UMG.Spacer",
+                              "properties": {
+                                "Size": {
+                                  "x": 1,
+                                  "y": 8
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "QuickStats",
+                              "widget_class": "/Script/UMG.HorizontalBox",
+                              "children": [
+                                {
+                                  "widget_name": "Atk_Val",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "ATK: 24",
+                                    "ColorAndOpacity": {
+                                      "specifiedColor": {
+                                        "r": 1,
+                                        "g": 0.800000011920929,
+                                        "b": 0.20000000298023224,
+                                        "a": 1
+                                      },
+                                      "colorUseRule": "UseColor_Specified"
+                                    },
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 12,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                },
+                                {
+                                  "widget_name": "S_Atk",
+                                  "widget_class": "/Script/UMG.Spacer",
+                                  "properties": {
+                                    "Size": {
+                                      "x": 15,
+                                      "y": 1
+                                    }
+                                  }
+                                },
+                                {
+                                  "widget_name": "Def_Val",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "DEF: 5",
+                                    "ColorAndOpacity": {
+                                      "specifiedColor": {
+                                        "r": 0.5,
+                                        "g": 0.699999988079071,
+                                        "b": 1,
+                                        "a": 1
+                                      },
+                                      "colorUseRule": "UseColor_Specified"
+                                    },
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 12,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "widget_name": "S4_3",
+                          "widget_class": "/Script/UMG.Spacer",
+                          "properties": {
+                            "Size": {
+                              "x": 15,
+                              "y": 1
+                            },
+                            "Slot": {
+                              "Size": {
+                                "value": 1,
+                                "sizeRule": "Fill"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "widget_name": "S4",
+                  "widget_class": "/Script/UMG.Spacer",
+                  "properties": {
+                    "Size": {
+                      "x": 15,
+                      "y": 1
+                    }
+                  }
+                },
+                {
+                  "widget_name": "CommandCard_Frame",
+                  "widget_class": "/Script/UMG.Border",
+                  "properties": {
+                    "BrushColor": {
+                      "r": 0.029999999329447746,
+                      "g": 0.029999999329447746,
+                      "b": 0.029999999329447746,
+                      "a": 1
+                    }
+                  },
+                  "children": [
+                    {
+                      "widget_name": "CommandGrid_Vertical",
+                      "widget_class": "/Script/UMG.VerticalBox",
+                      "children": [
+                        {
+                          "widget_name": "Row_1",
+                          "widget_class": "/Script/UMG.HorizontalBox",
+                          "children": [
+                            {
+                              "widget_name": "Cmd_Move",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              },
+                              "children": [
+                                {
+                                  "widget_name": "T1",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "MOVE",
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 10,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "widget_name": "Cmd_Stop",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              },
+                              "children": [
+                                {
+                                  "widget_name": "T2",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "STOP",
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 10,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "widget_name": "Cmd_Hold",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              },
+                              "children": [
+                                {
+                                  "widget_name": "T3",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "HOLD",
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 10,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "widget_name": "Cmd_Attack",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              },
+                              "children": [
+                                {
+                                  "widget_name": "T4",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "ATK",
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 10,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "widget_name": "Row_2",
+                          "widget_class": "/Script/UMG.HorizontalBox",
+                          "children": [
+                            {
+                              "widget_name": "Cmd_Skill1",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Cmd_Skill2",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Cmd_Skill3",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Cmd_Patrol",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              },
+                              "children": [
+                                {
+                                  "widget_name": "T5",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "PATROL",
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 8,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "widget_name": "Row_3",
+                          "widget_class": "/Script/UMG.HorizontalBox",
+                          "children": [
+                            {
+                              "widget_name": "Cmd_Extra1",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Cmd_Extra2",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Cmd_Extra3",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "widget_name": "Cmd_Build",
+                              "widget_class": "/Script/UMG.Button",
+                              "properties": {
+                                "Slot": {
+                                  "Padding": {
+                                    "left": 2,
+                                    "top": 2,
+                                    "right": 2,
+                                    "bottom": 2
+                                  }
+                                }
+                              },
+                              "children": [
+                                {
+                                  "widget_name": "T6",
+                                  "widget_class": "/Script/UMG.TextBlock",
+                                  "properties": {
+                                    "Text": "BUILD",
+                                    "Font": {
+                                      "fontObject": "/Script/Engine.Font'/Engine/EngineFonts/Roboto.Roboto'",
+                                      "fontMaterial": "None",
+                                      "outlineSettings": {
+                                        "outlineSize": 0,
+                                        "bMiteredCorners": false,
+                                        "bSeparateFillAlpha": false,
+                                        "bApplyOutlineToDropShadows": false,
+                                        "outlineMaterial": "None",
+                                        "outlineColor": {
+                                          "r": 0,
+                                          "g": 0,
+                                          "b": 0,
+                                          "a": 1
+                                        }
+                                      },
+                                      "typefaceFontName": "Bold",
+                                      "size": 10,
+                                      "letterSpacing": 0,
+                                      "skewAmount": 0,
+                                      "bForceMonospaced": false,
+                                      "bMaterialIsStencil": false,
+                                      "monospacedWidth": 1
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

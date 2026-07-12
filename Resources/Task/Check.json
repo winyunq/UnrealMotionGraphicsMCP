@@ -1,0 +1,16 @@
+{
+    "agent_meta": {
+        "name": "check",
+        "icon": "Resources/Icon64.png"
+    },
+    "system_instruction": "你是 Check Agent。负责核对任务闭环与交付质量。必要时可继续分派 task_begin；完成检查结论后调用 task_end。\n\nEN: You are the Check Agent. Verify closure/quality; optionally delegate with task_begin and conclude with task_end.",
+    "allowed_tools": [
+        "get_widget_tree",
+        "query_widget_properties",
+        "get_layout_data",
+        "get_widget_schema",
+        "material_get_graph_snapshot",
+        "task_end",
+        "task_begin"
+    ]
+}

@@ -3,6 +3,7 @@
 #include "Editor.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "WidgetBlueprint.h"
+#include "Engine/Blueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Widget.h"
 #include "Logging/LogMacros.h"
@@ -88,7 +89,7 @@ bool IsSameAssetPackagePath(const FString& LeftPath, const FString& RightPath)
 void UUmgAttentionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-    CachedTargetWidgetBlueprint = nullptr;
+	CachedTargetBlueprint = nullptr;
 
 	// Register the delegate to be called when an asset is opened.
 	if (GEditor)
@@ -127,10 +128,10 @@ void UUmgAttentionSubsystem::HandleAssetOpened(UObject* Asset, class IAssetEdito
 		return;
 	}
 
-	if (UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(Asset))
+	if (UBlueprint* Blueprint = Cast<UBlueprint>(Asset))
 	{
-		FString AssetPath = WidgetBP->GetPathName();
-		UE_LOG(LogUmgAttention, Log, TEXT("UMG Asset Opened: %s"), *AssetPath);
+		FString AssetPath = Blueprint->GetPathName();
+		UE_LOG(LogUmgAttention, Log, TEXT("Blueprint Asset Opened: %s"), *AssetPath);
 
 		// Update history
 		UmgAssetHistory.Remove(AssetPath);
@@ -140,12 +141,22 @@ void UUmgAttentionSubsystem::HandleAssetOpened(UObject* Asset, class IAssetEdito
         if (AssetPath == AttentionTargetAssetPath)
         {
             UE_LOG(LogUmgAttention, Log, TEXT("Opened asset matches current attention target. Updating cached object."));
-            CachedTargetWidgetBlueprint = WidgetBP;
+            CachedTargetBlueprint = Blueprint;
         }
 	}
 }
 
 bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
+{
+    return SetTargetBlueprintAssetInternal(AssetPath, true);
+}
+
+bool UUmgAttentionSubsystem::SetTargetBlueprintAsset(const FString& AssetPath)
+{
+    return SetTargetBlueprintAssetInternal(AssetPath, false);
+}
+
+bool UUmgAttentionSubsystem::SetTargetBlueprintAssetInternal(const FString& AssetPath, bool bAllowCreateWidget)
 {
     FString CleanAssetPath;
     FString PackageName;
@@ -155,11 +166,11 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
     {
         UE_LOG(LogUmgAttention, Warning, TEXT("SetTargetUmgAsset: %s Clearing target."), *PathError);
         AttentionTargetAssetPath.Empty();
-        CachedTargetWidgetBlueprint = nullptr;
+        CachedTargetBlueprint = nullptr;
         return false;
     }
 
-    UWidgetBlueprint* TargetBP = nullptr;
+    UBlueprint* TargetBP = nullptr;
 
     // 1. Try to find the asset in an open editor FIRST
     if (GEditor)
@@ -174,7 +185,7 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
                  IAssetEditorInstance* Editor = AssetEditorSubsystem->FindEditorForAsset(AssetObj, false);
                  if (Editor)
                  {
-                     TargetBP = Cast<UWidgetBlueprint>(AssetObj);
+                     TargetBP = Cast<UBlueprint>(AssetObj);
                      if (TargetBP)
                      {
                          UE_LOG(LogUmgAttention, Log, TEXT("SetTargetUmgAsset: Found open editor for %s. Using live instance."), *ObjectPath);
@@ -188,12 +199,12 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
     if (!TargetBP)
     {
         // Use LoadObject but handle failure gracefully without blocking ensure
-        TargetBP = LoadObject<UWidgetBlueprint>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
+        TargetBP = LoadObject<UBlueprint>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
     }
 
     // 3. Conditional Creation
     // Only create if it looks like a valid path but just missing
-    if (!TargetBP)
+    if (!TargetBP && bAllowCreateWidget)
     {
         if (!CanAutoCreateUmgAsset(PackageName))
         {
@@ -213,7 +224,7 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
             UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
             
             UObject* NewAsset = AssetTools.CreateAsset(AssetName, PackagePath, UWidgetBlueprint::StaticClass(), Factory);
-            TargetBP = Cast<UWidgetBlueprint>(NewAsset);
+            TargetBP = Cast<UBlueprint>(NewAsset);
             
             if (TargetBP)
             {
@@ -231,13 +242,13 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         // SUCCESS: The path is valid and the object was loaded/found.
         UE_LOG(LogUmgAttention, Log, TEXT("Setting Attention Target Path to: %s"), *CleanAssetPath);
         AttentionTargetAssetPath = CleanAssetPath;
-        CachedTargetWidgetBlueprint = TargetBP;
+        CachedTargetBlueprint = TargetBP;
         CurrentWidgetName.Empty(); // Clear stale widget scope when switching assets unless explicitly set later.
 
         // Also treat setting a target as an 'edit' action to update the history, ensuring consistency.
         UmgAssetHistory.Remove(CleanAssetPath);
         UmgAssetHistory.Insert(CleanAssetPath, 0);
-        UE_LOG(LogUmgAttention, Log, TEXT("Successfully cached UMG asset object."));
+        UE_LOG(LogUmgAttention, Log, TEXT("Successfully cached Blueprint asset object (%s)."), *TargetBP->GetClass()->GetName());
         return true;
     }
     else
@@ -245,7 +256,7 @@ bool UUmgAttentionSubsystem::SetTargetUmgAsset(const FString& AssetPath)
         // FAILURE: The path was invalid. Clear any existing target to prevent errors.
         UE_LOG(LogUmgAttention, Warning, TEXT("Failed to load or create UMG asset from path: %s. Clearing attention target."), *CleanAssetPath);
         AttentionTargetAssetPath.Empty();
-        CachedTargetWidgetBlueprint = nullptr;
+        CachedTargetBlueprint = nullptr;
         return false;
     }
 }
@@ -256,17 +267,17 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
     UUmgAttentionSubsystem* MutableThis = const_cast<UUmgAttentionSubsystem*>(this);
 
     // If we have an explicit target path, but our cached object is invalid, try to reload it.
-    if (!AttentionTargetAssetPath.IsEmpty() && !CachedTargetWidgetBlueprint.IsValid())
+    if (!AttentionTargetAssetPath.IsEmpty() && !CachedTargetBlueprint.IsValid())
     {
         UE_LOG(LogUmgAttention, Log, TEXT("Cached target object is invalid. Attempting to reload from path: %s"), *AttentionTargetAssetPath);
         FString CleanAssetPath;
         FString PackageName;
         FString ObjectPath;
         FString PathError;
-        UWidgetBlueprint* ReloadedBP = nullptr;
+        UBlueprint* ReloadedBP = nullptr;
         if (ResolveUmgAssetPath(AttentionTargetAssetPath, CleanAssetPath, PackageName, ObjectPath, PathError))
         {
-            ReloadedBP = LoadObject<UWidgetBlueprint>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
+            ReloadedBP = LoadObject<UBlueprint>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn);
         }
         else
         {
@@ -275,7 +286,7 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
         if (ReloadedBP)
         {
             UE_LOG(LogUmgAttention, Log, TEXT("Successfully reloaded and re-cached UMG asset object."));
-            MutableThis->CachedTargetWidgetBlueprint = ReloadedBP;
+            MutableThis->CachedTargetBlueprint = ReloadedBP;
         }
         else
         {
@@ -303,7 +314,7 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
                     UE_LOG(LogUmgAttention, Log, TEXT("Found currently open UMG editor: %s"), *AssetPath);
                     
                     // Update our cache
-                    MutableThis->CachedTargetWidgetBlueprint = WidgetBP;
+                    MutableThis->CachedTargetBlueprint = WidgetBP;
                     
                     // Return the first found UMG asset
                     return AssetPath;
@@ -326,14 +337,14 @@ FString UUmgAttentionSubsystem::GetTargetUmgAsset() const
     return DefaultPath;
 }
 
-UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
+UBlueprint* UUmgAttentionSubsystem::GetCachedTargetBlueprint() const
 {
     // Before returning, call GetTargetUmgAsset() to ensure lazy-load/reload logic is triggered.
     GetTargetUmgAsset(); 
     
-    if (CachedTargetWidgetBlueprint.IsValid())
+    if (CachedTargetBlueprint.IsValid())
     {
-        UWidgetBlueprint* CachedBP = CachedTargetWidgetBlueprint.Get();
+        UBlueprint* CachedBP = CachedTargetBlueprint.Get();
         if (AttentionTargetAssetPath.IsEmpty() || IsSameAssetPackagePath(AttentionTargetAssetPath, CachedBP->GetPathName()))
         {
             return CachedBP;
@@ -343,7 +354,7 @@ UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
             *CachedBP->GetPathName(),
             *AttentionTargetAssetPath);
         UUmgAttentionSubsystem* MutableThis = const_cast<UUmgAttentionSubsystem*>(this);
-        MutableThis->CachedTargetWidgetBlueprint = nullptr;
+        MutableThis->CachedTargetBlueprint = nullptr;
     }
 
     // If there's no explicit target, maybe the last edited one is what we want.
@@ -354,11 +365,11 @@ UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
         {
             // Non-const mutable copy for lazy-loading
             UUmgAttentionSubsystem* MutableThis = const_cast<UUmgAttentionSubsystem*>(this);
-            UWidgetBlueprint* LoadedBP = LoadObject<UWidgetBlueprint>(nullptr, *LastEditedPath);
+            UBlueprint* LoadedBP = LoadObject<UBlueprint>(nullptr, *LastEditedPath);
             if (LoadedBP)
             {
                 UE_LOG(LogUmgAttention, Log, TEXT("No explicit target. Lazy loading last edited asset: %s"), *LastEditedPath);
-                MutableThis->CachedTargetWidgetBlueprint = LoadedBP;
+                MutableThis->CachedTargetBlueprint = LoadedBP;
                 return LoadedBP;
             }
         }
@@ -366,6 +377,11 @@ UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
 
     UE_LOG(LogUmgAttention, Warning, TEXT("Returning nullptr because cached target is not valid and could not be loaded."));
     return nullptr;
+}
+
+UWidgetBlueprint* UUmgAttentionSubsystem::GetCachedTargetWidgetBlueprint() const
+{
+    return Cast<UWidgetBlueprint>(GetCachedTargetBlueprint());
 }
 
 

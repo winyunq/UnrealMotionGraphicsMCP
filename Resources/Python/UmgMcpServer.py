@@ -23,6 +23,7 @@ import logging
 import asyncio
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -449,6 +450,15 @@ async def get_target_umg_asset() -> Dict[str, Any]:
     umg_attention_client = UMGAttention.UMGAttention(conn)
     return await umg_attention_client.get_target_umg_asset()
 
+
+@register_tool("get_target_blueprint_asset", "Gets the active Widget or general Blueprint asset used by BlueCode.")
+async def get_target_blueprint_asset() -> Dict[str, Any]:
+    conn = get_unreal_connection()
+    response = await conn.send_command("get_target_blueprint_asset", {})
+    if response and response.get("status") != "error" and response.get("success") is not False and response.get("asset_path"):
+        context_manager.set_target(response.get("asset_path"))
+    return response
+
 @register_tool("get_target_widget", "Gets the focused widget within the current target asset.")
 async def get_target_widget() -> Dict[str, Any]:
     """
@@ -577,6 +587,16 @@ async def set_target_widget(widget_name: str) -> Dict[str, Any]:
     if resp.get("status") == "success" or resp.get("success"):
         context_manager.set_target(context_manager.get_target(), widget_name)
     return resp
+
+
+@register_tool("set_target_blueprint_asset", "Sets an existing Widget, Actor, Object, or other Blueprint as the active BlueCode target.")
+async def set_target_blueprint_asset(asset_path: str) -> Dict[str, Any]:
+    normalized_path = normalize_project_path(asset_path)
+    conn = get_unreal_connection()
+    response = await conn.send_command("set_target_blueprint_asset", {"asset_path": normalized_path})
+    if response and response.get("status") != "error" and response.get("success") is not False:
+        context_manager.set_target(response.get("asset_path") or normalized_path)
+    return response
 
 # =============================================================================
 #  Category: Sensing
@@ -828,7 +848,7 @@ async def list_assets(class_name: str = None, package_path: str = None, max_coun
 
 
 
-@register_tool("compile_blueprint", "Compiles a Blueprint.")
+@register_tool("compile_blueprint", "Compiles and saves a Blueprint.")
 async def compile_blueprint(blueprint_name: str = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
@@ -837,8 +857,696 @@ async def compile_blueprint(blueprint_name: str = None) -> Dict[str, Any]:
     return await conn.send_command("compile_blueprint", {"blueprint_name": blueprint_name})
 
 
+def _bluecode_strip_fences(code: str) -> str:
+    lines: List[str] = []
+    in_fence = False
+    for raw_line in (code or "").replace("\r\n", "\n").splitlines():
+        line = raw_line.strip()
+        if line.startswith("```"):
+            in_fence = not in_fence
+            continue
+        lines.append(raw_line)
+    return "\n".join(lines)
+
+
+def _bluecode_statements(code: str) -> List[str]:
+    statements: List[str] = []
+    for raw_line in _bluecode_strip_fences(code).splitlines():
+        line = raw_line.strip()
+        if not line or line in ("{", "}"):
+            continue
+        if line.startswith("#") or line.startswith("//"):
+            continue
+        lowered = line.lower()
+        if lowered in ("main()", "main:", "end", "return"):
+            continue
+        if line.endswith(";"):
+            line = line[:-1].strip()
+        statements.append(line)
+    return statements
+
+
+_BLUECODE_MATH_READBACK = {
+    "Add_IntInt": "+",
+    "Add_FloatFloat": "+",
+    "Subtract_IntInt": "-",
+    "Subtract_FloatFloat": "-",
+    "Multiply_IntInt": "*",
+    "Multiply_FloatFloat": "*",
+    "Divide_IntInt": "/",
+    "Divide_FloatFloat": "/",
+}
+
+
+_BLUECODE_WIDGET_EVENTS = {
+    "Button": ["OnClicked", "OnPressed", "OnReleased", "OnHovered", "OnUnhovered"],
+    "CheckBox": ["OnCheckStateChanged"],
+    "ComboBoxString": ["OnSelectionChanged", "OnOpening"],
+    "EditableTextBox": ["OnTextChanged", "OnTextCommitted"],
+    "MultiLineEditableTextBox": ["OnTextChanged", "OnTextCommitted"],
+    "Slider": ["OnValueChanged", "OnMouseCaptureBegin", "OnMouseCaptureEnd", "OnControllerCaptureBegin", "OnControllerCaptureEnd"],
+    "SpinBox": ["OnValueChanged", "OnValueCommitted", "OnBeginSliderMovement", "OnEndSliderMovement"],
+    "ExpandableArea": ["OnExpansionChanged"],
+}
+
+
+def _bluecode_normalize_widget_class(class_name: str) -> str:
+    normalized = (class_name or "").strip()
+    if normalized.startswith("U") and len(normalized) > 1 and normalized[1].isupper():
+        normalized = normalized[1:]
+    if normalized.endswith("_C"):
+        normalized = normalized[:-2]
+    return normalized
+
+
+def _bluecode_parse_widget_tree(tree_text: str) -> List[Dict[str, str]]:
+    widgets: List[Dict[str, str]] = []
+    for raw_line in (tree_text or "").splitlines():
+        match = re.match(r"^\s*(?:-\s*)?([A-Za-z_][A-Za-z0-9_]*)\s+\[([^\]]+)\]", raw_line.strip())
+        if not match:
+            continue
+        widget_name = match.group(1)
+        widget_class = _bluecode_normalize_widget_class(match.group(2))
+        if widget_class == "WidgetBlueprint":
+            continue
+        widgets.append({"widget": widget_name, "class": widget_class})
+    return widgets
+
+
+def _bluecode_available_events(widgets: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    events: List[Dict[str, str]] = []
+    for widget in widgets:
+        widget_name = widget.get("widget", "")
+        widget_class = widget.get("class", "")
+        for event_name in _BLUECODE_WIDGET_EVENTS.get(widget_class, []):
+            target = f"{widget_name}.{event_name}"
+            events.append({
+                "widget": widget_name,
+                "class": widget_class,
+                "event": event_name,
+                "target": target,
+                "set_function": f'bluecode_set_function("{target}")',
+            })
+    return events
+
+
+def _bluecode_bound_events(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    events: List[Dict[str, Any]] = []
+    seen = set()
+    for node in nodes or []:
+        kind = node.get("kind")
+        if kind not in ("component_event", "custom_event", "event"):
+            continue
+
+        label = str(node.get("member") or node.get("title") or node.get("name") or "")
+        event_name = label.replace(" ", "")
+        widget_name = ""
+        target = event_name
+
+        label_match = re.match(r"^\s*(.*?)\s*\((.*?)\)\s*$", label)
+        if kind == "component_event" and label_match:
+            event_name = label_match.group(1).replace(" ", "")
+            widget_name = label_match.group(2).strip()
+            target = f"{widget_name}.{event_name}" if widget_name else event_name
+
+        key = (kind, target, node.get("id"))
+        if key in seen:
+            continue
+        seen.add(key)
+        events.append({
+            "kind": kind,
+            "widget": widget_name,
+            "event": event_name,
+            "target": target,
+            "node_id": node.get("id"),
+            "title": node.get("title") or label,
+        })
+    return events
+
+
+def _bluecode_ok(result: Any) -> bool:
+    return isinstance(result, dict) and (result.get("success") is True or result.get("status") == "success")
+
+
+def _bluecode_format_arg(pin: Dict[str, Any]) -> Optional[str]:
+    if pin.get("linked_to"):
+        linked = pin["linked_to"][0]
+        label = linked.get("member") or linked.get("title") or linked.get("node") or linked.get("node_id")
+        return str(label) if label else None
+    value = pin.get("default")
+    if value is None or value == "":
+        return None
+    category = str(pin.get("category", "")).lower()
+    if category in ("string", "text", "name") and not (str(value).startswith('"') and str(value).endswith('"')):
+        return json.dumps(str(value), ensure_ascii=False)
+    return str(value)
+
+
+def _bluecode_expr_from_pin(pin: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], seen: Optional[set] = None) -> Optional[str]:
+    linked_to = pin.get("linked_to") or []
+    if linked_to:
+        linked = linked_to[0]
+        linked_id = linked.get("node_id")
+        if linked_id and linked_id in by_id:
+            return _bluecode_expr_from_node(by_id[linked_id], by_id, seen)
+    return _bluecode_format_arg(pin)
+
+
+def _bluecode_expr_from_node(node: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], seen: Optional[set] = None) -> str:
+    seen = seen or set()
+    node_id = node.get("id")
+    if node_id in seen:
+        return str(node.get("member") or node.get("title") or node.get("name") or node_id)
+    if node_id:
+        seen.add(node_id)
+
+    kind = node.get("kind")
+    member = str(node.get("member") or node.get("title") or node.get("name") or "")
+    if kind == "variable_get":
+        return member
+
+    args: List[str] = []
+    for pin in node.get("inputs", []):
+        pin_name = str(pin.get("name", "")).lower()
+        if pin.get("is_exec") or pin_name in ("execute", "then", "self", "worldcontextobject"):
+            continue
+        arg = _bluecode_expr_from_pin(pin, by_id, seen)
+        if arg is not None:
+            args.append(arg)
+
+    if kind == "call" and member in _BLUECODE_MATH_READBACK and len(args) >= 2:
+        return f"{args[0]} {_BLUECODE_MATH_READBACK[member]} {args[1]}"
+    if kind == "call" and member:
+        return f"{member}({', '.join(args)})"
+    return _bluecode_format_arg({"linked_to": [{"member": member}]}) or member
+
+
+def _bluecode_node_line(node: Dict[str, Any], by_id: Optional[Dict[str, Dict[str, Any]]] = None) -> Optional[str]:
+    by_id = by_id or {}
+    kind = node.get("kind") or node.get("class") or "node"
+    if kind in ("event", "component_event", "custom_event", "function_entry"):
+        return None
+    if kind == "branch":
+        condition = None
+        for pin in node.get("inputs", []):
+            if str(pin.get("name", "")).lower() == "condition":
+                condition = _bluecode_expr_from_pin(pin, by_id)
+                break
+        return f"if {condition or 'Condition'}:"
+    member = node.get("member") or node.get("title") or node.get("name")
+    if not member:
+        return None
+    if kind in ("call", "variable_get", "variable_set", "node"):
+        args: List[str] = []
+        for pin in node.get("inputs", []):
+            if pin.get("is_exec") or str(pin.get("name", "")).lower() in ("execute", "then", "self", "worldcontextobject"):
+                continue
+            arg = _bluecode_expr_from_pin(pin, by_id)
+            if arg is not None:
+                args.append(arg)
+        if kind == "variable_get":
+            return str(member)
+        if kind == "variable_set":
+            value = args[0] if args else ""
+            return f"{member} = {value}".rstrip()
+        return f"{member}({', '.join(args)})"
+    return str(node.get("title") or node.get("name"))
+
+
+def _bluecode_is_raw_node_dump_line(statement: str) -> bool:
+    text = str(statement or "").strip()
+    if text.endswith("()"):
+        text = text[:-2].strip()
+    return bool(re.match(r"^(K2Node|EdGraphNode|MaterialGraphNode|AnimGraphNode)_", text))
+
+
+def _bluecode_pin_summary(pin: Dict[str, Any]) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {
+        "name": pin.get("name"),
+        "direction": pin.get("direction"),
+        "category": pin.get("category"),
+        "is_exec": bool(pin.get("is_exec")),
+    }
+    if pin.get("subType"):
+        summary["subType"] = pin.get("subType")
+    if pin.get("default") not in (None, ""):
+        summary["default"] = pin.get("default")
+    linked_to = pin.get("linked_to") or []
+    if linked_to:
+        summary["linked_to"] = [
+            {
+                "node_id": link.get("node_id"),
+                "pin": link.get("pin"),
+                "member": link.get("member"),
+                "title": link.get("title"),
+            }
+            for link in linked_to
+        ]
+    return summary
+
+
+def _bluecode_add_unique(items: List[Dict[str, Any]], item: Dict[str, Any]) -> None:
+    key = json.dumps(item, sort_keys=True, ensure_ascii=False)
+    if not any(json.dumps(existing, sort_keys=True, ensure_ascii=False) == key for existing in items):
+        items.append(item)
+
+
+def _bluecode_expansion_entry(
+    line_number: int,
+    statement: str,
+    node: Dict[str, Any],
+    by_id: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    node_id = node.get("id")
+    pins = [_bluecode_pin_summary(pin) for pin in ((node.get("inputs") or []) + (node.get("outputs") or []))]
+    exec_edges = [
+        {
+            "from_node_id": node_id,
+            "to_node_id": next_id,
+            "inference": "exec edge recovered from output exec pin",
+        }
+        for next_id in node.get("exec_next", []) or []
+    ]
+    data_edges: List[Dict[str, Any]] = []
+    default_pins: List[Dict[str, Any]] = []
+
+    for pin in node.get("inputs", []) or []:
+        pin_name = pin.get("name")
+        pin_lower = str(pin_name or "").lower()
+        if pin.get("is_exec") or pin_lower in ("execute", "then", "self", "worldcontextobject"):
+            continue
+        if pin.get("default") not in (None, ""):
+            default_pins.append({
+                "pin": pin_name,
+                "value": pin.get("default"),
+                "category": pin.get("category"),
+                "inference": "literal/default pin retained as compact value",
+            })
+        for linked in pin.get("linked_to", []) or []:
+            _bluecode_add_unique(data_edges, {
+                "from_node_id": linked.get("node_id"),
+                "from_pin": linked.get("pin"),
+                "to_node_id": node_id,
+                "to_pin": pin_name,
+                "inference": "data edge recovered from linked input pin",
+            })
+
+    compacted_nodes: List[Dict[str, Any]] = []
+    for dep in node.get("data_dependencies", []) or []:
+        dep_node = by_id.get(dep.get("node_id"))
+        _bluecode_add_unique(data_edges, {
+            "from_node_id": dep.get("node_id"),
+            "to_node_id": node_id,
+            "to_pin": dep.get("pin"),
+            "inference": "data dependency compressed into statement expression",
+        })
+        if dep_node:
+            compacted_nodes.append({
+                "node_id": dep_node.get("id"),
+                "kind": dep_node.get("kind"),
+                "member": dep_node.get("member"),
+                "expression": _bluecode_expr_from_node(dep_node, by_id),
+                "to_pin": dep.get("pin"),
+            })
+
+    inference_sources = ["node kind/member"]
+    if exec_edges:
+        inference_sources.append("exec_next")
+    if data_edges:
+        inference_sources.append("linked pins/data_dependencies")
+    if default_pins:
+        inference_sources.append("pin defaults")
+    if compacted_nodes:
+        inference_sources.append("compacted dependency nodes")
+    if any(str(pin.get("name", "")).lower() in ("self", "worldcontextobject") for pin in node.get("inputs", []) or []):
+        inference_sources.append("implicit self/world context")
+
+    source_node_ids = {node_id} if node_id else set()
+    source_node_ids.update(dep.get("node_id") for dep in node.get("data_dependencies", []) or [] if dep.get("node_id"))
+
+    return {
+        "line": line_number,
+        "statement": statement,
+        "node_id": node_id,
+        "kind": node.get("kind") or node.get("class") or "node",
+        "member": node.get("member"),
+        "source_node_ids": sorted(source_node_ids),
+        "pins": pins,
+        "exec_edges": exec_edges,
+        "data_edges": data_edges,
+        "default_pins": default_pins,
+        "compacted_nodes": compacted_nodes,
+        "inference_sources": inference_sources,
+    }
+
+
+def _bluecode_order_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_id = {node.get("id"): node for node in nodes if node.get("id")}
+    starts = [
+        node for node in nodes
+        if node.get("kind") in ("event", "component_event", "custom_event", "function_entry")
+    ]
+    ordered: List[Dict[str, Any]] = []
+    seen = set()
+
+    def visit(node: Dict[str, Any]) -> None:
+        node_id = node.get("id")
+        if node_id in seen:
+            return
+        if node_id:
+            seen.add(node_id)
+        ordered.append(node)
+        for next_id in node.get("exec_next", []):
+            next_node = by_id.get(next_id)
+            if next_node:
+                visit(next_node)
+
+    for start in starts:
+        visit(start)
+    for node in nodes:
+        if node.get("id") not in seen:
+            visit(node)
+    return ordered
+
+
+def _bluecode_connections_from_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    connections: List[Dict[str, Any]] = []
+    seen = set()
+    for node in nodes or []:
+        source_node_id = node.get("id") or ""
+        source_title = node.get("title") or node.get("member") or node.get("name") or ""
+        for pin in node.get("outputs", []) or []:
+            source_pin = pin.get("name") or ""
+            source_endpoint = f"{source_node_id}:{source_pin}"
+            kind = "exec" if pin.get("is_exec") else "data"
+            for linked in pin.get("linked_to", []) or []:
+                target_node_id = linked.get("node_id") or ""
+                target_pin = linked.get("pin") or ""
+                target_endpoint = f"{target_node_id}:{target_pin}"
+                key = f"{source_endpoint}->{target_endpoint}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                connections.append({
+                    "source": source_endpoint,
+                    "target": target_endpoint,
+                    "source_node_id": source_node_id,
+                    "source_title": source_title,
+                    "source_pin": source_pin,
+                    "target_node_id": target_node_id,
+                    "target_title": linked.get("title") or linked.get("member") or linked.get("node") or "",
+                    "target_pin": target_pin,
+                    "kind": kind,
+                    "connect": f"{source_endpoint} -> {target_endpoint}",
+                    "delete_target": {
+                        "kind": "connection",
+                        "source": source_endpoint,
+                        "target": target_endpoint,
+                    },
+                })
+    return connections
+
+
+async def _bluecode_read_payload(conn: UnrealConnection, detail: str = "", include_connections: bool = False) -> Dict[str, Any]:
+    backend_payload: Dict[str, Any] = {"subAction": "bluecode_read_function"}
+    if detail:
+        backend_payload["detail"] = detail
+    if include_connections:
+        backend_payload["include_connections"] = True
+    backend_result = await conn.send_command("manage_blueprint_graph", backend_payload)
+    if _bluecode_ok(backend_result) and isinstance(backend_result, dict) and backend_result.get("code"):
+        return backend_result
+
+    graph = await conn.send_command("get_target_graph", {})
+    graph_name = (graph or {}).get("target_graph") or "EventGraph"
+    raw_nodes = await conn.send_command("manage_blueprint_graph", {"subAction": "get_nodes"})
+    nodes = (raw_nodes or {}).get("nodes", [])
+    by_id = {node.get("id"): node for node in nodes if node.get("id")}
+    dependency_node_ids = {
+        dep.get("node_id")
+        for node in nodes
+        for dep in (node.get("data_dependencies", []) or [])
+        if dep.get("node_id")
+    }
+    ordered = _bluecode_order_nodes(nodes)
+    body_lines = []
+    body_entries = []
+    dependencies = []
+    seen_deps = set()
+    for node in ordered:
+        if node.get("id") in dependency_node_ids and not node.get("isExec"):
+            continue
+        line = _bluecode_node_line(node, by_id)
+        if line:
+            body_lines.append(f"  {line}")
+            body_entries.append({"statement": line, "node": node})
+        for dep in node.get("data_dependencies", []):
+            dep_key = json.dumps(dep, sort_keys=True)
+            if dep_key not in seen_deps:
+                seen_deps.add(dep_key)
+                dependencies.append(dep)
+    code = "\n".join(["main()"] + body_lines + ["  end"])
+    degraded_lines = [
+        entry["statement"]
+        for entry in body_entries
+        if _bluecode_is_raw_node_dump_line(entry["statement"])
+    ]
+    semantic_read_degraded = bool(degraded_lines)
+    result: Dict[str, Any] = {
+        "success": _bluecode_ok(raw_nodes) and not semantic_read_degraded,
+        "function": graph_name,
+        "entry": "main",
+        "exit": "end",
+        "code": code,
+        "representation": "compressed_blueprint_node_graph",
+        "exec_paths": max(1, sum(1 for node in nodes if node.get("kind") == "branch") + 1),
+        "data_dependencies": dependencies,
+        "debug_nodes_available": True,
+        "fallback_used": True,
+    }
+    connections = _bluecode_connections_from_nodes(nodes)
+    result["connection_count"] = len(connections)
+    result["connections_available"] = True
+    if include_connections or detail in ("debug", "roundtrip"):
+        result["connections"] = connections
+        result["connections_usage"] = "Use bluecode_connect to add missing links and bluecode_delete(kind='connection', confirm_delete=true) to remove specific existing links."
+    if semantic_read_degraded:
+        result["semantic_read_degraded"] = True
+        result["error"] = "Backend bluecode_read_function did not return semantic code; legacy get_nodes fallback only produced raw node names."
+        result["raw_node_lines"] = degraded_lines
+    if isinstance(backend_result, dict) and not _bluecode_ok(backend_result):
+        result["backend_error"] = backend_result
+    elif isinstance(backend_result, dict):
+        result["backend_warning"] = backend_result
+    if isinstance(raw_nodes, dict) and not _bluecode_ok(raw_nodes):
+        result["raw_error"] = raw_nodes
+    if detail == "debug":
+        result["expansion"] = [
+            _bluecode_expansion_entry(index, entry["statement"], entry["node"], by_id)
+            for index, entry in enumerate(body_entries, start=2)
+        ]
+        result["nodes"] = nodes
+        result["raw"] = raw_nodes
+    return result
+
+
+@register_tool("bluecode_set_function", "Sets the active Blueprint function/event for bluecode.")
+async def bluecode_set_function(function_name: str) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    return await conn.send_command("set_edit_function", {"function_name": function_name})
+
+
+@register_tool("bluecode_read_function", "Reads the active Blueprint function as compact bluecode.")
+async def bluecode_read_function(detail: str = "", include_connections: bool = False) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    return await _bluecode_read_payload(conn, detail, include_connections)
+
+
+@register_tool("bluecode_read_variables", "Reads Blueprint member variables as compact bluecode data.")
+async def bluecode_read_variables() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    result = await conn.send_command("manage_blueprint_graph", {"subAction": "get_variables"})
+    variables = []
+    for var in (result or {}).get("variables", []):
+        variables.append({
+            "name": var.get("name"),
+            "type": var.get("type"),
+            "subType": var.get("subType", ""),
+        })
+    return {"success": bool(result and result.get("success", True)), "variables": variables}
+
+
+@register_tool("bluecode_read_events", "Reads Blueprint event candidates and currently scoped bound events.")
+async def bluecode_read_events() -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    tree_result = await conn.send_command("get_widget_tree", {})
+    payload: Dict[str, Any] = {"subAction": "get_events"}
+    if (tree_result or {}).get("scope") == "target_widget" and (tree_result or {}).get("root_widget"):
+        payload["scope_widget"] = tree_result.get("root_widget")
+
+    events_result = await conn.send_command("manage_blueprint_graph", payload)
+    if _bluecode_ok(events_result) and (
+        "available_events" in events_result or "bound_events" in events_result
+    ):
+        return events_result
+
+    graph = await conn.send_command("get_target_graph", {})
+    graph_name = (graph or {}).get("target_graph") or "EventGraph"
+    raw_nodes = await conn.send_command("manage_blueprint_graph", {"subAction": "get_nodes"})
+
+    tree_text = (tree_result or {}).get("widget_tree", "")
+    widgets = _bluecode_parse_widget_tree(tree_text)
+    return {
+        "success": bool((tree_result and tree_result.get("success", True)) or (raw_nodes and raw_nodes.get("success", True))),
+        "bound_scope": graph_name,
+        "widgets": widgets,
+        "available_events": _bluecode_available_events(widgets),
+        "bound_events": _bluecode_bound_events((raw_nodes or {}).get("nodes", [])),
+        "notes": [
+            "available_events are inferred from common UMG widget delegate names",
+            "bound_events are read from the current bluecode graph scope, not a full side-effect-free EventGraph scan",
+        ],
+    }
+
+
+@register_tool("bluecode_apply", "Applies bluecode statements as union-only Blueprint graph edits.")
+async def bluecode_apply(code: str, anchor: str = "end", mode: str = "append", member_classes: Dict[str, str] = None, action_handles: Dict[str, str] = None, action_hints: Dict[str, Dict[str, Any]] = None, expression_hints: Dict[str, Dict[str, Any]] = None, action_hints_by_line: List[Dict[str, Any]] = None, node_aliases: Dict[str, str] = None, aliases: Dict[str, str] = None, node_properties: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    if mode not in ("append", "upsert"):
+        return {"success": False, "error": "bluecode_apply supports mode='append' or mode='upsert' only"}
+
+    backend_payload: Dict[str, Any] = {
+        "subAction": "bluecode_apply",
+        "code": code,
+        "anchor": anchor,
+        "mode": mode,
+    }
+    for key, value in (
+        ("member_classes", member_classes),
+        ("action_handles", action_handles),
+        ("action_hints", action_hints),
+        ("expression_hints", expression_hints),
+        ("action_hints_by_line", action_hints_by_line),
+        ("node_aliases", node_aliases),
+        ("aliases", aliases),
+        ("node_properties", node_properties),
+    ):
+        if value is not None:
+            backend_payload[key] = value
+    return await conn.send_command("manage_blueprint_graph", backend_payload)
+
+
+@register_tool("bluecode_apply_variables", "Adds Blueprint variables as union-only bluecode data edits.")
+async def bluecode_apply_variables(variables: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    operations = []
+    for variable in variables or []:
+        payload = {
+            "subAction": "add_variable",
+            "name": variable.get("name"),
+            "type": variable.get("type"),
+        }
+        if variable.get("subType"):
+            payload["subType"] = variable.get("subType")
+        result = await conn.send_command("manage_blueprint_graph", payload)
+        operations.append({"variable": variable, "result": result})
+    return {
+        "success": all(_bluecode_ok(op.get("result")) for op in operations),
+        "applied_count": sum(1 for op in operations if _bluecode_ok(op.get("result"))),
+        "operations": operations,
+        "deleted_count": 0,
+    }
+
+
+@register_tool("bluecode_connect", "Adds explicit Blueprint pin connections as a BlueCode escape hatch.")
+async def bluecode_connect(connects: List[Any] = None, source: str = "", target: str = "", aliases: Dict[str, str] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    payload: Dict[str, Any] = {"subAction": "bluecode_connect"}
+    if connects is not None:
+        payload["connects"] = connects
+    elif source or target:
+        payload["connects"] = [{"source": source, "target": target}]
+    else:
+        payload["connects"] = []
+    if aliases:
+        payload["aliases"] = aliases
+    return await conn.send_command("manage_blueprint_graph", payload)
+
+
+@register_tool("bluecode_delete", "Explicitly deletes Blueprint bluecode targets with confirmation.")
+async def bluecode_delete(targets: List[Any], confirm_delete: bool = False, aliases: Dict[str, str] = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    if not confirm_delete:
+        return {"success": False, "error": "bluecode_delete requires confirm_delete=true"}
+
+    conn = get_unreal_connection()
+    payload: Dict[str, Any] = {
+        "subAction": "bluecode_delete",
+        "targets": targets or [],
+        "confirm_delete": True,
+    }
+    if aliases:
+        payload["aliases"] = aliases
+    return await conn.send_command("manage_blueprint_graph", payload)
+
+
+@register_tool("bluecode_compile", "Compiles and saves the active Blueprint, returning concise diagnostics.")
+async def bluecode_compile(blueprint_name: str = None) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    return await conn.send_command("compile_blueprint", {"blueprint_name": blueprint_name})
+
+
+@register_tool("bluecode_search_nodes", "Searches context-valid Blueprint menu nodes and returns stable action handles.")
+async def bluecode_search_nodes(query: str = "", category: str = "", node_class: str = "", node_class_path: str = "", max_count: int = 50, include_pins: bool = False, context_sensitive: bool = True, exact: bool = False) -> Dict[str, Any]:
+    """
+    (Description loaded from prompts.json)
+    """
+    conn = get_unreal_connection()
+    payload = {
+        "subAction": "bluecode_search_nodes",
+        "query": query,
+        "max_count": max_count,
+        "include_pins": include_pins,
+        "context_sensitive": context_sensitive,
+        "exact": exact
+    }
+    if category:
+        payload["category"] = category
+    if node_class:
+        payload["node_class"] = node_class
+    if node_class_path:
+        payload["node_class_path"] = node_class_path
+    return await conn.send_command("manage_blueprint_graph", payload)
+
+
 @register_tool("add_step", "Adds an Executable Node to the current Program Counter.")
-async def add_step(name: str, args: List[Any] = None, comment: str = None, input_wires: Dict[str, Any] = None, member_class: str = None) -> Dict[str, Any]:
+async def add_step(name: str = "", args: List[Any] = None, comment: str = None, input_wires: Dict[str, Any] = None, member_class: str = None, action_handle: str = "", category: str = "", node_class: str = "") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -860,12 +1568,19 @@ async def add_step(name: str, args: List[Any] = None, comment: str = None, input
     if member_class:
         payload["memberClass"] = member_class
 
+    if action_handle:
+        payload["action_handle"] = action_handle
+    if category:
+        payload["category"] = category
+    if node_class:
+        payload["node_class"] = node_class
+
     # We reuse 'manage_blueprint_graph' for all graph ops
     return await conn.send_command("manage_blueprint_graph", payload)
 
 
 @register_tool("prepare_value", "Places a Non-Executable Data Node (e.g. variable getter, literal).")
-async def prepare_value(name: str, args: List[Any] = None) -> Dict[str, Any]:
+async def prepare_value(name: str = "", args: List[Any] = None, action_handle: str = "", category: str = "", node_class: str = "") -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
@@ -879,6 +1594,12 @@ async def prepare_value(name: str, args: List[Any] = None) -> Dict[str, Any]:
     }
     if args:
         payload["extraArgs"] = args
+    if action_handle:
+        payload["action_handle"] = action_handle
+    if category:
+        payload["category"] = category
+    if node_class:
+        payload["node_class"] = node_class
         
     return await conn.send_command("manage_blueprint_graph", payload)
 
@@ -1254,15 +1975,6 @@ async def material_set_node_properties(handle: str, properties: Dict[str, Any]) 
     material_client = UMGMaterial.UMGMaterial(conn)
     return await material_client.set_node_properties(handle, properties)
 
-@register_tool("material_compile_asset", "Submit changes and analyze HLSL compilation errors.")
-async def material_compile_asset() -> Dict[str, Any]:
-    """
-    (Description loaded from prompts.json)
-    """
-    conn = get_unreal_connection()
-    material_client = UMGMaterial.UMGMaterial(conn)
-    return await material_client.compile_asset()
-
 @register_tool("material_get_pins", "Introspects the available pins for a given node or 'Master'.")
 async def material_get_pins(handle: str) -> Dict[str, Any]:
     """
@@ -1354,7 +2066,7 @@ async def hlsl_delete_output(names: List[str], confirm_delete: bool = False) -> 
     return await material_client.hlsl_delete_output(names, confirm_delete)
 
 
-@register_tool("hlsl_compile", "Compile current HLSL material target and return concise diagnostics.")
+@register_tool("hlsl_compile", "Compile and save current HLSL material target and return concise diagnostics.")
 async def hlsl_compile() -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)

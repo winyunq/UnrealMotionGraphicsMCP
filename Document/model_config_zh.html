@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1. 模型配置指南 - UMG MCP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#030712',
+                            card: '#0b0f19',
+                            border: '#1e293b',
+                            neonBlue: '#00f0ff',
+                            neonPurple: '#d946ef',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #0d1527 0%, #030712 100%);
+        }
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-border-hover:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .sidebar-link-active {
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(217, 70, 239, 0.02) 100%);
+            border-left: 3px solid #00f0ff;
+            color: #00f0ff;
+        }
+        code {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex">
+
+    <!-- 侧边栏 Sidebar -->
+    <aside class="w-80 glass-panel border-r border-slate-800 flex flex-col shrink-0">
+        <!-- Logo / Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-cyan-500 to-fuchsia-500 p-[2px]">
+                    <div class="w-full h-full bg-cyber-bg rounded-[6px] flex items-center justify-center">
+                        <i data-lucide="layout" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-cyber-text tracking-wide text-lg">UMG MCP</h1>
+                    <p class="text-xs text-slate-500">Winyunq 终极智造</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between text-sm">
+            <span class="text-slate-500">语言 / Language</span>
+            <a href="model_config.html" class="flex items-center space-x-1 text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                <span>English</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="index_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 transition-all">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span>快速开始 / 导航厅</span>
+            </a>
+            <div class="pt-4 pb-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">核心主题</div>
+            <a href="model_config_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-all font-medium sidebar-link-active">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>1. 怎么配置模型 (四选一)</span>
+            </a>
+            <a href="chat_dialogue_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span>2. 怎么对话 (4种Agent)</span>
+            </a>
+            <a href="mcp_support_zh.html" class="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-slate-400 hover:text-cyan-400 hover:bg-slate-900/40 border-l-3 border-transparent transition-all">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>3. 支持哪些 MCP (C++)</span>
+            </a>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-slate-800">
+            <div class="text-xs text-slate-500">
+                <p>© 2026 Winyunq. 保留所有权利。</p>
+                <p class="mt-1 flex items-center text-slate-600">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i>
+                    双回路极速直连安全保护
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 Main Content -->
+    <main class="flex-1 overflow-y-auto flex flex-col min-w-0">
+        <!-- Top bar -->
+        <header class="h-20 border-b border-slate-800 flex items-center justify-between px-10 shrink-0 bg-cyber-bg/30 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="text-slate-500">Official Docs</span>
+                <span class="text-slate-500">/</span>
+                <span class="text-slate-400 text-sm">模型配置</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <p class="text-xs text-slate-500">硬件状态</p>
+                    <p class="text-xs text-fuchsia-400 font-semibold">i9-13900HX | RTX 4060 | 64GB</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="px-10 py-12 max-w-5xl w-full mx-auto space-y-12">
+            <!-- Header -->
+            <div class="space-y-4">
+                <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center">
+                    <i data-lucide="sliders" class="w-8 h-8 text-cyan-400 mr-3"></i>
+                    第一章：怎么配置模型（平行四选一）
+                </h2>
+                <p class="text-slate-400 text-base leading-relaxed">
+                    在 UMG MCP 中，为了让 AI 完美编织 UI，我们设计了四种平行的模型接入机制。您可以根据开发者的实际部署情况（如本地计算或远程 API），在虚幻编辑器的 <code class="text-cyan-400 bg-slate-900/50 px-1 py-0.5 rounded">Project Settings -> Unreal Motion Graphics MCP</code> 中进行一键配置。
+                </p>
+            </div>
+
+            <!-- 四种配置模式 -->
+            <div class="space-y-8">
+                <h3 class="text-xl font-bold text-white flex items-center border-b border-slate-800 pb-3">
+                    <i data-lucide="layers" class="w-5 h-5 text-fuchsia-400 mr-2"></i>
+                    1. 四大平行配置模式详解
+                </h3>
+
+                <div class="grid grid-cols-1 gap-6">
+                    <!-- Mode 1 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <span class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center mr-3 text-sm font-semibold">01</span>
+                                本地大模型 (LiteRT-LM)
+                            </h4>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">内置免梯</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>运作原理：</strong> 开启此选项（设置 <code class="text-fuchsia-400">bEnableLiteRtLm = true</code>）后，插件将直接拉起内置的 C++ LiteRT 推理引擎。它直接加载保存在插件 <code class="text-fuchsia-400">Resources/Models</code> 目录下的本地模型文件（例如 <code class="text-cyan-400">gemma-4-E2B-it.litertlm</code>）。
+                        </p>
+                        <div class="bg-slate-900/60 rounded-lg p-4 border border-slate-800/80 text-xs leading-relaxed space-y-2">
+                            <p class="text-slate-400"><strong>🛠️ Winyunq 硬件调优建议：</strong></p>
+                            <p>得益于您强大的 <strong>i9-13900HX CPU</strong> 与 <strong>RTX 4060 GPU</strong> 硬件：</p>
+                            <ul class="list-disc pl-4 text-slate-400 space-y-1">
+                                <li>建议将 <code class="text-fuchsia-400">LocalModelContextLength</code>（上下文长度）设为 <strong>65536</strong>。</li>
+                                <li>将 <code class="text-fuchsia-400">LocalModelPrefillChunkSize</code> 设为 <strong>4096</strong>，以发挥 RTX 4060 大吞吐并行的优势，保障流畅的生成体验。</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Mode 2 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <span class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center mr-3 text-sm font-semibold">02</span>
+                                Google 登录账号 (AuthLogin)
+                            </h4>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">一键云连</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>运作原理：</strong> 选择此供应商后，通过虚幻内置的 <code class="text-fuchsia-400">UUmgMcpAuthenticationSubsystem</code> 调起 Google OAuth 2.0 登录流程，完成账号安全授权。插件将直接通过网络请求获取临时的 Access Token 进行鉴权，无缝直连 Google Gemini API，免去手动输入 API Key 的琐碎流程。
+                        </p>
+                    </div>
+
+                    <!-- Mode 3 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <span class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center mr-3 text-sm font-semibold">03</span>
+                                API 密钥配置 (ApiKey)
+                            </h4>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">高阶自定义</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>运作原理：</strong> 支持配置多组远程大模型平台。系统自带 <strong>Google</strong> (Gemini API)、<strong>ZhipuAI</strong> (智谱 AI) 预设，并支持 <strong>Custom</strong> 模式（可填入任意符合 OpenAI 协议的自定义 Endpoint，如 DeepSeek、本地 OneAPI/LM-Studio 后端）。支持模型配置的多 Tag 调度路由。
+                        </p>
+                    </div>
+
+                    <!-- Mode 4 -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-lg font-bold text-white flex items-center">
+                                <span class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center mr-3 text-sm font-semibold">04</span>
+                                本地命令行 (Local CLI)
+                            </h4>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20">管道直通</span>
+                        </div>
+                        <p class="text-sm text-slate-400 leading-relaxed">
+                            <strong>运作原理：</strong> 专为极致的脚本极客设计。设置首选供应商为 CLI 模式，并在 <code class="text-fuchsia-400">LocalCliCommand</code> 中配置可执行文件名。插件在推进会话时，将在后台启动此控制台进程，以标准输入输出 (StdIn/StdOut) 的管道方式接收和回传大模型数据，实现最底层的完全控制。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Key 专属高阶说明 -->
+            <div class="space-y-6">
+                <h3 class="text-xl font-bold text-white flex items-center border-b border-slate-800 pb-3">
+                    <i data-lucide="shield-alert" class="w-5 h-5 text-cyan-400 mr-2"></i>
+                    🔐 API Key 安全防护与非 Git 持久化原理
+                </h3>
+
+                <div class="glass-panel rounded-xl p-8 border border-slate-800 space-y-6 relative overflow-hidden">
+                    <div class="absolute -right-24 -bottom-24 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                    
+                    <p class="text-slate-300 text-sm leading-relaxed">
+                        在团队协作中，最常见的灾难就是**误将包含个人或公司付费 API Key 的配置文件提交到公共 Git 仓库**，导致巨额账单泄露。为此，UMG MCP 插件在底层完美结合了虚幻引擎的安全特性，设计了物理隔离的双重防泄露机制：
+                    </p>
+
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="w-6 h-6 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                                <i data-lucide="eye-off" class="w-3.5 h-3.5 text-fuchsia-400"></i>
+                            </div>
+                            <div>
+                                <h5 class="text-white font-bold text-sm">属性脱敏：<code class="text-cyan-400">meta=(Password=true)</code></h5>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    在 `UmgMcpSettings.h` 源码中，API 密钥定义为 <code class="text-fuchsia-400">meta=(Password=true)</code>。这使得虚幻编辑器在 Details 面板展示此属性时，会自动对其执行密码圆点脱敏遮罩，防窥防屏录。
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start space-x-3">
+                            <div class="w-6 h-6 rounded bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                                <i data-lucide="lock" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            </div>
+                            <div>
+                                <h5 class="text-white font-bold text-sm">非 Git 持久化路径：<code class="text-cyan-400">Saved/Config/WindowsEditor/Editor.ini</code></h5>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    该配置类声明为 <code class="text-fuchsia-400">UCLASS(Config = Editor, DefaultConfig)</code>，但所有的 API Key 数据均存放在由 <code class="text-fuchsia-400">UPROPERTY(Config)</code> 修饰的运行时字段中。这表明：
+                                </p>
+                                <ul class="list-disc pl-5 text-xs text-slate-400 mt-2 space-y-1">
+                                    <li>当您在编辑器中输入并保存配置时，它**绝不**会写入项目的 <code class="text-fuchsia-400">Config/DefaultEditor.ini</code>（该文件通常需要提交至 Git 跟踪）；</li>
+                                    <li>而是自动持久化在项目根目录下的 <code class="text-fuchsia-400">Saved/Config/WindowsEditor/Editor.ini</code> 本地缓存中。</li>
+                                    <li>根据虚幻的工业标准，整个 <code class="text-cyan-400">Saved/</code> 目录在 Git 的 <code class="text-cyan-400">.gitignore</code> 中是**默认且强制物理屏蔽**的！</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 物理占位截图卡片 Placeholder -->
+            <div class="space-y-4">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase tracking-wider font-mono">📸 物理截图占位（双击此卡片查看截图详情）</h4>
+                <div class="border-2 border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
+                    <i data-lucide="image" class="w-8 h-8 text-slate-600 mx-auto mb-3"></i>
+                    <p class="text-sm text-slate-400 font-semibold">[IMAGE_PLACEHOLDER: Unreal Settings - DeveloperSettings Tab for Unreal Motion Graphics MCP]</p>
+                    <p class="text-xs text-slate-600 mt-1">请运行虚幻编辑器，打开项目设置，截图“Unreal Motion Graphics MCP”属性窗口并替换此占位。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

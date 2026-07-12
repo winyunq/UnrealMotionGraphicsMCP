@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EdGraph/EdGraphPin.h"
 #include "Json.h"
 
 // Forward declarations

@@ -7,6 +7,8 @@
 #include "Materials/MaterialExpression.h"
 #include "UmgMcpMaterialSubsystem.generated.h"
 
+class FJsonObject;
+
 /**
  * @brief       UMGMCP 材质操控子系统
  * 
@@ -142,8 +144,8 @@ public:
     bool SetOutputNode(const FString& NodeHandle);
 
     /**
-     * @brief       编译并保存材质
-     * 
+     * @brief       编译材质
+     *
      * @return      编译状态/错误信息                       数据类型:        FString
      **/
     FString CompileAsset();

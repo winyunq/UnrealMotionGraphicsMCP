@@ -6,6 +6,7 @@
 #include "UmgAttentionSubsystem.generated.h"
 
 class UWidgetBlueprint;
+class UBlueprint;
 
 /**
  * @brief Manages the "attention" or context for AI-driven UMG operations.
@@ -54,6 +55,12 @@ public:
      * @return bool True if the asset was successfully found or created, False if invalid path or error.
 	 */
 	bool SetTargetUmgAsset(const FString& AssetPath);
+
+    /** Sets an existing Widget, Actor, Object, or other Blueprint asset as the BlueCode target. */
+    bool SetTargetBlueprintAsset(const FString& AssetPath);
+
+    /** Returns the generic Blueprint target used by BlueCode and Blueprint commands. */
+    UBlueprint* GetCachedTargetBlueprint() const;
 
     /**
      * Gets the cached UWidgetBlueprint object.
@@ -127,11 +134,12 @@ public:
 private:
 	void HandleAssetOpened(UObject* Asset, class IAssetEditorInstance* EditorInstance);
 
-	// The asset path of the UMG widget blueprint that is the current focus of attention (for conversation context).
+	// The asset path of the Blueprint that is the current focus of attention.
 	FString AttentionTargetAssetPath;
 
-    // A weak pointer to the actual loaded UMG asset (for performance).
-    TWeakObjectPtr<UWidgetBlueprint> CachedTargetWidgetBlueprint;
+    // Generic cache used by BlueCode. UMG-only systems request a checked cast through
+    // GetCachedTargetWidgetBlueprint rather than constraining the shared target model.
+    TWeakObjectPtr<UBlueprint> CachedTargetBlueprint;
 
 	// The name of the animation currently in focus.
 	FString CurrentAnimationName;
@@ -146,4 +154,7 @@ private:
 
 protected:
 	TArray<FString> UmgAssetHistory;
+
+private:
+    bool SetTargetBlueprintAssetInternal(const FString& AssetPath, bool bAllowCreateWidget);
 };

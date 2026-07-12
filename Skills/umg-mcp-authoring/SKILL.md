@@ -41,12 +41,28 @@ For the five-system login demo and concrete script workflow, read [login-demo.md
    - Read back with `animation_overview` or `animation_time_properties`; do not trust write responses alone.
    - Treat `get_animation_keyframes`, `get_animation_full_data`, `set_property_keys`, `remove_property_track`, and `remove_keys` as hidden compatibility commands, not default authoring tools.
 
-6. Wire Blueprint only at the current semantic level.
-   - Use `set_edit_function("WidgetName.EventName")` for component event scope.
-   - Use `add_step` for simple executable calls such as `PrintString`.
-   - Use `get_function_nodes` only as a minimal sanity check; it is still node-shaped and not the desired long-term semantic Blueprint read protocol.
-   - Do not use `delete_node` or `delete_variable` from the compatibility backend; default Blueprint MCP hides them until deletion is hardened with `confirm_delete=true`.
-   - For bluecode design work, read `Document/BlueprintBluecodeProtocol.md` and treat it as a draft target, not an implemented tool set.
+6. Wire Blueprint through BlueCode.
+   - Use `bluecode_set_function("WidgetName.EventName")` for component event scope.
+   - Read with `bluecode_read_function`, `bluecode_read_variables`, and `bluecode_read_events`; use `detail="debug"` or `include_connections=true` only when node IDs, pins, or edges are needed.
+   - Preserve `bluecode_read_function.action_hints`, `expression_hints`, and `action_hints_by_line` when editing readback code; pass them back to `bluecode_apply` so custom, plugin, macro, duplicate, nested expression, or ambiguous nodes keep their exact Action Menu mapping. These hints include pin/link evidence for round trips beyond the compact code text.
+   - When editing a readback line, keep the corresponding hint. Hints with `node_id` cause `bluecode_apply` to update the existing node's supplied input pins/defaults instead of appending a duplicate node, including variable-set and Branch nodes; `Pin=A+B` and `Pin=value("Select", ...)` can create data expression nodes for that existing pin. Unmentioned pins and links are preserved.
+   - When reconnecting or deleting edges, read `connections` via `detail="debug"` or `include_connections=true`; use each entry's `connect` as a `bluecode_connect` reference and `delete_target` as a `bluecode_delete(..., confirm_delete=true)` target.
+   - Write with `bluecode_apply` and `bluecode_apply_variables`; writes are union-only and must not delete omitted graph content. Use `FunctionName(Pin=value, ...)` for normal calls, `node("Action Menu Name", Pin=value, ...)` for generic exec/action nodes, and `value("Action Menu Name", Pin=value, ...)` for pure/data nodes.
+   - Pin names in `Pin=value` and `bluecode_connect` endpoints may use internal pin names, editor display names, or FriendlyName. When omitting an endpoint pin, rely on automatic resolution only if the node has one matching data input/output.
+   - Pin values may be strings, numbers, booleans, or structured objects such as `{path:"/Game/..."}`, `{class:"/Script/..."}`, `{object:"..."}`, `{text:"..."}`, or `{literal:"(X=0,Y=0)"}`. Check `input_warnings` after writes.
+   - Pin values may also be data expressions: `Pin=value("Select", Index=ActiveIndex)`, `Pin=PureFunction(A, B)`, or `Pin=A + B`. These create pure/data nodes and connect their compatible output.
+   - For custom pure/data expression nodes, pass action hints for the inner expression as well, using the inner Action Menu name or full expression key, such as `expression_hints={"My Custom Pure": {...}}` for `Pin=value("My Custom Pure", Input=A)`. Readback returns these dependency hints in `expression_hints`, mirrors them into `action_hints`, and `bluecode_apply` accepts either object directly.
+   - If a custom, plugin, or macro node stores behavior in UObject node properties rather than pins, pass `node_properties` to `bluecode_apply` using the same statement/name keys as `action_hints`, or put `node_properties`/`properties` inside the matching hint object. Treat `operations[].result.node_properties.failures` as a failed semantic write.
+   - If a data expression cannot connect to the target pin, the temporary expression nodes are rolled back and the reason appears in `input_warnings`.
+   - Variable-input nodes that implement UE's native add-pin interface can grow before BlueCode writes values, such as `value("Make Array", 0=First, 1=Second, 2=Third)` or multi-input math nodes. Array-style pins accept either `[0]` or `0`.
+   - `Format Text` is preconfigured from its `Format` pin before the rest of the inputs are applied, so `value("Format Text", Format="Hello {Name}", Name=PlayerName)` can generate the `Name` argument pin.
+   - Treat `input_warnings` as write feedback that must be read and handled; warnings mean part of the requested semantic write did not map cleanly.
+   - Add `alias=Name` inside `bluecode_apply` statements, or pass `node_aliases`, when newly created nodes must be referenced later. Pass the returned `aliases` map into `bluecode_connect` and use `Name:Pin` endpoints.
+   - Treat each successful `bluecode_apply.operations[].result` as immediate context for the next operation: it returns `nodeId`/`node_id`, node title/class, `is_exec`, `pin_counts`, and `inputs`/`outputs` pin evidence using the same endpoint format as readback hints.
+   - Use `bluecode_connect` only when a complex custom, plugin, or macro node needs explicit pin links that cannot be inferred from `bluecode_apply` inputs. Treat it as union-only connection append, not as a reconnect/delete tool.
+   - For custom, plugin, macro, or ambiguous nodes, call `bluecode_search_nodes` first and pass its returned `handle` as an `action_handle`, or place the returned search result object directly in `bluecode_apply.action_hints` so `signature/category/node_class/node_class_path` remain available for fallback matching. Use `is_exec` to choose `node(...)` versus `value(...)`; use `include_pins=true` only when `pin_counts` is not enough.
+   - Delete nodes, variables, or existing pin connections only with `bluecode_delete(..., confirm_delete=true)`. For connection deletes, use `{"kind":"connection","source":"NodeA:Then","target":"NodeB:Execute"}` or `"NodeA:Then -> NodeB:Execute"`; if a node pair has multiple links, provide the exact pin names instead of guessing.
+   - Treat `add_step`, `prepare_value`, `connect_data_to_pin`, `get_function_nodes`, `delete_node`, and `delete_variable` as backend compatibility tools, not default authoring tools.
 
 7. Validate with read operations.
    - Use `get_widget_tree` after structure writes.
@@ -56,7 +72,7 @@ For the five-system login demo and concrete script workflow, read [login-demo.md
 
 ## Blueprint Direction
 
-Treat current Blueprint MCP as transitional. The long-term target is semantic/code-like Blueprint read/write, not raw node dumps. Node-level reads should be compressed into intent such as events, variables, calls, branches, bindings, and data dependencies.
+Treat BlueCode as the default Blueprint MCP direction. The target is semantic/code-like Blueprint read/write, not raw node dumps. Node-level reads should be compressed into intent such as events, variables, calls, branches, bindings, and data dependencies.
 
 Useful reference directions:
 

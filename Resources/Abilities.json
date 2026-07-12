@@ -1,0 +1,38 @@
+{
+    "abilities": [
+        {
+            "id": "long_conversation_compression",
+            "name": "长对话历史压缩",
+            "description": "自动summarize历史消息，减少上下文长度",
+            "cost_warning": "⚠️ 代价：可能丢失过去的重要细节，需要手动查询历史对话",
+            "default_enabled": false,
+            "affected_tools": [],
+            "category": "Conversation",
+            "icon": "📦"
+        },
+        {
+            "id": "focus_current_umg",
+            "name": "聚焦当前UMG",
+            "description": "限制AI只能编辑当前打开的UMG文件，无法切换target",
+            "cost_warning": "",
+            "default_enabled": true,
+            "affected_tools": [
+                "set_target_umg_asset"
+            ],
+            "category": "Target",
+            "exclusive_group": "target_control",
+            "icon": "📌"
+        },
+        {
+            "id": "follow_ai_target",
+            "name": "跟随AI目标",
+            "description": "允许AI自由切换编辑文件，编辑器镜头自动跟随",
+            "cost_warning": "⚠️ 代价：可能迷失AI正在编辑什么文件",
+            "default_enabled": false,
+            "affected_tools": [],
+            "category": "Target",
+            "exclusive_group": "target_control",
+            "icon": "🎯"
+        }
+    ]
+}
