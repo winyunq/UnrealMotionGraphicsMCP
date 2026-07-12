@@ -176,9 +176,11 @@ void UUmgMcpBridge::StartServer()
         return;
     }
 
-    // Allow address reuse for quick restarts
-    // Note: We are keeping this ENABLED as it is standard practice, but we are aware it can cause SE_EACCES on Windows if port is excluded.
-    NewListenerSocket->SetReuseAddr(true);
+    // A shared listener port must have exactly one owner. On Windows, SO_REUSEADDR
+    // can let multiple editor processes bind the same endpoint and makes discovery
+    // records route clients to the wrong UE instance. A failed exclusive bind is
+    // intentional here: it activates the ephemeral-port fallback below.
+    NewListenerSocket->SetReuseAddr(false);
     NewListenerSocket->SetNonBlocking(true);
 
     // Bind to address
