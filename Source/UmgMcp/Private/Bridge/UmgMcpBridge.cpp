@@ -63,12 +63,32 @@
 #include "Material/UmgMcpMaterialCommands.h" // Add Material Commands
 #include "Blueprint/UmgBlueprintFunctionSubsystem.h"
 #include "FileManage/UmgAttentionSubsystem.h"
+#include "Material/UmgMcpMaterialSubsystem.h"
+#include "Misc/Guid.h"
+#include "Misc/DateTime.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/PlatformMisc.h"
 
-
+namespace
+{
+bool IsTargetIndependentCommand(const FString& CommandType)
+{
+    return CommandType == TEXT("ping") ||
+        CommandType == TEXT("get_widget_schema") ||
+        CommandType == TEXT("get_last_edited_umg_asset") ||
+        CommandType == TEXT("get_recently_edited_umg_assets") ||
+        CommandType == TEXT("list_assets");
+}
+}
 
 UUmgMcpBridge::UUmgMcpBridge()
 {
     bCommandQueueProcessing = false;
+    ServerRunnable = nullptr;
+    NextSequence = 0;
+    ServerInstanceId = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower);
     AttentionCommands = MakeShared<FUmgMcpAttentionCommands>();
     WidgetCommands = MakeShared<FUmgMcpWidgetCommands>();
     FileTransformationCommands = MakeShared<FUmgMcpFileTransformationCommands>();
@@ -98,6 +118,7 @@ void UUmgMcpBridge::Initialize(FSubsystemCollectionBase& Collection)
     ListenerSocket = nullptr;
     ConnectionSocket = nullptr;
     ServerThread = nullptr;
+    ServerRunnable = nullptr;
     Port = MCP_SERVER_PORT_DEFAULT;
     bCommandQueueProcessing = false;
     FIPv4Address::Parse(MCP_SERVER_HOST_DEFAULT, ServerAddress);
@@ -142,7 +163,12 @@ void UUmgMcpBridge::StartServer()
     }
 
     // Create listener socket
-    TSharedPtr<FSocket> NewListenerSocket = MakeShareable(SocketSubsystem->CreateSocket(NAME_Stream, TEXT("UnrealMCPListener"), false));
+    TSharedPtr<FSocket> NewListenerSocket = MakeShareable(
+        SocketSubsystem->CreateSocket(NAME_Stream, TEXT("UnrealMCPListener"), false),
+        [](FSocket* Socket)
+        {
+            if (Socket) ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(Socket);
+        });
     if (!NewListenerSocket.IsValid())
     {
         UE_LOG(LogUmgMcp, Error, TEXT("UmgMcpBridge: Failed to create listener socket: %s"), SocketSubsystem->GetSocketError(SocketSubsystem->GetLastErrorCode()));
@@ -174,7 +200,18 @@ void UUmgMcpBridge::StartServer()
             UE_LOG(LogUmgMcp, Error, TEXT("UmgMcpBridge: Port %d is already in use by another process."), Port);
         }
         
-        return;
+        // Multiple UE editor instances are a supported topology. If the well-known
+        // default is occupied, ask the OS for an ephemeral port instead of disabling MCP.
+        FIPv4Endpoint DynamicEndpoint(ServerAddress, 0);
+        if (!NewListenerSocket->Bind(*DynamicEndpoint.ToInternetAddr()))
+        {
+            return;
+        }
+
+        TSharedRef<FInternetAddr> BoundAddress = SocketSubsystem->CreateInternetAddr();
+        NewListenerSocket->GetAddress(*BoundAddress);
+        Port = BoundAddress->GetPort();
+        UE_LOG(LogUmgMcp, Warning, TEXT("UmgMcpBridge: Default port unavailable; bound dynamic port %d."), Port);
     }
 
     // Start listening
@@ -192,9 +229,26 @@ void UUmgMcpBridge::StartServer()
     bGlobalServerStarted = true; // Set global flag
     UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Server started successfully on %s:%d"), *ServerAddress.ToString(), Port);
 
+    // Publish a small discovery record. Clients validate records with server_info, so a
+    // stale file after a crash is harmless and will be ignored.
+    const FString DiscoveryDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("UmgMcp"), TEXT("instances"));
+    IFileManager::Get().MakeDirectory(*DiscoveryDir, true);
+    DiscoveryFilePath = FPaths::Combine(DiscoveryDir, ServerInstanceId + TEXT(".json"));
+    TSharedRef<FJsonObject> Discovery = MakeShared<FJsonObject>();
+    Discovery->SetStringField(TEXT("server_instance_id"), ServerInstanceId);
+    Discovery->SetStringField(TEXT("host"), ServerAddress.ToString());
+    Discovery->SetNumberField(TEXT("port"), Port);
+    Discovery->SetStringField(TEXT("project"), FApp::GetProjectName());
+    Discovery->SetNumberField(TEXT("process_id"), FPlatformProcess::GetCurrentProcessId());
+    Discovery->SetStringField(TEXT("started_at"), FDateTime::UtcNow().ToIso8601());
+    FString DiscoveryJson;
+    FJsonSerializer::Serialize(Discovery, TJsonWriterFactory<>::Create(&DiscoveryJson));
+    FFileHelper::SaveStringToFile(DiscoveryJson, *DiscoveryFilePath);
+
     // Start server thread
+    ServerRunnable = new FMCPServerRunnable(this, ListenerSocket);
     ServerThread = FRunnableThread::Create(
-        new FMCPServerRunnable(this, ListenerSocket),
+        ServerRunnable,
         TEXT("UnrealMCPServerThread"),
         0, TPri_Normal
     );
@@ -217,42 +271,83 @@ void UUmgMcpBridge::StopServer()
 
     bIsRunning = false;
     bGlobalServerStarted = false; // Reset global flag
-    bCommandQueueProcessing = false;
+    {
+        // Deinitialization runs on the Game Thread. Wake every socket worker before
+        // waiting for it, otherwise a worker waiting on a queued editor command could
+        // deadlock editor shutdown.
+        FScopeLock CommandLock(&CommandQueueCs);
+        for (const TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe>& Pending : CommandQueue)
+        {
+            if (Pending.IsValid())
+            {
+                Pending->Response = MakeErrorResponse(TEXT("UmgMcp server is shutting down."), TEXT("server_stopping"));
+                if (Pending->CompletionEvent) Pending->CompletionEvent->Trigger();
+            }
+        }
+        CommandQueue.Empty();
+        bCommandQueueProcessing = false;
+    }
 
     // Clean up thread
     if (ServerThread)
     {
-        ServerThread->Kill(true);
+        if (ServerRunnable)
+        {
+            ServerRunnable->Stop();
+        }
+        ServerThread->WaitForCompletion();
         delete ServerThread;
         ServerThread = nullptr;
     }
+    delete ServerRunnable;
+    ServerRunnable = nullptr;
 
     // Close sockets
     if (ConnectionSocket.IsValid())
     {
-        ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ConnectionSocket.Get());
+        ConnectionSocket->Close();
         ConnectionSocket.Reset();
     }
 
     if (ListenerSocket.IsValid())
     {
-        ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ListenerSocket.Get());
+        ListenerSocket->Close();
         ListenerSocket.Reset();
+    }
+
+    if (!DiscoveryFilePath.IsEmpty())
+    {
+        IFileManager::Get().Delete(*DiscoveryFilePath, false, true);
+        DiscoveryFilePath.Empty();
     }
 
     UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Server stopped"));
 }
 
 // Execute a command received from a client
-FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
+FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params,
+    const FString& InClientId, const FString& InRequestId, const FString& RawRequestJson)
 {
     UE_LOG(LogUmgMcp, Display, TEXT("UmgMcpBridge: Received command: %s"), *CommandType);
+
+    if (!bIsRunning && !IsInGameThread())
+    {
+        return MakeErrorResponse(TEXT("UmgMcp server is not running."), TEXT("server_stopped"));
+    }
     
     // If we are already on the GameThread (e.g. internal call or test), execute directly
     if (IsInGameThread())
     {
         UE_LOG(LogUmgMcp, Verbose, TEXT("UmgMcpBridge: Already on GameThread, executing directly."));
-        return InternalExecuteCommand(CommandType, Params);
+        TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe> Direct = MakeShared<FQueuedBridgeCommand, ESPMode::ThreadSafe>();
+        Direct->CommandType = CommandType;
+        Direct->Params = Params;
+        Direct->ClientId = InClientId.IsEmpty() ? TEXT("legacy") : InClientId;
+        Direct->RequestId = InRequestId.IsEmpty() ? FGuid::NewGuid().ToString(EGuidFormats::Digits) : InRequestId;
+        Direct->RawRequestJson = RawRequestJson;
+        Direct->Sequence = ++NextSequence;
+        Direct->EnqueuedAt = FPlatformTime::Seconds();
+        return ExecuteQueuedCommand(Direct);
     }
     
     // Otherwise, queue execution on Game Thread and wait
@@ -276,16 +371,38 @@ FString UUmgMcpBridge::ExecuteCommand(const FString& CommandType, const TSharedP
     QueuedCommand->CommandType = CommandType;
     QueuedCommand->Params = Params;
     QueuedCommand->CompletionEvent = CompletionEvent;
+    QueuedCommand->ClientId = InClientId.IsEmpty() ? TEXT("legacy") : InClientId;
+    QueuedCommand->RequestId = InRequestId.IsEmpty() ? FGuid::NewGuid().ToString(EGuidFormats::Digits) : InRequestId;
+    QueuedCommand->RawRequestJson = RawRequestJson;
+    QueuedCommand->Sequence = ++NextSequence;
+    QueuedCommand->EnqueuedAt = FPlatformTime::Seconds();
+
+    AddDebugRecord(*QueuedCommand, TEXT("queued"), TEXT(""), 0.0);
 
     bool bShouldScheduleProcessor = false;
+    bool bRejectedDuringShutdown = false;
     {
         FScopeLock CommandLock(&CommandQueueCs);
-        CommandQueue.Add(QueuedCommand);
-        if (!bCommandQueueProcessing)
+        if (!bIsRunning)
         {
-            bCommandQueueProcessing = true;
-            bShouldScheduleProcessor = true;
+            bRejectedDuringShutdown = true;
         }
+        else
+        {
+            CommandQueue.Add(QueuedCommand);
+            if (!bCommandQueueProcessing)
+            {
+                bCommandQueueProcessing = true;
+                bShouldScheduleProcessor = true;
+            }
+        }
+    }
+
+    if (bRejectedDuringShutdown)
+    {
+        FPlatformProcess::ReturnSynchEventToPool(CompletionEvent);
+        QueuedCommand->CompletionEvent = nullptr;
+        return MakeErrorResponse(TEXT("UmgMcp server is shutting down."), TEXT("server_stopping"));
     }
 
     if (bShouldScheduleProcessor)
@@ -322,7 +439,7 @@ void UUmgMcpBridge::ProcessNextQueuedCommand()
 
     if (QueuedCommand.IsValid())
     {
-        QueuedCommand->Response = InternalExecuteCommand(QueuedCommand->CommandType, QueuedCommand->Params);
+        QueuedCommand->Response = ExecuteQueuedCommand(QueuedCommand);
         if (QueuedCommand->CompletionEvent)
         {
             QueuedCommand->CompletionEvent->Trigger();
@@ -346,6 +463,331 @@ void UUmgMcpBridge::ProcessNextQueuedCommand()
             ProcessNextQueuedCommand();
         });
     }
+}
+
+FString UUmgMcpBridge::MakeErrorResponse(const FString& Error, const FString& Code) const
+{
+    TSharedRef<FJsonObject> Json = MakeShared<FJsonObject>();
+    Json->SetStringField(TEXT("status"), TEXT("error"));
+    Json->SetStringField(TEXT("error"), Error);
+    if (!Code.IsEmpty())
+    {
+        Json->SetStringField(TEXT("code"), Code);
+    }
+
+    FString Result;
+    FJsonSerializer::Serialize(Json, TJsonWriterFactory<>::Create(&Result));
+    return Result;
+}
+
+void UUmgMcpBridge::AddDebugRecord(const FQueuedBridgeCommand& Command, const FString& State, const FString& Response, double DurationMs)
+{
+    FMcpDebugRecord Record;
+    Record.Sequence = Command.Sequence;
+    Record.Time = FDateTime::Now().ToString(TEXT("%H:%M:%S.%s"));
+    Record.ClientId = Command.ClientId;
+    Record.RequestId = Command.RequestId;
+    Record.Command = Command.CommandType;
+    Record.RequestJson = Command.RawRequestJson;
+    Record.ResponseJson = Response;
+    Record.State = State;
+    Record.DurationMs = DurationMs;
+
+    FScopeLock Lock(&DebugRecordsCs);
+    // Replace the queued row when the same request reaches a terminal state.
+    const int32 Existing = DebugRecords.IndexOfByPredicate([&Record](const FMcpDebugRecord& Item)
+    {
+        return Item.Sequence == Record.Sequence;
+    });
+    if (Existing != INDEX_NONE)
+    {
+        DebugRecords[Existing] = MoveTemp(Record);
+    }
+    else
+    {
+        DebugRecords.Add(MoveTemp(Record));
+    }
+    constexpr int32 MaxDebugRecords = 500;
+    if (DebugRecords.Num() > MaxDebugRecords)
+    {
+        DebugRecords.RemoveAt(0, DebugRecords.Num() - MaxDebugRecords);
+    }
+}
+
+void UUmgMcpBridge::GetDebugRecords(TArray<FMcpDebugRecord>& OutRecords) const
+{
+    FScopeLock Lock(&DebugRecordsCs);
+    OutRecords = DebugRecords;
+}
+
+FString UUmgMcpBridge::ExecuteDebugMessage(const FString& Message)
+{
+    TSharedPtr<FJsonObject> Json;
+    if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Message), Json) || !Json.IsValid())
+    {
+        return MakeErrorResponse(TEXT("Debug request is not valid JSON."), TEXT("invalid_json"));
+    }
+
+    FString Command;
+    if (!Json->TryGetStringField(TEXT("command"), Command) || Command.IsEmpty())
+    {
+        return MakeErrorResponse(TEXT("Debug request is missing 'command'."), TEXT("missing_command"));
+    }
+
+    FString ClientId = TEXT("debug-ui");
+    FString RequestId;
+    Json->TryGetStringField(TEXT("client_id"), ClientId);
+    Json->TryGetStringField(TEXT("request_id"), RequestId);
+    TSharedPtr<FJsonObject> Params = MakeShared<FJsonObject>();
+    const TSharedPtr<FJsonValue> ParamsValue = Json->TryGetField(TEXT("params"));
+    if (ParamsValue.IsValid() && ParamsValue->Type == EJson::Object)
+    {
+        Params = ParamsValue->AsObject();
+    }
+    return ExecuteCommand(Command, Params, ClientId, RequestId, Message);
+}
+
+bool UUmgMcpBridge::RestoreSessionContext(const FString& ClientId, FString& OutError)
+{
+    if (ClientId.IsEmpty() || ClientId == TEXT("legacy") || !GEditor)
+    {
+        return true;
+    }
+
+    FConnectionSession Session;
+    {
+        FScopeLock Lock(&SessionCs);
+        const FConnectionSession* Existing = Sessions.Find(ClientId);
+        if (!Existing)
+        {
+            OutError = FString::Printf(TEXT("Client '%s' is not connected. Call connect first."), *ClientId);
+            return false;
+        }
+        Session = *Existing;
+    }
+
+    if (UUmgAttentionSubsystem* Attention = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+    {
+        if (!Session.TargetAsset.IsEmpty() && !Attention->SetTargetUmgAsset(Session.TargetAsset))
+        {
+            OutError = FString::Printf(TEXT("Could not restore target '%s' for client '%s'."), *Session.TargetAsset, *ClientId);
+            return false;
+        }
+        if (!Session.TargetWidget.IsEmpty()) Attention->SetTargetWidget(Session.TargetWidget);
+        Attention->SetTargetGraph(Session.TargetGraph);
+        Attention->SetCursorNode(Session.CursorNode);
+        Attention->SetTargetAnimation(Session.TargetAnimation);
+    }
+    if (!Session.TargetMaterial.IsEmpty())
+    {
+        if (UUmgMcpMaterialSubsystem* Material = GEditor->GetEditorSubsystem<UUmgMcpMaterialSubsystem>())
+        {
+            Material->SetTargetMaterial(Session.TargetMaterial, false);
+        }
+    }
+    return true;
+}
+
+void UUmgMcpBridge::CaptureSessionContext(const FString& ClientId)
+{
+    if (ClientId.IsEmpty() || ClientId == TEXT("legacy") || !GEditor)
+    {
+        return;
+    }
+
+    FScopeLock Lock(&SessionCs);
+    FConnectionSession* Session = Sessions.Find(ClientId);
+    if (!Session)
+    {
+        return;
+    }
+    if (UUmgAttentionSubsystem* Attention = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+    {
+        Session->TargetAsset = Attention->GetTargetUmgAsset();
+        Session->TargetWidget = Attention->GetTargetWidget();
+        Session->TargetGraph = Attention->GetTargetGraph();
+        Session->CursorNode = Attention->GetCursorNode();
+        Session->TargetAnimation = Attention->GetTargetAnimation();
+    }
+    if (UUmgMcpMaterialSubsystem* Material = GEditor->GetEditorSubsystem<UUmgMcpMaterialSubsystem>())
+    {
+        if (UMaterial* Target = Material->GetTargetMaterial())
+        {
+            Session->TargetMaterial = Target->GetPathName();
+        }
+    }
+    for (auto It = TargetOwners.CreateIterator(); It; ++It)
+    {
+        if (It.Value() == ClientId) It.RemoveCurrent();
+    }
+    if (Session->bExclusiveTargets)
+    {
+        if (!Session->TargetAsset.IsEmpty()) TargetOwners.Add(Session->TargetAsset.ToLower(), ClientId);
+        if (!Session->TargetMaterial.IsEmpty()) TargetOwners.Add(Session->TargetMaterial.ToLower(), ClientId);
+    }
+    Session->LastSeenAt = FDateTime::UtcNow();
+}
+
+bool UUmgMcpBridge::ValidateTargetLease(const FString& ClientId, const FString& CommandType,
+    const TSharedPtr<FJsonObject>& Params, FString& OutError)
+{
+    if (ClientId.IsEmpty() || ClientId == TEXT("legacy") || !Params.IsValid() || IsTargetIndependentCommand(CommandType))
+    {
+        return true;
+    }
+    FString RequestedTarget;
+    if (CommandType == TEXT("set_target_umg_asset"))
+    {
+        Params->TryGetStringField(TEXT("asset_path"), RequestedTarget);
+        FString Left, Right;
+        if (RequestedTarget.Split(TEXT(":"), &Left, &Right)) RequestedTarget = Left;
+    }
+    else if (CommandType == TEXT("material_set_target") || CommandType == TEXT("hlsl_set_target"))
+    {
+        Params->TryGetStringField(TEXT("path"), RequestedTarget);
+    }
+    FScopeLock Lock(&SessionCs);
+    FConnectionSession* Session = Sessions.Find(ClientId);
+    if (!Session) return true;
+    if (RequestedTarget.IsEmpty())
+    {
+        RequestedTarget = (CommandType.StartsWith(TEXT("material_")) || CommandType.StartsWith(TEXT("hlsl_")))
+            ? Session->TargetMaterial : Session->TargetAsset;
+    }
+    if (RequestedTarget.IsEmpty()) return true;
+    const FString Canonical = RequestedTarget.ToLower();
+    if (const FString* Owner = TargetOwners.Find(Canonical))
+    {
+        if (*Owner != ClientId)
+        {
+            OutError = FString::Printf(TEXT("Target '%s' is exclusively bound to client '%s'."), *RequestedTarget, **Owner);
+            return false;
+        }
+    }
+    return true;
+}
+
+FString UUmgMcpBridge::HandleConnectionCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params, const FString& ClientId)
+{
+    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("status"), TEXT("success"));
+    if (CommandType == TEXT("connect"))
+    {
+        FString EffectiveId = ClientId;
+        if (EffectiveId.IsEmpty() || EffectiveId == TEXT("legacy"))
+        {
+            Params->TryGetStringField(TEXT("client_id"), EffectiveId);
+        }
+        if (EffectiveId.IsEmpty()) EffectiveId = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower);
+        FConnectionSession Session;
+        Session.ClientId = EffectiveId;
+        Params->TryGetStringField(TEXT("display_name"), Session.DisplayName);
+        Params->TryGetStringField(TEXT("target"), Session.TargetAsset);
+        Params->TryGetBoolField(TEXT("exclusive"), Session.bExclusiveTargets);
+        Session.ConnectedAt = FDateTime::UtcNow();
+        Session.LastSeenAt = Session.ConnectedAt;
+        if (Session.TargetAsset.IsEmpty() && GEditor)
+        {
+            if (UUmgAttentionSubsystem* Attention = GEditor->GetEditorSubsystem<UUmgAttentionSubsystem>())
+            {
+                Session.TargetAsset = Attention->GetTargetUmgAsset();
+                Session.TargetWidget = Attention->GetTargetWidget();
+                Session.TargetGraph = Attention->GetTargetGraph();
+                Session.CursorNode = Attention->GetCursorNode();
+                Session.TargetAnimation = Attention->GetTargetAnimation();
+            }
+        }
+        {
+            FScopeLock Lock(&SessionCs);
+            if (FConnectionSession* Existing = Sessions.Find(EffectiveId))
+            {
+                const FString PreservedTarget = Existing->TargetAsset;
+                const FString PreservedWidget = Existing->TargetWidget;
+                const FString PreservedMaterial = Existing->TargetMaterial;
+                *Existing = Session;
+                if (Existing->TargetAsset.IsEmpty()) Existing->TargetAsset = PreservedTarget;
+                Existing->TargetWidget = PreservedWidget;
+                Existing->TargetMaterial = PreservedMaterial;
+            }
+            else Sessions.Add(EffectiveId, Session);
+        }
+        Result->SetStringField(TEXT("client_id"), EffectiveId);
+        Result->SetStringField(TEXT("server_instance_id"), ServerInstanceId);
+        Result->SetNumberField(TEXT("port"), Port);
+        Result->SetBoolField(TEXT("exclusive"), Session.bExclusiveTargets);
+    }
+    else if (CommandType == TEXT("disconnect"))
+    {
+        FScopeLock Lock(&SessionCs);
+        Sessions.Remove(ClientId);
+        for (auto It = TargetOwners.CreateIterator(); It; ++It)
+        {
+            if (It.Value() == ClientId) It.RemoveCurrent();
+        }
+        Result->SetStringField(TEXT("client_id"), ClientId);
+    }
+    else if (CommandType == TEXT("server_info") || CommandType == TEXT("list_connections"))
+    {
+        Result->SetStringField(TEXT("server_instance_id"), ServerInstanceId);
+        Result->SetNumberField(TEXT("port"), Port);
+        int32 QueuedRequests = 0;
+        {
+            FScopeLock QueueLock(&CommandQueueCs);
+            QueuedRequests = CommandQueue.Num();
+        }
+        Result->SetNumberField(TEXT("queued_requests"), QueuedRequests);
+        TArray<TSharedPtr<FJsonValue>> Items;
+        FScopeLock Lock(&SessionCs);
+        for (const auto& Pair : Sessions)
+        {
+            TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+            Item->SetStringField(TEXT("client_id"), Pair.Key);
+            Item->SetStringField(TEXT("display_name"), Pair.Value.DisplayName);
+            Item->SetStringField(TEXT("target"), Pair.Value.TargetAsset);
+            Item->SetStringField(TEXT("material_target"), Pair.Value.TargetMaterial);
+            Item->SetBoolField(TEXT("exclusive"), Pair.Value.bExclusiveTargets);
+            Item->SetStringField(TEXT("last_seen"), Pair.Value.LastSeenAt.ToIso8601());
+            Items.Add(MakeShared<FJsonValueObject>(Item));
+        }
+        Result->SetArrayField(TEXT("connections"), Items);
+    }
+    FString Serialized;
+    FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Serialized));
+    return Serialized;
+}
+
+FString UUmgMcpBridge::ExecuteQueuedCommand(const TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe>& Command)
+{
+    const double StartedAt = FPlatformTime::Seconds();
+    FString Response;
+    if (Command->CommandType == TEXT("connect") || Command->CommandType == TEXT("disconnect") ||
+        Command->CommandType == TEXT("server_info") || Command->CommandType == TEXT("list_connections"))
+    {
+        Response = HandleConnectionCommand(Command->CommandType, Command->Params, Command->ClientId);
+    }
+    else
+    {
+        FString Error;
+        if (!RestoreSessionContext(Command->ClientId, Error))
+        {
+            Response = MakeErrorResponse(Error, TEXT("not_connected"));
+        }
+        else if (!ValidateTargetLease(Command->ClientId, Command->CommandType, Command->Params, Error))
+        {
+            Response = MakeErrorResponse(Error, TEXT("target_locked"));
+        }
+        else
+        {
+            Response = InternalExecuteCommand(Command->CommandType, Command->Params);
+            if (!IsTargetIndependentCommand(Command->CommandType))
+            {
+                CaptureSessionContext(Command->ClientId);
+            }
+        }
+    }
+    const double DurationMs = (FPlatformTime::Seconds() - StartedAt) * 1000.0;
+    AddDebugRecord(*Command, Response.Contains(TEXT("\"status\":\"error\"")) ? TEXT("error") : TEXT("completed"), Response, DurationMs);
+    return Response;
 }
 
 FString UUmgMcpBridge::InternalExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)

@@ -28,6 +28,19 @@ class FUmgMcpFileTransformationCommands; // Forward declaration for File Transfo
 class FUmgMcpSequencerCommands; // Forward declaration for Sequencer Commands
 class FUmgMcpMaterialCommands; // Forward declaration for Material Commands
 
+struct FMcpDebugRecord
+{
+    uint64 Sequence = 0;
+    FString Time;
+    FString ClientId;
+    FString RequestId;
+    FString Command;
+    FString RequestJson;
+    FString ResponseJson;
+    FString State;
+    double DurationMs = 0.0;
+};
+
 /**
  * @brief The central communication hub for the UMG MCP plugin.
  *
@@ -56,7 +69,15 @@ public:
 	bool IsRunning() const { return bIsRunning; }
 
 	// Command execution
-	FString ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
+	FString ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params,
+        const FString& ClientId = TEXT(""), const FString& RequestId = TEXT(""),
+        const FString& RawRequestJson = TEXT(""));
+
+    /** Executes exactly the same protocol path used by TCP clients, for the Debug UI. */
+    FString ExecuteDebugMessage(const FString& Message);
+    void GetDebugRecords(TArray<FMcpDebugRecord>& OutRecords) const;
+    int32 GetListeningPort() const { return Port; }
+    FString GetServerInstanceId() const { return ServerInstanceId; }
 
 private:
     struct FQueuedBridgeCommand
@@ -65,11 +86,38 @@ private:
         TSharedPtr<FJsonObject> Params;
         FString Response;
         FEvent* CompletionEvent = nullptr;
+        FString ClientId;
+        FString RequestId;
+        FString RawRequestJson;
+        uint64 Sequence = 0;
+        double EnqueuedAt = 0.0;
+    };
+
+    struct FConnectionSession
+    {
+        FString ClientId;
+        FString DisplayName;
+        FString TargetAsset;
+        FString TargetWidget;
+        FString TargetGraph;
+        FString CursorNode;
+        FString TargetAnimation;
+        FString TargetMaterial;
+        bool bExclusiveTargets = true;
+        FDateTime ConnectedAt;
+        FDateTime LastSeenAt;
     };
 
     // Internal helper to execute command logic (thread-agnostic)
     FString InternalExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
     void ProcessNextQueuedCommand();
+    FString ExecuteQueuedCommand(const TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe>& QueuedCommand);
+    FString HandleConnectionCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params, const FString& ClientId);
+    bool RestoreSessionContext(const FString& ClientId, FString& OutError);
+    void CaptureSessionContext(const FString& ClientId);
+    bool ValidateTargetLease(const FString& ClientId, const FString& CommandType, const TSharedPtr<FJsonObject>& Params, FString& OutError);
+    void AddDebugRecord(const FQueuedBridgeCommand& Command, const FString& State, const FString& Response, double DurationMs);
+    FString MakeErrorResponse(const FString& Error, const FString& Code = TEXT("")) const;
 
     TSharedPtr<FUmgMcpEditorCommands> EditorCommands;
     TSharedPtr<FUmgMcpBlueprintCommands> BlueprintCommands;
@@ -84,11 +132,20 @@ private:
     TSharedPtr<FSocket> ListenerSocket;
     TSharedPtr<FSocket> ConnectionSocket;
     FRunnableThread* ServerThread;
+    FMCPServerRunnable* ServerRunnable;
     int32 Port;
     FIPv4Address ServerAddress;
     FCriticalSection CommandQueueCs;
     TArray<TSharedPtr<FQueuedBridgeCommand, ESPMode::ThreadSafe>> CommandQueue;
     bool bCommandQueueProcessing;
+    TAtomic<uint64> NextSequence;
+    FString ServerInstanceId;
+    FString DiscoveryFilePath;
+    mutable FCriticalSection SessionCs;
+    TMap<FString, FConnectionSession> Sessions;
+    TMap<FString, FString> TargetOwners;
+    mutable FCriticalSection DebugRecordsCs;
+    TArray<FMcpDebugRecord> DebugRecords;
 
     // Static flag to prevent multiple instances from trying to bind the same port
     static bool bGlobalServerStarted;
