@@ -52,6 +52,9 @@ def main() -> None:
     captured.clear()
     result = skills.bluecode_apply(
         'node("Set Timer by Event", Time=2.0, Event=TickEvent, alias=TimerNode)',
+        base_revision="bcrev:test",
+        source_map={"/body/0": {"node_id": "ExistingTimerNode"}},
+        dry_run=True,
         action_handles={"settimerbyevent": "bpact:test-handle"},
         action_hints={"Set Timer by Event": {"handle": "bpact:search-result-handle"}},
         expression_hints={'value("Select", Index=ActiveIndex)': {"handle": "bpact:select"}},
@@ -78,7 +81,10 @@ def main() -> None:
         "subAction": "bluecode_apply",
         "code": 'node("Set Timer by Event", Time=2.0, Event=TickEvent, alias=TimerNode)',
         "anchor": "end",
-        "mode": "append",
+        "mode": "union",
+        "base_revision": "bcrev:test",
+        "source_map": {"/body/0": {"node_id": "ExistingTimerNode"}},
+        "dry_run": True,
         "member_classes": {"CustomClass.DoThing": "/Script/Test.CustomClass"},
         "action_handles": {"settimerbyevent": "bpact:test-handle"},
         "action_hints": {"Set Timer by Event": {"handle": "bpact:search-result-handle"}},

@@ -85,7 +85,7 @@ def main() -> None:
 
         apply_schema = tools["bluecode_apply"].get("inputSchema", {})
         apply_props = apply_schema.get("properties", {})
-        for name in ("code", "anchor", "member_classes", "action_handles", "action_hints", "action_hints_by_line", "node_aliases", "aliases", "node_properties"):
+        for name in ("code", "anchor", "mode", "base_revision", "source_map", "dry_run", "member_classes", "action_handles", "action_hints", "action_hints_by_line", "node_aliases", "aliases", "node_properties"):
             if name not in apply_props:
                 raise AssertionError(f"bluecode_apply stdio schema missing {name}")
 
@@ -106,12 +106,12 @@ def main() -> None:
                 raise AssertionError(f"bluecode_connect stdio schema missing {name}")
 
         description = tools["bluecode_apply"].get("description", "")
-        for text in ("node(\"Action Menu Name\"", "value(\"Action Menu Name\"", "action_handles", "action_hints", "node_properties", "signature", "alias"):
+        for text in ("node(\"Action Menu Name\"", "value(\"Action Menu Name\"", "union", "base_revision", "source_map", "dry_run", "aliases"):
             if text not in description:
                 raise AssertionError(f"bluecode_apply stdio description missing {text}")
 
         read_description = tools["bluecode_read_function"].get("description", "")
-        for text in ("action_hints", "round-trip"):
+        for text in ("semantic", "roundtrip", "source_map"):
             if text not in read_description:
                 raise AssertionError(f"bluecode_read_function stdio description missing {text}")
 

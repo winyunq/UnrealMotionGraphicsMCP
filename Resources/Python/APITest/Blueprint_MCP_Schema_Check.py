@@ -42,12 +42,12 @@ async def main() -> None:
 
     apply_schema = tools["bluecode_apply"].inputSchema
     apply_props = apply_schema.get("properties", {})
-    for name in ("code", "anchor", "mode", "member_classes", "action_handles", "action_hints", "expression_hints", "action_hints_by_line", "node_aliases", "aliases", "node_properties"):
+    for name in ("code", "anchor", "mode", "base_revision", "source_map", "dry_run", "member_classes", "action_handles", "action_hints", "expression_hints", "action_hints_by_line", "node_aliases", "aliases", "node_properties"):
         if name not in apply_props:
             raise AssertionError(f"bluecode_apply missing MCP input: {name}")
 
     description = tools["bluecode_apply"].description or ""
-    for text in ("node(\"Action Menu Name\"", "value(\"Action Menu Name\"", "action_handles", "action_hints", "expression_hints", "node_properties", "signature", "alias"):
+    for text in ("node(\"Action Menu Name\"", "value(\"Action Menu Name\"", "union", "base_revision", "source_map", "dry_run", "action", "node properties", "aliases"):
         if text not in description:
             raise AssertionError(f"bluecode_apply description missing: {text}")
 
@@ -56,7 +56,7 @@ async def main() -> None:
     for name in ("detail", "include_connections"):
         if name not in read_props:
             raise AssertionError(f"bluecode_read_function missing MCP input: {name}")
-    for text in ("action_hints", "round-trip", "include_connections", "edge"):
+    for text in ("semantic", "roundtrip", "source_map", "include_connections"):
         if text not in read_description:
             raise AssertionError(f"bluecode_read_function description missing: {text}")
 

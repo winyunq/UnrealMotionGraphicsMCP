@@ -45,6 +45,10 @@ The README is the front door. The step-by-step tutorials live in the deployed do
 | Blueprint wiring is click-heavy | BlueCode and MCP commands create nodes, pins, references, and links directly |
 | Long chat history wastes context | Fab edition adds production packaging and context-management work for larger sessions |
 
+## Blueprint API Status (Transitional)
+
+BlueCode now separates attention-compressed semantic reads from round-trip/debug evidence. Union writes support graph revisions, source maps, dry-run plans, LCS right-anchor insertion, safe append, and rollback on failure. It is still transitional: complete structured CFG recovery and editing for nested branches, loops, Sequence/Switch, latent nodes, and arbitrary irreducible graphs remains v2 work. Low-level node commands are compatibility execution primitives, not the BlueCode language.
+
 ## Install
 
 UMG MCP currently targets **Unreal Engine 5.8 on Win64**. The plugin descriptor in this package is set to `EngineVersion: 5.8.0`.

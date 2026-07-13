@@ -1,6 +1,8 @@
 # Blueprint Bluecode Protocol Draft
 
-本文记录新的 Blueprint MCP 方向。范围限定为 UE 5.8；当前实现已有 BlueCode MVP，旧节点级 MCP 仍作为后端兼容层保留。
+本文记录新的 Blueprint MCP 方向。范围限定为 UE 5.8；旧节点级 MCP 只作为执行层兼容原语，不等同于 BlueCode 语义层。
+
+当前实现状态：已落地 semantic / roundtrip / debug 三层读取、布局无关 revision、AST 路径 source map、LCS 线性序列对齐、右锚点插入、无锚点末尾追加、失败整图节点快照恢复，以及任意 Action Menu 节点逃生通道。任意 CFG 的完整结构化 `if/else`、循环、Sequence/Switch 和三方并发合并仍属于后续 v2 工作；在这些能力完成前不得把扁平 Branch 行宣传成完整结构化 BlueCode。
 
 ## 为什么需要 bluecode
 
@@ -43,7 +45,7 @@ WidgetName.EventName
 
 | Tool | 作用 |
 | --- | --- |
-| `bluecode_read_function(detail?, include_connections?)` | 以代码式摘要读取当前函数。默认返回执行流、必要数据依赖和 round-trip hints；`detail="debug"` 或 `include_connections=true` 时返回节点 ID、pin 和连接 manifest。 |
+| `bluecode_read_function(detail?, include_connections?)` | 默认 `detail="semantic"` 只返回注意力压缩后的代码、revision 和紧凑计数；`detail="roundtrip"` 才返回 source map 与重建 hints；`detail="debug"` 再增加原始节点和连接证据。 |
 | `bluecode_read_variables()` | 读取变量、类型、默认值和引用摘要。 |
 | `bluecode_read_events()` | 读取当前 UMG Target 下可编辑事件和已绑定事件。 |
 | `bluecode_search_nodes(query?, category?, node_class?, node_class_path?, include_pins?)` | 搜索当前上下文可用的 Blueprint Action Menu 节点，返回稳定 `handle`，用于插件、自定义、宏或同名歧义节点。写入时可作为 `action_handle` 使用。 |
@@ -61,28 +63,20 @@ main()
   end
 ```
 
-返回 JSON 同时带结构化信息：
+默认 semantic JSON 不携带 pin/hint dump：
 
 ```json
 {
+  "protocol_version": "2",
+  "detail": "semantic",
   "function": "LoginButton.OnClicked",
-  "entry": "main",
-  "exit": "end",
+  "base_revision": "bcrev:...",
   "code": "main()\n  PrintString(\"Welcome\")\n  end",
-  "action_hints": {
-    "PrintString(\"Welcome\")": {
-      "handle": "bpact:...",
-      "node_class": "K2Node_CallFunction",
-      "category": "Utilities|String"
-    }
-  },
-  "exec_paths": 1,
-  "data_dependencies": [
-    {"name": "LoginPanel", "kind": "widget_reference"}
-  ],
-  "debug_nodes_available": true
+  "statement_count": 1
 }
 ```
+
+`detail="roundtrip"` 在此基础上增加 `source_map`、`action_hints`、`expression_hints` 和 `action_hints_by_line`。`source_map` 以 AST 路径（例如 `/body/0`）为 key，而不是以语句文本为唯一 key，因此重复语句不会互相覆盖。`detail="debug"` 或显式 `include_connections=true` 才返回低层节点、pin 与连接 manifest。
 
 ## 写语义
 
@@ -90,16 +84,19 @@ main()
 
 | Tool | 作用 |
 | --- | --- |
-| `bluecode_apply(code, anchor?, mode?, action_handles?, action_hints?, expression_hints?, action_hints_by_line?, node_aliases?, node_properties?)` | 并集式应用代码片段。默认插入到当前函数 `end` 前；可携带 `action_handle` 精确生成任意 Action Menu 节点；可直接复用读回的 `expression_hints`；可用 `alias=Name` 或 `node_aliases` 给本次新节点命名；可用 `node_properties` 写入非 pin 的 UObject 节点属性。 |
+| `bluecode_apply(code, mode="union", base_revision?, source_map?, dry_run?, ...)` | 规划或原子应用语义补丁。默认用 LCS 对齐既有序列，未匹配语句优先插入到下一个已匹配右锚点前，否则追加到当前块末尾；可用 `dry_run=true` 只返回计划。 |
 | `bluecode_apply_variables(variables)` | 并集式添加/更新变量，不删除未提及变量。 |
 | `bluecode_connect(connects, aliases?)` | 并集式追加少量显式数据依赖或 pin 连接，作为复杂自定义节点 escape hatch；不删除已有连接；可传入 `bluecode_apply` 返回的 `aliases` 后使用 `NodeAlias:Pin`。 |
 | `bluecode_compile()` | 编译并保存当前 Blueprint，返回紧凑诊断。 |
 
 写入原则：
 
-- 写操作只能追加或覆盖匹配到的节点、变量、连接。
+- 写操作默认是 union：只能复用、追加、在明确右锚点前插入，或覆盖 source map 明确匹配到的节点。
 - 如果输入片段省略了既有节点，不视为删除。
-- 如果片段与既有节点相似，应按匹配策略复用或在右侧插入，并返回 `merge_report`。
+- 当前线性块使用 LCS 对齐语义语句；未匹配语句优先使用补丁右侧的已匹配节点作为插入锚点，无右锚点才追加，并返回 `merge_report`。
+- 修改已有图前应传回 `base_revision`；revision 不一致必须返回 `graph_revision_conflict`，不得在过期上下文上重新猜测。
+- `dry_run=true` 只返回 `operations`、`expected_revision` 与 `plan_hash`，不得改变 Graph。
+- apply 任一操作失败时必须从 pre-apply 节点文本快照恢复整个 Graph，并验证恢复后的 revision；不得残留半成品节点或断开的旧边。
 - 无法连接的数据节点应先尝试转换为参数表达式，再尝试 cast，仍失败时放入 `floating_nodes`，并在返回中解释。
 - 每个成功的 `bluecode_apply.operations[].result` 应返回 `nodeId`/`node_id`、`title`、`node_class`、`node_class_path`、`is_exec`、`pin_counts`、`inputs`、`outputs` 和 `input_warnings`，其中 `inputs`/`outputs` 使用与 `bluecode_read_function.action_hints` 相同的 pin evidence 格式；调用方可以直接用这些 endpoint 或返回的 `aliases` 继续 `bluecode_connect`，不必为了找到新节点 pin 立刻再读整图。
 
@@ -157,9 +154,9 @@ main()
 }
 ```
 
-默认读取应优先从事件/函数入口沿 exec flow 输出语句，未连接的节点再按编辑器位置作为 floating 语句追加。被数据 pin 引用的纯节点、变量 getter、简单数学节点应内联成表达式；只有未被引用的纯节点才作为 `value(...)` 顶层语句出现。这样 read 回来的是可继续编辑的高密度语义，而不是噪声节点 dump。
+默认读取应优先从事件/函数入口沿 exec flow 输出语句；未连接的 floating 节点按 semantic key + node GUID 稳定排序，绝不能按编辑器坐标决定代码顺序。被数据 pin 引用的纯节点、变量 getter、简单数学节点应内联成表达式；只有未被引用的纯节点才作为 `value(...)` 顶层语句出现。这样只移动节点不会改变 semantic code 或 base revision。
 
-`bluecode_read_function` 同时返回 `action_hints` 和 `expression_hints`，以语句或表达式文本为 key，value 包含可重建节点所需的 `handle`、`category`、`node_class`、`node_class_path`、`signature`、`node_id` 等信息。读取到自定义、插件、宏、同名节点或嵌套纯/数据节点后，应把这些对象原样传回 `bluecode_apply(action_hints=..., expression_hints=...)`，保证语义代码之外仍有一一映射证据。若存在重复语句，`action_hints` 的文本 key 会天然冲突，因此读回还会返回 `action_hints_by_line`；修改读回代码时应尽量一并传回 `bluecode_apply(action_hints_by_line=...)`，使相同语句也能按行/顺序保留精确映射。
+默认 semantic 读取不返回 hints。需要编辑时调用 `detail="roundtrip"`，并把 `base_revision`、`source_map`、`action_hints`、`expression_hints` 与 `action_hints_by_line` 原样传回。`source_map` 负责 AST 路径到 node GUID/semantic key/action descriptor 的身份映射；兼容 hints 负责插件、宏、动态 pin 和 Action Menu 重建证据。
 
 当 `bluecode_apply` 收到 readback hint 中的 `node_id` / `target_node_id` 时，它应优先更新该既有节点的输入 pin/default，而不是追加重复节点。这适用于自定义/插件节点，也适用于基础的变量赋值节点和 Branch 节点。这是写操作“并集覆盖重复项”的具体语义：同一节点的已给定 pin 会被覆盖、追加兼容连接，或根据 `Pin=A+B` / `Pin=value("Select", ...)` 生成新的数据表达式节点并连接回来；未提及 pin、未提及连接和未提及节点不会被删除。若更新某个已连接 pin 会导致替换旧连接，必须失败并要求先用 `bluecode_delete(kind="connection")` 删除旧边。
 

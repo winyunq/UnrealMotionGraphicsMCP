@@ -371,15 +371,21 @@ def bluecode_search_nodes(query: str = "", category: str = "", node_class: str =
     return _send("manage_blueprint_graph", payload)
 
 
-def bluecode_apply(code: str, anchor: str = "end", mode: str = "append", member_classes: Dict[str, str] = None, action_handles: Dict[str, str] = None, action_hints: Dict[str, Dict[str, Any]] = None, expression_hints: Dict[str, Dict[str, Any]] = None, action_hints_by_line: List[Dict[str, Any]] = None, node_aliases: Dict[str, str] = None, aliases: Dict[str, str] = None, node_properties: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
-    if mode not in ("append", "upsert"):
-        return {"success": False, "error": "bluecode_apply supports mode='append' or mode='upsert' only"}
+def bluecode_apply(code: str, anchor: str = "end", mode: str = "union", base_revision: str = "", source_map: Dict[str, Dict[str, Any]] = None, dry_run: bool = False, member_classes: Dict[str, str] = None, action_handles: Dict[str, str] = None, action_hints: Dict[str, Dict[str, Any]] = None, expression_hints: Dict[str, Dict[str, Any]] = None, action_hints_by_line: List[Dict[str, Any]] = None, node_aliases: Dict[str, str] = None, aliases: Dict[str, str] = None, node_properties: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
+    if mode not in ("union", "upsert", "append"):
+        return {"success": False, "error": "bluecode_apply supports mode='union' (or legacy 'upsert') and explicit mode='append'"}
     payload: Dict[str, Any] = {
         "subAction": "bluecode_apply",
         "code": code,
         "anchor": anchor,
         "mode": mode,
     }
+    if base_revision:
+        payload["base_revision"] = base_revision
+    if source_map is not None:
+        payload["source_map"] = source_map
+    if dry_run:
+        payload["dry_run"] = True
     for key, value in (
         ("member_classes", member_classes),
         ("action_handles", action_handles),

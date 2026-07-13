@@ -1493,13 +1493,13 @@ async def bluecode_read_events() -> Dict[str, Any]:
 
 
 @register_tool("bluecode_apply", "Applies bluecode statements as union-only Blueprint graph edits.")
-async def bluecode_apply(code: str, anchor: str = "end", mode: str = "append", member_classes: Dict[str, str] = None, action_handles: Dict[str, str] = None, action_hints: Dict[str, Dict[str, Any]] = None, expression_hints: Dict[str, Dict[str, Any]] = None, action_hints_by_line: List[Dict[str, Any]] = None, node_aliases: Dict[str, str] = None, aliases: Dict[str, str] = None, node_properties: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
+async def bluecode_apply(code: str, anchor: str = "end", mode: str = "union", base_revision: str = "", source_map: Dict[str, Dict[str, Any]] = None, dry_run: bool = False, member_classes: Dict[str, str] = None, action_handles: Dict[str, str] = None, action_hints: Dict[str, Dict[str, Any]] = None, expression_hints: Dict[str, Dict[str, Any]] = None, action_hints_by_line: List[Dict[str, Any]] = None, node_aliases: Dict[str, str] = None, aliases: Dict[str, str] = None, node_properties: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     (Description loaded from prompts.json)
     """
     conn = get_unreal_connection()
-    if mode not in ("append", "upsert"):
-        return {"success": False, "error": "bluecode_apply supports mode='append' or mode='upsert' only"}
+    if mode not in ("union", "upsert", "append"):
+        return {"success": False, "error": "bluecode_apply supports mode='union' (or legacy 'upsert') and explicit mode='append'"}
 
     backend_payload: Dict[str, Any] = {
         "subAction": "bluecode_apply",
@@ -1507,6 +1507,12 @@ async def bluecode_apply(code: str, anchor: str = "end", mode: str = "append", m
         "anchor": anchor,
         "mode": mode,
     }
+    if base_revision:
+        backend_payload["base_revision"] = base_revision
+    if source_map is not None:
+        backend_payload["source_map"] = source_map
+    if dry_run:
+        backend_payload["dry_run"] = True
     for key, value in (
         ("member_classes", member_classes),
         ("action_handles", action_handles),

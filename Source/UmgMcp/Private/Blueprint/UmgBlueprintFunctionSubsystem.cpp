@@ -1,5 +1,7 @@
 // Copyright (c) 2025-2026 Winyunq. All rights reserved.
 #include "Blueprint/UmgBlueprintFunctionSubsystem.h"
+#include "Blueprint/Bluecode/BluecodeMergePlanner.h"
+#include "Blueprint/Bluecode/BluecodeSyntax.h"
 #include "WidgetBlueprint.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -9,6 +11,7 @@
 #include "Bridge/UmgMcpJsonCompat.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "UObject/Package.h"
 
 // Editor includes
 #if WITH_EDITOR
@@ -16,6 +19,7 @@
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
 #include "EdGraph/EdGraphSchema.h"
+#include "EdGraphUtilities.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
 #include "Components/Widget.h"
@@ -269,6 +273,190 @@ namespace
 		Normalized.ReplaceInline(TEXT("["), TEXT(""));
 		Normalized.ReplaceInline(TEXT("]"), TEXT(""));
 		return Normalized;
+	}
+
+	FString HashBluecodeIdentity(const FString& Identity, const FString& Prefix)
+	{
+		FTCHARToUTF8 Utf8Identity(*Identity);
+		FMD5 Md5;
+		Md5.Update(reinterpret_cast<const uint8*>(Utf8Identity.Get()), Utf8Identity.Length());
+		uint8 Digest[16];
+		Md5.Final(Digest);
+		return Prefix + BytesToHex(Digest, UE_ARRAY_COUNT(Digest)).ToLower();
+	}
+
+	FString MakeBluecodeSemanticKey(const UEdGraphNode* Node)
+	{
+		if (!Node)
+		{
+			return TEXT("invalid");
+		}
+		if (const UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(Node))
+		{
+			const UFunction* Function = CallNode->GetTargetFunction();
+			const FString Owner = Function && Function->GetOwnerClass()
+				? Function->GetOwnerClass()->GetPathName()
+				: TEXT("self");
+			return FString::Printf(
+				TEXT("call:%s::%s"),
+				*Owner,
+				*CallNode->FunctionReference.GetMemberName().ToString());
+		}
+		if (const UK2Node_VariableSet* SetNode = Cast<UK2Node_VariableSet>(Node))
+		{
+			return TEXT("set:") + SetNode->VariableReference.GetMemberName().ToString();
+		}
+		if (const UK2Node_VariableGet* GetNode = Cast<UK2Node_VariableGet>(Node))
+		{
+			return TEXT("get:") + GetNode->VariableReference.GetMemberName().ToString();
+		}
+		if (Cast<UK2Node_IfThenElse>(Node))
+		{
+			return TEXT("control:branch");
+		}
+		return FString::Printf(
+			TEXT("node:%s:%s"),
+			Node->GetClass() ? *Node->GetClass()->GetPathName() : TEXT("unknown"),
+			*NormalizeBluecodeStatement(Node->GetNodeTitle(ENodeTitleType::ListView).ToString()));
+	}
+
+	bool IsBluecodeSemanticKeyCompatible(
+		const FString& SemanticKey,
+		const FString& CallName,
+		const FString& ResolvedNodeName)
+	{
+		if (SemanticKey.IsEmpty())
+		{
+			return false;
+		}
+		const FString NormalizedResolved = NormalizeBluecodeStatement(ResolvedNodeName);
+		const FString NormalizedCall = NormalizeBluecodeStatement(CallName);
+		if (SemanticKey.StartsWith(TEXT("call:")))
+		{
+			FString Left;
+			FString MemberName;
+			return SemanticKey.Split(TEXT("::"), &Left, &MemberName, ESearchCase::CaseSensitive, ESearchDir::FromEnd) &&
+				NormalizeBluecodeStatement(MemberName) == NormalizedResolved;
+		}
+		if (SemanticKey.StartsWith(TEXT("set:")))
+		{
+			return NormalizeBluecodeStatement(SemanticKey.Mid(4)) == NormalizedResolved;
+		}
+		if (SemanticKey == TEXT("control:branch"))
+		{
+			return NormalizedCall == TEXT("if") || NormalizedResolved == TEXT("branch");
+		}
+		if (SemanticKey.StartsWith(TEXT("node:")))
+		{
+			FString Left;
+			FString Title;
+			return SemanticKey.Split(TEXT(":"), &Left, &Title, ESearchCase::CaseSensitive, ESearchDir::FromEnd) &&
+				NormalizeBluecodeStatement(Title) == NormalizedResolved;
+		}
+		return false;
+	}
+
+	FString MakeBluecodeGraphRevision(const UEdGraph* Graph)
+	{
+		if (!Graph)
+		{
+			return TEXT("bcrev:invalid");
+		}
+
+		TArray<const UEdGraphNode*> Nodes;
+		for (const UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (Node)
+			{
+				Nodes.Add(Node);
+			}
+		}
+		Nodes.Sort([](const UEdGraphNode& A, const UEdGraphNode& B)
+		{
+			return A.NodeGuid.ToString() < B.NodeGuid.ToString();
+		});
+
+		TArray<FString> Parts;
+		Parts.Reserve(Nodes.Num() * 4);
+		Parts.Add(TEXT("graph:") + Graph->GetName());
+		for (const UEdGraphNode* Node : Nodes)
+		{
+			Parts.Add(FString::Printf(
+				TEXT("node:%s|%s|%s"),
+				*Node->NodeGuid.ToString(),
+				Node->GetClass() ? *Node->GetClass()->GetPathName() : TEXT("unknown"),
+				*MakeBluecodeSemanticKey(Node)));
+
+			// Preserve arbitrary UK2Node/plugin UObject properties in the semantic
+			// revision while deliberately removing editor-only layout coordinates.
+			TSet<UObject*> NodeToExport;
+			NodeToExport.Add(const_cast<UEdGraphNode*>(Node));
+			FString ExportedNodeText;
+			FEdGraphUtilities::ExportNodesToText(NodeToExport, ExportedNodeText);
+			TArray<FString> ExportedLines;
+			ExportedNodeText.ParseIntoArrayLines(ExportedLines, false);
+			TArray<FString> SemanticPropertyLines;
+			for (FString Line : ExportedLines)
+			{
+				Line.TrimStartAndEndInline();
+				if (Line.StartsWith(TEXT("Begin Object")) ||
+					Line == TEXT("End Object") ||
+					Line.StartsWith(TEXT("CustomProperties Pin")) ||
+					Line.StartsWith(TEXT("NodePosX=")) ||
+					Line.StartsWith(TEXT("NodePosY=")) ||
+					Line.StartsWith(TEXT("NodeWidth=")) ||
+					Line.StartsWith(TEXT("NodeHeight=")))
+				{
+					continue;
+				}
+				SemanticPropertyLines.Add(Line);
+			}
+			Parts.Add(TEXT("properties:") + FString::Join(SemanticPropertyLines, TEXT("\n")));
+
+			TArray<const UEdGraphPin*> Pins;
+			for (const UEdGraphPin* Pin : Node->Pins)
+			{
+				if (Pin)
+				{
+					Pins.Add(Pin);
+				}
+			}
+			Pins.Sort([](const UEdGraphPin& A, const UEdGraphPin& B)
+			{
+				const FString AKey = FString::Printf(TEXT("%d:%s"), static_cast<int32>(A.Direction), *A.PinName.ToString());
+				const FString BKey = FString::Printf(TEXT("%d:%s"), static_cast<int32>(B.Direction), *B.PinName.ToString());
+				return AKey < BKey;
+			});
+
+			for (const UEdGraphPin* Pin : Pins)
+			{
+				TArray<FString> Links;
+				for (const UEdGraphPin* LinkedPin : Pin->LinkedTo)
+				{
+					const UEdGraphNode* LinkedNode = LinkedPin ? LinkedPin->GetOwningNode() : nullptr;
+					if (LinkedNode && LinkedPin)
+					{
+						Links.Add(LinkedNode->NodeGuid.ToString() + TEXT(":") + LinkedPin->PinName.ToString());
+					}
+				}
+				Links.Sort();
+				const FString DefaultObjectPath = Pin->DefaultObject ? Pin->DefaultObject->GetPathName() : TEXT("");
+				Parts.Add(FString::Printf(
+					TEXT("pin:%s|%d|%s|%s|%s|%s|%s|%s"),
+					*Pin->PinName.ToString(),
+					static_cast<int32>(Pin->Direction),
+					*Pin->PinType.PinCategory.ToString(),
+					*Pin->PinType.PinSubCategory.ToString(),
+					*Pin->DefaultValue,
+					*Pin->DefaultTextValue.ToString(),
+					*DefaultObjectPath,
+					*FString::Join(Links, TEXT(","))));
+			}
+		}
+
+		// Deliberately excludes NodePosX/Y: layout-only edits must not invalidate a
+		// semantic read/plan/apply cycle.
+		return HashBluecodeIdentity(FString::Join(Parts, TEXT("\n")), TEXT("bcrev:"));
 	}
 
 	FString StripBluecodeQuotes(FString Value);
@@ -952,15 +1140,24 @@ namespace
 			return false;
 		}
 
-		FString Left;
-		FString Right;
-		if (!Statement.Split(TEXT("="), &Left, &Right))
+		// Assignment is only valid for a top-level '='. Named call arguments such as
+		// node("Action", Pin=value) must remain calls; the old first-'=' split turned
+		// them into bogus K2Node_VariableSet nodes.
+		const int32 AssignmentIndex = FBluecodeSyntax::FindTopLevelAssignmentOperator(Statement);
+		if (AssignmentIndex == INDEX_NONE)
 		{
 			return false;
 		}
+
+		FString Left = Statement.Left(AssignmentIndex);
+		FString Right = Statement.Mid(AssignmentIndex + 1);
 		Left.TrimStartAndEndInline();
 		Right.TrimStartAndEndInline();
 		if (Left.IsEmpty() || Right.IsEmpty())
+		{
+			return false;
+		}
+		if (!FBluecodeSyntax::IsIdentifier(Left))
 		{
 			return false;
 		}
@@ -972,21 +1169,7 @@ namespace
 
 	bool IsBluecodeIdentifier(const FString& Value)
 	{
-		FString Text = Value;
-		Text.TrimStartAndEndInline();
-		if (Text.IsEmpty() || !(FChar::IsAlpha(Text[0]) || Text[0] == TEXT('_')))
-		{
-			return false;
-		}
-		for (int32 Index = 1; Index < Text.Len(); ++Index)
-		{
-			const TCHAR Ch = Text[Index];
-			if (!(FChar::IsAlnum(Ch) || Ch == TEXT('_')))
-			{
-				return false;
-			}
-		}
-		return true;
+		return FBluecodeSyntax::IsIdentifier(Value);
 	}
 
 	bool IsBluecodeNamedPinArgName(const FString& Value)
@@ -2011,6 +2194,15 @@ namespace
 				Payload->SetStringField(TEXT("signature"), Signature);
 			}
 
+			FString MemberClass;
+			if (EffectiveHint->TryGetStringField(TEXT("member_class"), MemberClass) && !MemberClass.IsEmpty())
+			{
+				Payload->SetStringField(TEXT("memberClass"), MemberClass);
+			}
+			else if (EffectiveHint->TryGetStringField(TEXT("memberClass"), MemberClass) && !MemberClass.IsEmpty())
+			{
+				Payload->SetStringField(TEXT("memberClass"), MemberClass);
+			}
 			bool bContextSensitive = true;
 			if (EffectiveHint->TryGetBoolField(TEXT("context_sensitive"), bContextSensitive))
 			{
@@ -2131,7 +2323,68 @@ namespace
 			return false;
 		};
 
-		if (TryApplyOrderedLineHint())
+		auto TryApplySourceMap = [&]()
+		{
+			if (StatementOrdinal == INDEX_NONE)
+			{
+				return false;
+			}
+			const TSharedPtr<FJsonObject>* SourceMap = nullptr;
+			if (!Params->TryGetObjectField(TEXT("source_map"), SourceMap) || !SourceMap || !SourceMap->IsValid())
+			{
+				return false;
+			}
+
+			auto IsCompatibleSource = [&](const TSharedPtr<FJsonObject>& Source)
+			{
+				FString SemanticKey;
+				if (!Source.IsValid() || !Source->TryGetStringField(TEXT("semantic_key"), SemanticKey) || SemanticKey.IsEmpty())
+				{
+					return false;
+				}
+				return IsBluecodeSemanticKeyCompatible(SemanticKey, CallName, ResolvedNodeName);
+			};
+
+			FString PatchCode;
+			Params->TryGetStringField(TEXT("code"), PatchCode);
+			const bool bShapePreserved = ParseBluecodeStatements(PatchCode).Num() == (*SourceMap)->Values.Num();
+			if (bShapePreserved)
+			{
+				const FString Path = FString::Printf(TEXT("/body/%d"), StatementOrdinal);
+				const TSharedPtr<FJsonObject>* Source = nullptr;
+				if ((*SourceMap)->TryGetObjectField(Path, Source) && Source && Source->IsValid() && IsCompatibleSource(*Source))
+				{
+					return ApplyHintObject(*Source);
+				}
+			}
+
+			// If lines were inserted or removed, do not trust ordinal paths. Exact
+			// unchanged statements can still retain their source identity safely.
+			for (const auto& Pair : (*SourceMap)->Values)
+			{
+				if (!Pair.Value.IsValid() || Pair.Value->Type != EJson::Object)
+				{
+					continue;
+				}
+				const TSharedPtr<FJsonObject> Source = Pair.Value->AsObject();
+				FString SourceStatement;
+				if (Source.IsValid() &&
+					IsCompatibleSource(Source) &&
+					Source->TryGetStringField(TEXT("statement"), SourceStatement) &&
+					NormalizeBluecodeStatement(SourceStatement) == NormalizeBluecodeStatement(Statement))
+				{
+					return ApplyHintObject(Source);
+				}
+			}
+			return false;
+		};
+
+		const TSharedPtr<FJsonObject>* ProvidedSourceMap = nullptr;
+		const bool bHasSourceMap =
+			Params->TryGetObjectField(TEXT("source_map"), ProvidedSourceMap) &&
+			ProvidedSourceMap &&
+			ProvidedSourceMap->IsValid();
+		if (TryApplySourceMap() || (!bHasSourceMap && TryApplyOrderedLineHint()))
 		{
 			return;
 		}
@@ -2925,8 +3178,20 @@ FString UUmgBlueprintFunctionSubsystem::ExecuteGraphAction(UBlueprint* Blueprint
 
 	if (Result.IsValid())
 	{
+        bool bResultSucceeded = false;
+        Result->TryGetBoolField(TEXT("success"), bResultSucceeded);
+        bool bShouldMarkBlueprintModified = bResultSucceeded;
+        if (SubAction == TEXT("bluecode_apply"))
+        {
+            double AppliedCount = 0.0;
+            bool bDryRun = false;
+            Result->TryGetNumberField(TEXT("applied_count"), AppliedCount);
+            Result->TryGetBoolField(TEXT("dry_run"), bDryRun);
+            bShouldMarkBlueprintModified = bResultSucceeded && !bDryRun && AppliedCount > 0.0;
+        }
         // Refresh UI (Skip for read-only actions)
-        if (SubAction != TEXT("find_functions") && SubAction != TEXT("search_function_library") &&
+        if (bShouldMarkBlueprintModified &&
+            SubAction != TEXT("find_functions") && SubAction != TEXT("search_function_library") &&
             SubAction != TEXT("search_nodes") && SubAction != TEXT("bluecode_search_nodes") && SubAction != TEXT("search_blueprint_nodes") &&
             SubAction != TEXT("get_variables") && SubAction != TEXT("get_widget_tree") &&
             SubAction != TEXT("get_nodes") &&
@@ -3852,77 +4117,259 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::CreateNodeInstance(UEdGr
 
 TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::AddNode(UEdGraph* TargetGraph, const TSharedPtr<FJsonObject>& Payload)
 {
+    if (!TargetGraph || !Payload.IsValid())
+    {
+        TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+        Error->SetBoolField(TEXT("success"), false);
+        Error->SetStringField(TEXT("error_code"), TEXT("invalid_add_node_context"));
+        Error->SetStringField(TEXT("error"), TEXT("AddNode requires a valid graph and payload."));
+        return Error;
+    }
+
+    // CreateNodeInstance may create helper/data nodes while configuring the requested
+    // node. Keep a graph-local snapshot so every failed path can remove all artifacts.
+    UBlueprint* OwningBlueprint = ResolveBlueprintFromGraph(TargetGraph);
+    UPackage* OwningPackage = OwningBlueprint ? OwningBlueprint->GetOutermost() : nullptr;
+    const bool bPackageWasDirty = OwningPackage ? OwningPackage->IsDirty() : false;
+    TSet<FGuid> ExistingNodeGuids;
+    for (UEdGraphNode* ExistingNode : TargetGraph->Nodes)
+    {
+        if (ExistingNode)
+        {
+            ExistingNodeGuids.Add(ExistingNode->NodeGuid);
+        }
+    }
+
+    auto RollbackCreatedNodes = [&]()
+    {
+        TArray<UEdGraphNode*> NodesToRemove;
+        for (UEdGraphNode* Candidate : TargetGraph->Nodes)
+        {
+            if (Candidate && !ExistingNodeGuids.Contains(Candidate->NodeGuid))
+            {
+                NodesToRemove.Add(Candidate);
+            }
+        }
+
+        for (UEdGraphNode* Candidate : NodesToRemove)
+        {
+            if (OwningBlueprint)
+            {
+                FBlueprintEditorUtils::RemoveNode(OwningBlueprint, Candidate, true);
+            }
+            else
+            {
+                TargetGraph->RemoveNode(Candidate);
+            }
+        }
+        if (OwningPackage)
+        {
+            OwningPackage->SetDirtyFlag(bPackageWasDirty);
+        }
+    };
+
+    auto MakeFailure = [&](const FString& ErrorCode, const FString& Message)
+    {
+        RollbackCreatedNodes();
+        TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+        Error->SetBoolField(TEXT("success"), false);
+        Error->SetStringField(TEXT("error_code"), ErrorCode);
+        Error->SetStringField(TEXT("error"), Message);
+        Error->SetBoolField(TEXT("rolled_back"), true);
+        return Error;
+    };
+
     UEdGraphNode* NewNode = nullptr;
     TSharedPtr<FJsonObject> Result = CreateNodeInstance(TargetGraph, Payload, NewNode);
-    if (!Result.IsValid()) return nullptr;
+    if (!Result.IsValid())
+    {
+        return MakeFailure(TEXT("node_creation_failed"), TEXT("Node creation returned no result."));
+    }
+
+    bool bCreatedSuccessfully = false;
+    Result->TryGetBoolField(TEXT("success"), bCreatedSuccessfully);
+    if (!bCreatedSuccessfully || !NewNode)
+    {
+        FString ErrorMessage = TEXT("Node creation failed before a valid graph node was produced.");
+        Result->TryGetStringField(TEXT("error"), ErrorMessage);
+        RollbackCreatedNodes();
+        Result->SetBoolField(TEXT("success"), false);
+        Result->SetStringField(TEXT("error_code"), TEXT("node_creation_failed"));
+        Result->SetStringField(TEXT("error"), ErrorMessage);
+        Result->SetBoolField(TEXT("rolled_back"), true);
+        return Result;
+    }
+
+    const UEdGraphSchema* Schema = TargetGraph->GetSchema();
+    if (!Schema)
+    {
+        return MakeFailure(TEXT("missing_graph_schema"), TEXT("Target graph has no schema for safe connection validation."));
+    }
+
+    auto FindExecPin = [](UEdGraphNode* Node, const EEdGraphPinDirection Direction, const FString& PreferredName, const bool bRequireUnlinked) -> UEdGraphPin*
+    {
+        if (!Node)
+        {
+            return nullptr;
+        }
+        UEdGraphPin* FirstMatch = nullptr;
+        for (UEdGraphPin* Pin : Node->Pins)
+        {
+            if (!Pin || Pin->Direction != Direction || Pin->PinType.PinCategory != UEdGraphSchema_K2::PC_Exec)
+            {
+                continue;
+            }
+            if (bRequireUnlinked && Pin->LinkedTo.Num() > 0)
+            {
+                continue;
+            }
+            if (!PreferredName.IsEmpty() && BluecodePinNameMatches(Pin, PreferredName))
+            {
+                return Pin;
+            }
+            if (!FirstMatch)
+            {
+                FirstMatch = Pin;
+            }
+        }
+        return PreferredName.IsEmpty() ? FirstMatch : nullptr;
+    };
+
+    auto CountExecPins = [](const UEdGraphNode* Node, const EEdGraphPinDirection Direction, const bool bRequireUnlinked)
+    {
+        int32 Count = 0;
+        if (Node)
+        {
+            for (const UEdGraphPin* Pin : Node->Pins)
+            {
+                if (Pin &&
+                    Pin->Direction == Direction &&
+                    Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec &&
+                    (!bRequireUnlinked || Pin->LinkedTo.Num() == 0))
+                {
+                    ++Count;
+                }
+            }
+        }
+        return Count;
+    };
+
+    auto IsUnionSafeResponse = [](const FPinConnectionResponse& Response)
+    {
+        return Response.Response == CONNECT_RESPONSE_MAKE ||
+            Response.Response == CONNECT_RESPONSE_MAKE_WITH_CONVERSION_NODE ||
+            Response.Response == CONNECT_RESPONSE_MAKE_WITH_PROMOTION;
+    };
+
+    // A semantic right-anchor insertion is an explicit splice: preserve both
+    // existing nodes and replace only the single anchor edge with prev->new->anchor.
+    FString InsertBeforeNodeId;
+    Payload->TryGetStringField(TEXT("insertBeforeNodeId"), InsertBeforeNodeId);
+    if (InsertBeforeNodeId.IsEmpty())
+    {
+        Payload->TryGetStringField(TEXT("insert_before_node_id"), InsertBeforeNodeId);
+    }
+    if (!InsertBeforeNodeId.IsEmpty())
+    {
+        UEdGraphNode* AnchorNode = FindNodeByIdOrName(TargetGraph, InsertBeforeNodeId);
+        UEdGraphPin* AnchorExecIn = FindExecPin(AnchorNode, EGPD_Input, TEXT(""), false);
+        UEdGraphPin* NewExecIn = FindExecPin(NewNode, EGPD_Input, TEXT(""), true);
+        UEdGraphPin* NewExecOut = FindExecPin(NewNode, EGPD_Output, TEXT(""), true);
+        if (!AnchorNode ||
+            !AnchorExecIn ||
+            AnchorExecIn->LinkedTo.Num() != 1 ||
+            !NewExecIn ||
+            !NewExecOut ||
+            CountExecPins(NewNode, EGPD_Input, true) != 1 ||
+            CountExecPins(NewNode, EGPD_Output, true) != 1)
+        {
+            return MakeFailure(
+                TEXT("unsafe_right_anchor"),
+                TEXT("Right-anchor insertion requires one existing incoming exec edge and one unambiguous exec input/output on the new node."));
+        }
+
+        UEdGraphPin* PreviousExecOut = AnchorExecIn->LinkedTo[0];
+        if (!PreviousExecOut || PreviousExecOut->Direction != EGPD_Output || PreviousExecOut->PinType.PinCategory != UEdGraphSchema_K2::PC_Exec)
+        {
+            return MakeFailure(TEXT("invalid_right_anchor_edge"), TEXT("The right anchor's incoming edge is not a valid exec connection."));
+        }
+
+        Schema->BreakSinglePinLink(PreviousExecOut, AnchorExecIn);
+        const bool bConnectedPrevious =
+            IsUnionSafeResponse(Schema->CanCreateConnection(PreviousExecOut, NewExecIn)) &&
+            Schema->TryCreateConnection(PreviousExecOut, NewExecIn);
+        const bool bConnectedAnchor =
+            bConnectedPrevious &&
+            IsUnionSafeResponse(Schema->CanCreateConnection(NewExecOut, AnchorExecIn)) &&
+            Schema->TryCreateConnection(NewExecOut, AnchorExecIn);
+        if (!bConnectedPrevious || !bConnectedAnchor)
+        {
+            Schema->BreakPinLinks(*NewExecIn, false);
+            Schema->BreakPinLinks(*NewExecOut, false);
+            Schema->TryCreateConnection(PreviousExecOut, AnchorExecIn);
+            return MakeFailure(
+                TEXT("right_anchor_splice_failed"),
+                TEXT("Failed to splice the new node before the right anchor; the original exec edge was restored."));
+        }
+
+        NewNode->NodePosX = AnchorNode->NodePosX - 300;
+        NewNode->NodePosY = AnchorNode->NodePosY;
+        Result->SetBoolField(TEXT("inserted_before_anchor"), true);
+        Result->SetStringField(TEXT("anchor_node_id"), AnchorNode->NodeGuid.ToString());
+    }
 
     // FORWARD WIRING (Sequence)
     FString AutoConnectId;
-    if (Payload->TryGetStringField(TEXT("autoConnectToNodeId"), AutoConnectId))
+    if (InsertBeforeNodeId.IsEmpty() && Payload->TryGetStringField(TEXT("autoConnectToNodeId"), AutoConnectId) && !AutoConnectId.IsEmpty())
     {
         UEdGraphNode* PrevNode = FindNodeByIdOrName(TargetGraph, AutoConnectId);
-        if (PrevNode)
+        if (!PrevNode)
         {
-                // Auto-Layout: Place new node to the right of Previous Node
-                NewNode->NodePosX = PrevNode->NodePosX + 300;
-                NewNode->NodePosY = PrevNode->NodePosY;
-
-                // Wiring Logic
-                UEdGraphPin* ExecOut = PrevNode->FindPin(UEdGraphSchema_K2::PN_Then);
-                if (!ExecOut)
-                {
-                     UEdGraphPin* FirstExec = nullptr;
-                     for (UEdGraphPin* Pin : PrevNode->Pins)
-                    {
-                        if (Pin->Direction == EGPD_Output && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec)
-                        {
-                            if (!FirstExec) FirstExec = Pin; // Keep track of the first one (default)
-
-                            // Priority: First FREE pin (supports branching)
-                            if (Pin->LinkedTo.Num() == 0)
-                            {
-                                ExecOut = Pin;
-                                break;
-                            }
-                        }
-                    }
-                    // Default to first exec if all occupied (or none found)
-                    if (!ExecOut) ExecOut = FirstExec;
-                }
-                // If PN_Then exists but is connected, try to find another free one?
-                else if (ExecOut->LinkedTo.Num() > 0)
-                {
-                     // 'Then' is taken. Search for any other free Exec pin (e.g. False)
-                     for (UEdGraphPin* Pin : PrevNode->Pins)
-                     {
-                         if (Pin->Direction == EGPD_Output && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec && Pin->LinkedTo.Num() == 0)
-                         {
-                             ExecOut = Pin;
-                             break;
-                         }
-                     }
-                }
-
-            UEdGraphPin* ExecIn = NewNode->FindPin(UEdGraphSchema_K2::PN_Execute);
-            if (!ExecIn)
-            {
-                 for (UEdGraphPin* Pin : NewNode->Pins)
-                {
-                    if (Pin->Direction == EGPD_Input && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec)
-                    {
-                        ExecIn = Pin;
-                        break;
-                    }
-                }
-            }
-
-            if (ExecOut && ExecIn)
-            {
-                TargetGraph->GetSchema()->TryCreateConnection(ExecOut, ExecIn);
-            }
+            return MakeFailure(TEXT("auto_connect_source_missing"), TEXT("The requested auto-connect source node no longer exists."));
         }
+
+        FString SourcePinName;
+        Payload->TryGetStringField(TEXT("autoConnectFromPin"), SourcePinName);
+        if (SourcePinName.IsEmpty()) Payload->TryGetStringField(TEXT("auto_connect_from_pin"), SourcePinName);
+        FString TargetPinName;
+        Payload->TryGetStringField(TEXT("autoConnectToPin"), TargetPinName);
+        if (TargetPinName.IsEmpty()) Payload->TryGetStringField(TEXT("auto_connect_to_pin"), TargetPinName);
+
+        UEdGraphPin* ExecOut = FindExecPin(PrevNode, EGPD_Output, SourcePinName, true);
+        UEdGraphPin* ExecIn = FindExecPin(NewNode, EGPD_Input, TargetPinName, true);
+        if (SourcePinName.IsEmpty() && CountExecPins(PrevNode, EGPD_Output, true) != 1)
+        {
+            return MakeFailure(
+                TEXT("ambiguous_auto_connect_source"),
+                TEXT("Auto-connect found zero or multiple free exec outputs; specify autoConnectFromPin or use structured BlueCode control flow."));
+        }
+        if (TargetPinName.IsEmpty() && CountExecPins(NewNode, EGPD_Input, true) != 1)
+        {
+            return MakeFailure(
+                TEXT("ambiguous_auto_connect_target"),
+                TEXT("The new node has zero or multiple exec inputs; specify autoConnectToPin."));
+        }
+        if (!ExecOut || !ExecIn)
+        {
+            return MakeFailure(
+                TEXT("auto_connect_would_replace_edge"),
+                TEXT("No unlinked exec pin is available for union-safe auto-connect; existing execution links were preserved."));
+        }
+
+        const FPinConnectionResponse Response = Schema->CanCreateConnection(ExecOut, ExecIn);
+        if (!IsUnionSafeResponse(Response) || !Schema->TryCreateConnection(ExecOut, ExecIn))
+        {
+            return MakeFailure(
+                TEXT("auto_connect_failed"),
+                FString::Printf(TEXT("Exec auto-connect was rejected without changing existing links (%s)."), *Response.Message.ToString()));
+        }
+
+        // Auto-Layout: Place new node to the right of Previous Node.
+        NewNode->NodePosX = PrevNode->NodePosX + 300;
+        NewNode->NodePosY = PrevNode->NodePosY;
+        Result->SetBoolField(TEXT("auto_connected"), true);
     }
-    else
+    else if (InsertBeforeNodeId.IsEmpty())
     {
         // FLOATING STRATEGY: No Auto-Connect (Prepare Data)
         // Place below the current cursor node to keep organized
@@ -4952,22 +5399,70 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
     TArray<FString> Lines;
     TSharedPtr<FJsonObject> ActionHints = MakeShared<FJsonObject>();
     TSharedPtr<FJsonObject> ExpressionHints = MakeShared<FJsonObject>();
+    TSharedPtr<FJsonObject> SourceMap = MakeShared<FJsonObject>();
     TArray<TSharedPtr<FJsonValue>> ActionHintsByLine;
     Lines.Add(TEXT("main()"));
+    int32 StatementCount = 0;
 
     FString Detail;
     Params->TryGetStringField(TEXT("detail"), Detail);
+    if (Detail.IsEmpty())
+    {
+        Detail = TEXT("semantic");
+    }
+    const bool bRoundtripDetail =
+        Detail.Equals(TEXT("roundtrip"), ESearchCase::IgnoreCase) ||
+        Detail.Equals(TEXT("debug"), ESearchCase::IgnoreCase);
+    const bool bDebugDetail = Detail.Equals(TEXT("debug"), ESearchCase::IgnoreCase);
+    bool bIncludeReconstructionHints = bRoundtripDetail;
+    Params->TryGetBoolField(TEXT("include_reconstruction_hints"), bIncludeReconstructionHints);
+    bIncludeReconstructionHints = bRoundtripDetail && bIncludeReconstructionHints;
+    if (!Detail.Equals(TEXT("semantic"), ESearchCase::IgnoreCase) &&
+        !Detail.Equals(TEXT("roundtrip"), ESearchCase::IgnoreCase) &&
+        !bDebugDetail)
+    {
+        TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+        Error->SetBoolField(TEXT("success"), false);
+        Error->SetStringField(TEXT("error_code"), TEXT("invalid_bluecode_detail"));
+        Error->SetStringField(TEXT("error"), TEXT("detail must be 'semantic', 'roundtrip', or 'debug'."));
+        return Error;
+    }
     bool bIncludeConnections = false;
     Params->TryGetBoolField(TEXT("include_connections"), bIncludeConnections);
-    bIncludeConnections = bIncludeConnections ||
-        Detail.Equals(TEXT("debug"), ESearchCase::IgnoreCase) ||
-        Detail.Equals(TEXT("roundtrip"), ESearchCase::IgnoreCase);
+    bIncludeConnections = bIncludeConnections || bDebugDetail;
 
     auto AddStatementLine = [&](const FString& Statement, UEdGraphNode* SourceNode, const bool bIncludeActionHint)
     {
         const int32 LineNumber = Lines.Num() + 1;
+        const FString SourcePath = FString::Printf(TEXT("/body/%d"), StatementCount++);
         Lines.Add(FString::Printf(TEXT("  %s"), *Statement));
-        if (bIncludeActionHint && SourceNode)
+        if (bRoundtripDetail && SourceNode)
+        {
+            TSharedPtr<FJsonObject> Source = MakeShared<FJsonObject>();
+            Source->SetStringField(TEXT("statement"), Statement);
+            Source->SetStringField(TEXT("node_guid"), SourceNode->NodeGuid.ToString());
+            Source->SetStringField(TEXT("node_id"), SourceNode->NodeGuid.ToString());
+            Source->SetStringField(TEXT("semantic_key"), MakeBluecodeSemanticKey(SourceNode));
+            Source->SetStringField(
+                TEXT("node_class_path"),
+                SourceNode->GetClass() ? SourceNode->GetClass()->GetPathName() : TEXT(""));
+            if (const UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(SourceNode))
+            {
+                TSharedPtr<FJsonObject> Descriptor = MakeShared<FJsonObject>();
+                const UFunction* Function = CallNode->GetTargetFunction();
+                Descriptor->SetStringField(TEXT("member_name"), CallNode->FunctionReference.GetMemberName().ToString());
+                Descriptor->SetStringField(
+                    TEXT("member_owner"),
+                    Function && Function->GetOwnerClass() ? Function->GetOwnerClass()->GetPathName() : TEXT("self"));
+                Source->SetStringField(
+                    TEXT("member_class"),
+                    Function && Function->GetOwnerClass() ? Function->GetOwnerClass()->GetPathName() : TEXT(""));
+                Descriptor->SetStringField(TEXT("signature"), Function ? Function->GetPathName() : TEXT(""));
+                Source->SetObjectField(TEXT("action_descriptor"), Descriptor);
+            }
+            SourceMap->SetObjectField(SourcePath, Source);
+        }
+        if (bIncludeReconstructionHints && bIncludeActionHint && SourceNode)
         {
             TSharedPtr<FJsonObject> Hint = MakeBluecodeRoundtripHint(Graph, SourceNode, Statement);
             ActionHints->SetObjectField(Statement, Hint);
@@ -4990,12 +5485,12 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
                 SortedNodes.Add(Node);
             }
         }
+        // Semantic read order must be layout-independent. Exec traversal below
+        // supplies control-flow order; this key only stabilizes roots/floating nodes.
         SortedNodes.Sort([](const UEdGraphNode& A, const UEdGraphNode& B) {
-            if (A.NodePosX == B.NodePosX)
-            {
-                return A.NodePosY < B.NodePosY;
-            }
-            return A.NodePosX < B.NodePosX;
+            const FString AKey = MakeBluecodeSemanticKey(&A) + TEXT(":") + A.NodeGuid.ToString();
+            const FString BKey = MakeBluecodeSemanticKey(&B) + TEXT(":") + B.NodeGuid.ToString();
+            return AKey < BKey;
         });
 
         TSet<const UEdGraphNode*> DependencyNodes;
@@ -5006,7 +5501,7 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
 
         for (UEdGraphNode* Node : SortedNodes)
         {
-            if (!Node || !DependencyNodes.Contains(Node))
+            if (!bIncludeReconstructionHints || !Node || !DependencyNodes.Contains(Node))
             {
                 continue;
             }
@@ -5076,7 +5571,7 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
                 AddStatementLine(
                     FString::Printf(TEXT("%s = %s"), *SetNode->VariableReference.GetMemberName().ToString(), *Value),
                     Node,
-                    true);
+                    false);
             }
             else if (Cast<UK2Node_IfThenElse>(Node))
             {
@@ -5096,7 +5591,7 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
                         break;
                     }
                 }
-                AddStatementLine(FString::Printf(TEXT("if %s:"), *Condition), Node, true);
+                AddStatementLine(FString::Printf(TEXT("if %s:"), *Condition), Node, false);
             }
             else if (UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(Node))
             {
@@ -5106,7 +5601,7 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
                 AddStatementLine(
                     FString::Printf(TEXT("%s(%s)"), *FunctionName, *JoinBluecodeCallArgs(Args)),
                     Node,
-                    true);
+                    false);
             }
             else if (UK2Node_VariableGet* GetNode = Cast<UK2Node_VariableGet>(Node))
             {
@@ -5135,25 +5630,37 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ReadBluecodeFunction(UEd
 
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetBoolField(TEXT("success"), true);
+    Result->SetStringField(TEXT("protocol_version"), TEXT("2"));
+    Result->SetStringField(TEXT("detail"), Detail.ToLower());
     Result->SetStringField(TEXT("function"), Graph ? Graph->GetName() : TEXT("EventGraph"));
-    Result->SetStringField(TEXT("entry"), TEXT("main"));
-    Result->SetStringField(TEXT("exit"), TEXT("end"));
+    if (UBlueprint* Blueprint = ResolveBlueprintFromGraph(Graph))
+    {
+        Result->SetStringField(TEXT("target"), Blueprint->GetPathName());
+    }
+    Result->SetStringField(TEXT("base_revision"), MakeBluecodeGraphRevision(Graph));
     Result->SetStringField(TEXT("code"), FString::Join(Lines, TEXT("\n")));
-    Result->SetObjectField(TEXT("action_hints"), ActionHints);
-    Result->SetObjectField(TEXT("expression_hints"), ExpressionHints);
-    Result->SetArrayField(TEXT("action_hints_by_line"), ActionHintsByLine);
-    Result->SetStringField(TEXT("action_hints_usage"), TEXT("Pass this object back to bluecode_apply when preserving custom, plugin, macro, or ambiguous nodes."));
-    Result->SetBoolField(TEXT("debug_nodes_available"), true);
-    const TArray<TSharedPtr<FJsonValue>> Connections = CollectBluecodeConnections(Graph);
-    Result->SetNumberField(TEXT("connection_count"), Connections.Num());
-    Result->SetBoolField(TEXT("connections_available"), true);
+    Result->SetNumberField(TEXT("statement_count"), StatementCount);
+    if (bRoundtripDetail)
+    {
+        Result->SetStringField(TEXT("entry"), TEXT("main"));
+        Result->SetStringField(TEXT("exit"), TEXT("end"));
+        Result->SetObjectField(TEXT("source_map"), SourceMap);
+        if (bIncludeReconstructionHints)
+        {
+            Result->SetObjectField(TEXT("action_hints"), ActionHints);
+            Result->SetObjectField(TEXT("expression_hints"), ExpressionHints);
+            Result->SetArrayField(TEXT("action_hints_by_line"), ActionHintsByLine);
+            Result->SetStringField(TEXT("roundtrip_usage"), TEXT("Pass base_revision, source_map, and hints back to bluecode_apply for an exact union edit."));
+        }
+    }
     if (bIncludeConnections)
     {
+        const TArray<TSharedPtr<FJsonValue>> Connections = CollectBluecodeConnections(Graph);
+        Result->SetNumberField(TEXT("connection_count"), Connections.Num());
         Result->SetArrayField(TEXT("connections"), Connections);
-        Result->SetStringField(TEXT("connections_usage"), TEXT("Use bluecode_connect to add missing links and bluecode_delete(kind='connection', confirm_delete=true) to remove specific existing links."));
     }
 
-    if (Detail.Equals(TEXT("debug"), ESearchCase::IgnoreCase))
+    if (bDebugDetail)
     {
         TSharedPtr<FJsonObject> Nodes = GetNodes(Graph);
         if (Nodes.IsValid())
@@ -5188,18 +5695,37 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
         return Error;
     }
 
-    FString Mode = TEXT("append");
+    FString ExpectedRevision;
+    Params->TryGetStringField(TEXT("base_revision"), ExpectedRevision);
+    if (ExpectedRevision.IsEmpty()) Params->TryGetStringField(TEXT("expected_revision"), ExpectedRevision);
+    const FString CurrentRevision = MakeBluecodeGraphRevision(Graph);
+    UPackage* BlueprintPackage = Blueprint->GetOutermost();
+    const bool bPackageWasDirty = BlueprintPackage ? BlueprintPackage->IsDirty() : false;
+    if (!ExpectedRevision.IsEmpty() && ExpectedRevision != CurrentRevision)
+    {
+        TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
+        Error->SetBoolField(TEXT("success"), false);
+        Error->SetStringField(TEXT("error_code"), TEXT("graph_revision_conflict"));
+        Error->SetStringField(TEXT("error"), TEXT("The Blueprint graph changed after it was read; re-read before applying this BlueCode patch."));
+        Error->SetStringField(TEXT("expected_revision"), ExpectedRevision);
+        Error->SetStringField(TEXT("actual_revision"), CurrentRevision);
+        return Error;
+    }
+
+    FString Mode = TEXT("union");
     Params->TryGetStringField(TEXT("mode"), Mode);
     if (Mode.IsEmpty())
     {
-        Mode = TEXT("append");
+        Mode = TEXT("union");
     }
-    const bool bUpsertMode = Mode.Equals(TEXT("upsert"), ESearchCase::IgnoreCase);
+    const bool bUpsertMode =
+        Mode.Equals(TEXT("union"), ESearchCase::IgnoreCase) ||
+        Mode.Equals(TEXT("upsert"), ESearchCase::IgnoreCase);
     if (!bUpsertMode && !Mode.Equals(TEXT("append"), ESearchCase::IgnoreCase))
     {
         TSharedPtr<FJsonObject> Error = MakeShared<FJsonObject>();
         Error->SetBoolField(TEXT("success"), false);
-        Error->SetStringField(TEXT("error"), TEXT("bluecode_apply supports mode='append' or mode='upsert' only."));
+        Error->SetStringField(TEXT("error"), TEXT("bluecode_apply supports mode='union' (or legacy 'upsert') and explicit mode='append'."));
         return Error;
     }
 
@@ -5216,20 +5742,274 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
     TArray<TSharedPtr<FJsonValue>> Unsupported;
     TArray<TSharedPtr<FJsonValue>> Failures;
     TSharedPtr<FJsonObject> AliasMap = MakeShared<FJsonObject>();
+    const TArray<FString> ParsedStatements = ParseBluecodeStatements(Code);
     TSet<FString> ExistingKeys;
+    TArray<FBluecodeMergeStatement> ExistingMergeStatements;
     if (bUpsertMode)
     {
-        TSharedPtr<FJsonObject> EmptyParams = MakeShared<FJsonObject>();
-        TSharedPtr<FJsonObject> Existing = ReadBluecodeFunction(Graph, EmptyParams);
+        TSharedPtr<FJsonObject> RoundtripParams = MakeShared<FJsonObject>();
+        RoundtripParams->SetStringField(TEXT("detail"), TEXT("roundtrip"));
+        RoundtripParams->SetBoolField(TEXT("include_reconstruction_hints"), false);
+        TSharedPtr<FJsonObject> Existing = ReadBluecodeFunction(Graph, RoundtripParams);
         FString ExistingCode;
         if (Existing.IsValid() && Existing->TryGetStringField(TEXT("code"), ExistingCode))
         {
-            for (const FString& ExistingStatement : ParseBluecodeStatements(ExistingCode))
+            const TArray<FString> ExistingStatements = ParseBluecodeStatements(ExistingCode);
+            const TSharedPtr<FJsonObject>* ExistingSourceMap = nullptr;
+            Existing->TryGetObjectField(TEXT("source_map"), ExistingSourceMap);
+            for (int32 ExistingIndex = 0; ExistingIndex < ExistingStatements.Num(); ++ExistingIndex)
             {
+                const FString& ExistingStatement = ExistingStatements[ExistingIndex];
                 ExistingKeys.Add(NormalizeBluecodeStatement(ExistingStatement));
+                FBluecodeMergeStatement MergeStatement;
+                MergeStatement.Statement = ExistingStatement;
+                MergeStatement.Normalized = NormalizeBluecodeStatement(ExistingStatement);
+                if (ExistingSourceMap && ExistingSourceMap->IsValid())
+                {
+                    const FString Path = FString::Printf(TEXT("/body/%d"), ExistingIndex);
+                    const TSharedPtr<FJsonObject>* Source = nullptr;
+                    if ((*ExistingSourceMap)->TryGetObjectField(Path, Source) && Source && Source->IsValid())
+                    {
+                        (*Source)->TryGetStringField(TEXT("node_id"), MergeStatement.NodeId);
+                    }
+                }
+                ExistingMergeStatements.Add(MoveTemp(MergeStatement));
             }
         }
     }
+
+    TArray<FBluecodeMergeStatement> PatchMergeStatements;
+    PatchMergeStatements.Reserve(ParsedStatements.Num());
+    for (const FString& Statement : ParsedStatements)
+    {
+        FBluecodeMergeStatement MergeStatement;
+        MergeStatement.Statement = Statement;
+        MergeStatement.Normalized = NormalizeBluecodeStatement(Statement);
+        PatchMergeStatements.Add(MoveTemp(MergeStatement));
+    }
+
+    FBluecodeMergePlan MergePlan;
+    if (bUpsertMode)
+    {
+        MergePlan = FBluecodeMergePlanner::PlanUnion(ExistingMergeStatements, PatchMergeStatements);
+    }
+    else
+    {
+        for (int32 PatchIndex = 0; PatchIndex < PatchMergeStatements.Num(); ++PatchIndex)
+        {
+            FBluecodeMergeOperation Operation;
+            Operation.Kind = EBluecodeMergeOperationKind::Append;
+            Operation.PatchIndex = PatchIndex;
+            Operation.Statement = PatchMergeStatements[PatchIndex].Statement;
+            MergePlan.Operations.Add(MoveTemp(Operation));
+        }
+    }
+
+    auto FindLinearExecTailId = [&](const FString& RequestedStartId)
+    {
+        UEdGraphNode* Current = RequestedStartId.IsEmpty() ? nullptr : FindNodeByIdOrName(Graph, RequestedStartId);
+        if (!Current)
+        {
+            TArray<UEdGraphNode*> Entries;
+            for (UEdGraphNode* Node : Graph->Nodes)
+            {
+                if (IsBluecodeEntryNode(Node))
+                {
+                    Entries.Add(Node);
+                }
+            }
+            if (Entries.Num() == 1)
+            {
+                Current = Entries[0];
+            }
+        }
+
+        TSet<UEdGraphNode*> Visited;
+        while (Current && !Visited.Contains(Current))
+        {
+            Visited.Add(Current);
+            TSet<UEdGraphNode*> NextNodes;
+            for (UEdGraphPin* Pin : Current->Pins)
+            {
+                if (!Pin || Pin->Direction != EGPD_Output || Pin->PinType.PinCategory != UEdGraphSchema_K2::PC_Exec)
+                {
+                    continue;
+                }
+                for (UEdGraphPin* LinkedPin : Pin->LinkedTo)
+                {
+                    if (LinkedPin && LinkedPin->GetOwningNode())
+                    {
+                        NextNodes.Add(LinkedPin->GetOwningNode());
+                    }
+                }
+            }
+            if (NextNodes.Num() != 1)
+            {
+                break;
+            }
+            for (UEdGraphNode* NextNode : NextNodes)
+            {
+                Current = NextNode;
+                break;
+            }
+        }
+        return Current ? Current->NodeGuid.ToString() : FString();
+    };
+
+    auto FindSourceMappedTargetNodeId = [&](const int32 StatementOrdinal, const FString& Statement)
+    {
+        const TSharedPtr<FJsonObject>* SourceMap = nullptr;
+        if (!Params->TryGetObjectField(TEXT("source_map"), SourceMap) ||
+            !SourceMap ||
+            !SourceMap->IsValid() ||
+            (*SourceMap)->Values.Num() != ParsedStatements.Num())
+        {
+            return FString();
+        }
+
+        const FString Path = FString::Printf(TEXT("/body/%d"), StatementOrdinal);
+        const TSharedPtr<FJsonObject>* Source = nullptr;
+        if (!(*SourceMap)->TryGetObjectField(Path, Source) || !Source || !Source->IsValid())
+        {
+            return FString();
+        }
+
+        FString CallName;
+        FString ResolvedNodeName;
+        FString IgnoredValue;
+        TArray<FString> CallArgs;
+        if (TryParseBluecodeAssignment(Statement, ResolvedNodeName, IgnoredValue))
+        {
+            CallName = ResolvedNodeName;
+        }
+        else if (TryParseBluecodeBranch(Statement, IgnoredValue))
+        {
+            CallName = TEXT("if");
+            ResolvedNodeName = TEXT("Branch");
+        }
+        else if (TryParseBluecodeCall(Statement, CallName, CallArgs))
+        {
+            const bool bGenericNode =
+                CallName.Equals(TEXT("node"), ESearchCase::IgnoreCase) ||
+                CallName.Equals(TEXT("action"), ESearchCase::IgnoreCase) ||
+                CallName.Equals(TEXT("exec"), ESearchCase::IgnoreCase) ||
+                CallName.Equals(TEXT("value"), ESearchCase::IgnoreCase) ||
+                CallName.Equals(TEXT("pure"), ESearchCase::IgnoreCase);
+            if (bGenericNode)
+            {
+                if (CallArgs.Num() > 0)
+                {
+                    ResolvedNodeName = CallArgs[0];
+                }
+            }
+            else
+            {
+                FString IgnoredMemberClass;
+                ResolveBluecodeCallName(CallName, Params, ResolvedNodeName, IgnoredMemberClass);
+            }
+        }
+
+        FString SemanticKey;
+        FString NodeId;
+        (*Source)->TryGetStringField(TEXT("semantic_key"), SemanticKey);
+        (*Source)->TryGetStringField(TEXT("node_id"), NodeId);
+        return IsBluecodeSemanticKeyCompatible(SemanticKey, CallName, ResolvedNodeName) ? NodeId : FString();
+    };
+
+    bool bDryRun = false;
+    Params->TryGetBoolField(TEXT("dry_run"), bDryRun);
+    if (bDryRun)
+    {
+        TArray<TSharedPtr<FJsonValue>> PlannedOperations;
+        TArray<FString> PlanIdentityParts = { CurrentRevision, Mode };
+        for (const FBluecodeMergeOperation& Operation : MergePlan.Operations)
+        {
+            TSharedPtr<FJsonObject> Planned = MakeShared<FJsonObject>();
+            Planned->SetNumberField(TEXT("patch_index"), Operation.PatchIndex);
+            Planned->SetStringField(TEXT("statement"), Operation.Statement);
+            FString Kind;
+            const FString SourceMappedTarget = FindSourceMappedTargetNodeId(Operation.PatchIndex, Operation.Statement);
+            if (Operation.Kind != EBluecodeMergeOperationKind::Noop && !SourceMappedTarget.IsEmpty())
+            {
+                Kind = TEXT("update");
+                Planned->SetStringField(TEXT("target_node_id"), SourceMappedTarget);
+            }
+            else switch (Operation.Kind)
+            {
+            case EBluecodeMergeOperationKind::Noop:
+                Kind = TEXT("noop");
+                Planned->SetStringField(TEXT("matched_node_id"), Operation.MatchedNodeId);
+                break;
+            case EBluecodeMergeOperationKind::InsertBefore:
+                Kind = TEXT("insert_before");
+                Planned->SetStringField(TEXT("right_anchor_node_id"), Operation.RightAnchorNodeId);
+                break;
+            default:
+                Kind = TEXT("append");
+                Planned->SetStringField(TEXT("append_after_node_id"), FindLinearExecTailId(AutoConnectNodeId));
+                break;
+            }
+            Planned->SetStringField(TEXT("op"), Kind);
+            PlanIdentityParts.Add(Kind + TEXT(":") + Operation.Statement + TEXT(":") + Operation.RightAnchorNodeId + TEXT(":") + SourceMappedTarget);
+            PlannedOperations.Add(MakeShared<FJsonValueObject>(Planned));
+        }
+
+        TSharedPtr<FJsonObject> PlanResult = MakeShared<FJsonObject>();
+        PlanResult->SetBoolField(TEXT("success"), MergePlan.Conflicts.Num() == 0);
+        PlanResult->SetBoolField(TEXT("dry_run"), true);
+        PlanResult->SetStringField(TEXT("expected_revision"), CurrentRevision);
+        PlanResult->SetStringField(TEXT("plan_hash"), HashBluecodeIdentity(FString::Join(PlanIdentityParts, TEXT("\n")), TEXT("bcplan:")));
+        PlanResult->SetArrayField(TEXT("operations"), PlannedOperations);
+        if (MergePlan.Conflicts.Num() > 0)
+        {
+            TArray<TSharedPtr<FJsonValue>> ConflictValues;
+            for (const FString& Conflict : MergePlan.Conflicts)
+            {
+                ConflictValues.Add(MakeShared<FJsonValueString>(Conflict));
+            }
+            PlanResult->SetArrayField(TEXT("conflicts"), ConflictValues);
+        }
+        return PlanResult;
+    }
+
+    FString GraphSnapshotText;
+    {
+        TSet<UObject*> NodesToSnapshot;
+        for (UEdGraphNode* Node : Graph->Nodes)
+        {
+            if (Node)
+            {
+                NodesToSnapshot.Add(Node);
+            }
+        }
+        FEdGraphUtilities::ExportNodesToText(NodesToSnapshot, GraphSnapshotText);
+    }
+
+    auto RestoreGraphSnapshot = [&]()
+    {
+        TArray<UEdGraphNode*> NodesToRemove;
+        for (UEdGraphNode* Node : Graph->Nodes)
+        {
+            if (Node)
+            {
+                NodesToRemove.Add(Node);
+            }
+        }
+        for (UEdGraphNode* Node : NodesToRemove)
+        {
+            if (Node)
+            {
+                Graph->RemoveNode(Node);
+            }
+        }
+        TSet<UEdGraphNode*> RestoredNodes;
+        FEdGraphUtilities::ImportNodesFromText(Graph, GraphSnapshotText, RestoredNodes);
+        if (BlueprintPackage)
+        {
+            BlueprintPackage->SetDirtyFlag(bPackageWasDirty);
+        }
+        return MakeBluecodeGraphRevision(Graph) == CurrentRevision;
+    };
 
     int32 AppliedCount = 0;
     int32 OperationIndex = 0;
@@ -5830,16 +6610,22 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
         return ResultObj;
     };
 
-    const TArray<FString> ParsedStatements = ParseBluecodeStatements(Code);
     for (int32 StatementOrdinal = 0; StatementOrdinal < ParsedStatements.Num(); ++StatementOrdinal)
     {
         const FString& Statement = ParsedStatements[StatementOrdinal];
         const FString StatementKey = NormalizeBluecodeStatement(Statement);
-        if (bUpsertMode && ExistingKeys.Contains(StatementKey))
+        const FBluecodeMergeOperation* PlannedOperation = MergePlan.Operations.IsValidIndex(StatementOrdinal)
+            ? &MergePlan.Operations[StatementOrdinal]
+            : nullptr;
+        if (bUpsertMode && PlannedOperation && PlannedOperation->Kind == EBluecodeMergeOperationKind::Noop)
         {
             TSharedPtr<FJsonObject> SkippedObj = MakeShared<FJsonObject>();
             SkippedObj->SetStringField(TEXT("statement"), Statement);
-            SkippedObj->SetStringField(TEXT("reason"), TEXT("already_present"));
+            SkippedObj->SetStringField(TEXT("reason"), TEXT("semantic_match"));
+            if (!PlannedOperation->MatchedNodeId.IsEmpty())
+            {
+                SkippedObj->SetStringField(TEXT("matched_node_id"), PlannedOperation->MatchedNodeId);
+            }
             Skipped.Add(MakeShared<FJsonValueObject>(SkippedObj));
             continue;
         }
@@ -5849,9 +6635,24 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
         Payload->SetNumberField(TEXT("x"), BaseX + (OperationIndex * 320.0));
         Payload->SetNumberField(TEXT("y"), BaseY + (OperationIndex * 80.0));
         CopyBluecodeHintContext(Params, Payload);
-        if (!AutoConnectNodeId.IsEmpty())
+        const FString SourceMappedTargetNodeId = FindSourceMappedTargetNodeId(StatementOrdinal, Statement);
+        if (!SourceMappedTargetNodeId.IsEmpty())
         {
-            Payload->SetStringField(TEXT("autoConnectToNodeId"), AutoConnectNodeId);
+            Payload->SetStringField(TEXT("target_node_id"), SourceMappedTargetNodeId);
+        }
+        if (PlannedOperation &&
+            PlannedOperation->Kind == EBluecodeMergeOperationKind::InsertBefore &&
+            !PlannedOperation->RightAnchorNodeId.IsEmpty())
+        {
+            Payload->SetStringField(TEXT("insertBeforeNodeId"), PlannedOperation->RightAnchorNodeId);
+        }
+        else
+        {
+            const FString TailNodeId = FindLinearExecTailId(AutoConnectNodeId);
+            if (!TailNodeId.IsEmpty())
+            {
+                Payload->SetStringField(TEXT("autoConnectToNodeId"), TailNodeId);
+            }
         }
 
         FString AssignmentName;
@@ -5980,6 +6781,7 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
                 {
                     Payload->SetStringField(TEXT("subAction"), TEXT("create_node"));
                     Payload->RemoveField(TEXT("autoConnectToNodeId"));
+                    Payload->RemoveField(TEXT("insertBeforeNodeId"));
                 }
                 ApplyBluecodeActionHints(Statement, CallName, NodeName, Params, Payload, StatementOrdinal, &UsedLineHintIndices);
                 ApplyBluecodeArgsToPayload(CallArgs, 1, Payload);
@@ -6089,12 +6891,25 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
         ++OperationIndex;
     }
 
+    const int32 AttemptedAppliedCount = AppliedCount;
+    const bool bNeedsRollback = Unsupported.Num() > 0 || Failures.Num() > 0;
+    bool bRollbackVerified = false;
+    if (bNeedsRollback)
+    {
+        bRollbackVerified = RestoreGraphSnapshot();
+        AppliedCount = 0;
+        LastNodeId.Empty();
+        bLastNodeExec = false;
+        AliasMap = MakeShared<FJsonObject>();
+    }
+
     TSharedPtr<FJsonObject> MergeReport = MakeShared<FJsonObject>();
-    MergeReport->SetStringField(TEXT("strategy"), TEXT("append_or_skip_exact_match"));
+    MergeReport->SetStringField(TEXT("strategy"), bUpsertMode ? TEXT("lcs_union_right_anchor") : TEXT("explicit_append"));
     MergeReport->SetNumberField(TEXT("deleted_count"), 0);
+    MergeReport->SetNumberField(TEXT("attempted_applied_count"), AttemptedAppliedCount);
 
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetBoolField(TEXT("success"), Unsupported.Num() == 0 && AppliedCount == Operations.Num());
+    Result->SetBoolField(TEXT("success"), !bNeedsRollback && AppliedCount == Operations.Num());
     Result->SetStringField(TEXT("mode"), Mode);
     Result->SetNumberField(TEXT("applied_count"), AppliedCount);
     Result->SetArrayField(TEXT("operations"), Operations);
@@ -6103,6 +6918,16 @@ TSharedPtr<FJsonObject> UUmgBlueprintFunctionSubsystem::ApplyBluecode(UEdGraph* 
     Result->SetArrayField(TEXT("failures"), Failures);
     Result->SetObjectField(TEXT("merge_report"), MergeReport);
     Result->SetObjectField(TEXT("aliases"), AliasMap);
+    Result->SetStringField(TEXT("base_revision"), CurrentRevision);
+    Result->SetStringField(TEXT("new_revision"), MakeBluecodeGraphRevision(Graph));
+    if (bNeedsRollback)
+    {
+        Result->SetBoolField(TEXT("rolled_back"), true);
+        Result->SetBoolField(TEXT("rollback_verified"), bRollbackVerified);
+        Result->SetStringField(
+            TEXT("error_code"),
+            bRollbackVerified ? TEXT("bluecode_apply_failed_rolled_back") : TEXT("bluecode_apply_rollback_verification_failed"));
+    }
     if (!LastNodeId.IsEmpty())
     {
         Result->SetStringField(TEXT("nodeId"), LastNodeId);
