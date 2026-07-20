@@ -1,0 +1,15 @@
+{
+  "version": "1.0.12",
+  "internalVersion": 8,
+  "auditedDate": "2026-07-20",
+  "sourceCommit": "adab2ead1eda523cdeb358e89b5478488551904e",
+  "toolCount": 89,
+  "toolGroups": 8,
+  "sourceEngine": "5.8",
+  "fabEngines": ["5.6", "5.7", "5.8"],
+  "platform": "Win64",
+  "fabVisibilityNote": {
+    "zh": "Fab 商店实际可见的版本取决于 Fab 审核状态。",
+    "en": "Versions visible to buyers depend on the current Fab review state."
+  }
+}

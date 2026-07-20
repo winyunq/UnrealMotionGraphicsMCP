@@ -3,317 +3,219 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Getting Started — UMG MCP</title>
-  <meta name="description" content="UMG MCP quick start guide — open source setup or commercial one-click install.">
+  <title>安装与第一次连接 — UMG MCP</title>
+  <meta name="description" content="UMG MCP v1.0.12 开源版与 Fab 版的线性安装、连接、验证和故障排查指南。">
+  <link rel="canonical" href="https://winyunq.github.io/UnrealMotionGraphicsMCP/getting-started.html">
   <link rel="stylesheet" href="assets/css/main.css">
-  <style>
-    .req-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 24px; }
-    .req-item {
-      background: var(--card);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .req-icon { font-size: 1.4rem; flex-shrink: 0; }
-    .req-item h5 { font-size: .9rem; margin-bottom: 2px; }
-    .req-item p  { font-size: .8rem; color: var(--muted); }
-
-    .tabs-wrap { margin-top: 40px; }
-
-    .config-key { color: var(--accent); }
-    .config-val { color: #50fa7b; }
-    .config-cm  { color: #6272a4; }
-  </style>
 </head>
 <body>
-  <nav id="main-nav"></nav>
+  <nav id="main-nav" aria-label="Main navigation"></nav>
 
-  <div class="page-hero">
+  <header class="page-hero">
     <div class="container">
-      <span class="section-label" data-i18n="docs.badge">Quick Start</span>
-      <h1 class="mt-16" data-i18n="docs.title">Getting Started</h1>
-      <p class="hero-subtitle" data-i18n="docs.subtitle">Choose your path: open source setup or instant commercial install.</p>
-    </div>
-  </div>
-
-  <section class="section" id="commercial">
-    <div class="container container-sm">
-      <!-- TAB NAV -->
-      <div class="tabs-nav" role="tablist" data-tab-group="getting-started">
-        <button class="tab-btn active" data-tab="tab-oss" role="tab" aria-selected="true" data-i18n="docs.tab.oss">Open Source</button>
-        <button class="tab-btn" data-tab="tab-commercial" role="tab" aria-selected="false" data-i18n="docs.tab.commercial">Commercial (Fab)</button>
+      <span class="section-label" data-i18n="setup.badge">主线第 6 步 · 安装与连接</span>
+      <h1 class="mt-16" data-i18n="setup.title">选定一条路线，然后从 1 做到完成</h1>
+      <p class="hero-subtitle" data-i18n="setup.subtitle">开源版负责“源码 + 外部 MCP”，Fab 版额外提供“Launcher 安装 + 编辑器内 AI”；不要把两条路线的依赖混在一起。</p>
+      <div class="hero-cta">
+        <a href="#open-source" class="btn btn-secondary" data-i18n="setup.oss.jump">开源版步骤 ↓</a>
+        <a href="#fab" class="btn btn-primary" data-i18n="setup.fab.jump">Fab 版步骤 ↓</a>
       </div>
+    </div>
+  </header>
 
-      <div class="tabs-wrap" data-tab-group="getting-started">
-        <!-- OSS TAB -->
-        <div class="tab-pane active" id="tab-oss" role="tabpanel">
-
-          <div class="highlight-box green mb-24">
-            <strong style="color:var(--accent2)">Prerequisites</strong>
-            <p style="margin-top:6px;font-size:.9rem">UE5.3+, Python 3.9+, an MCP-compatible AI client (Claude Desktop, Cursor, or custom)</p>
+  <main>
+    <section class="section-sm">
+      <div class="container">
+        <div class="surface-note reveal">
+          <div>
+            <strong data-i18n="setup.rule.title">先决定你要从哪里聊天</strong>
+            <p data-i18n="setup.rule.desc">Codex、Claude、Gemini 等外部 MCP 客户端：两版都使用 Python/uv stdio server。直接在 Unreal Editor 内聊天：仅 Fab 版提供，并且这条路线不需要 Python。</p>
           </div>
+        </div>
+      </div>
+    </section>
 
-          <div class="req-grid reveal">
-            <div class="req-item">
-              <div class="req-icon">🎮</div>
-              <div>
-                <h5>Unreal Engine</h5>
-                <p>5.3 or newer</p>
-              </div>
-            </div>
-            <div class="req-item">
-              <div class="req-icon">🐍</div>
-              <div>
-                <h5>Python</h5>
-                <p>3.9 or newer</p>
-              </div>
-            </div>
-            <div class="req-item">
-              <div class="req-icon">🤖</div>
-              <div>
-                <h5>AI Client</h5>
-                <p>MCP compatible</p>
-              </div>
-            </div>
-            <div class="req-item">
-              <div class="req-icon">🔑</div>
-              <div>
-                <h5>API Key</h5>
-                <p>Gemini / GPT / Claude</p>
-              </div>
-            </div>
-          </div>
+    <section class="section" id="open-source">
+      <div class="container container-reading">
+        <div class="guide-heading reveal">
+          <span class="badge badge-green" data-i18n="setup.oss.badge">路线 A · 开源版</span>
+          <h2 data-i18n="setup.oss.title">GitHub 源码 + 外部 MCP 客户端</h2>
+          <p data-i18n="setup.oss.subtitle">当前公开源码基线是 UE 5.8 / Win64。需要 Git、可用的 C++ 编译环境、uv，以及一个支持 MCP stdio 的 AI 客户端。</p>
+        </div>
 
-          <div class="steps mt-48 reveal">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div class="step-content">
-                <h4>Clone the repository</h4>
-                <div class="code-block mt-12">
-                  <span class="code-lang">bash</span>
-                  <pre>git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git
-cd UnrealMotionGraphicsMCP</pre>
-                </div>
-              </div>
+        <ol class="setup-sequence reveal">
+          <li>
+            <div class="setup-number">1</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.oss.1.title">把仓库克隆到项目 Plugins/UmgMcp</h3>
+              <pre><code>cd D:\UE5Project\YourProject
+mkdir Plugins
+cd Plugins
+git clone https://github.com/winyunq/UnrealMotionGraphicsMCP.git UmgMcp</code></pre>
+              <p data-i18n="setup.oss.1.note">保持最终目录名为 UmgMcp，便于配置和排错。</p>
             </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div class="step-content">
-                <h4>Copy plugin to your UE5 project</h4>
-                <p>Copy the <code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">Source/</code> folder into your UE5 project's <code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">Plugins/UmgMcp/</code> directory.</p>
-                <div class="code-block mt-12">
-                  <span class="code-lang">bash</span>
-                  <pre># Windows (PowerShell)
-Copy-Item -Recurse Source\ "C:\MyProject\Plugins\UmgMcp\"
-
-# macOS / Linux
-cp -r Source/ /path/to/MyProject/Plugins/UmgMcp/</pre>
-                </div>
-              </div>
+          </li>
+          <li>
+            <div class="setup-number">2</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.oss.2.title">用 UE 5.8 打开项目并编译插件</h3>
+              <p data-i18n="setup.oss.2.desc">在 Plugins 中启用 UmgMcp，允许 Unreal Build Tool 构建 Editor 模块，然后重启编辑器。若从旧版本升级，先清理该插件的旧 Binaries/Intermediate。</p>
             </div>
-            <div class="step">
-              <div class="step-num">3</div>
-              <div class="step-content">
-                <h4>Enable the plugin in UE5</h4>
-                <p>Open your project → <strong>Edit → Plugins</strong> → search <em>"UMG MCP"</em> → Enable → Restart UE5.</p>
-                <div class="highlight-box accent mt-12">
-                  <p style="font-size:.85rem">If prompted to rebuild modules, click <strong>Yes</strong>. This compiles the C++ plugin for your platform.</p>
-                </div>
-              </div>
+          </li>
+          <li>
+            <div class="setup-number">3</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.oss.3.title">安装 uv，并确认 Python server 可以启动</h3>
+              <pre><code>cd D:\UE5Project\YourProject\Plugins\UmgMcp\Resources\Python
+uv run python UmgMcpServer.py</code></pre>
+              <p data-i18n="setup.oss.3.note">正常使用时由 MCP 客户端启动 server；这条命令只用于单独排错。</p>
             </div>
-            <div class="step">
-              <div class="step-num">4</div>
-              <div class="step-content">
-                <h4>Install Python dependencies</h4>
-                <div class="code-block mt-12">
-                  <span class="code-lang">bash</span>
-                  <pre>cd UnrealMotionGraphicsMCP
-pip install -r requirements.txt</pre>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">5</div>
-              <div class="step-content">
-                <h4>Configure UmgMcpConfig.json</h4>
-                <p>The config file at the repo root controls the server port and settings.</p>
-                <div class="code-block mt-12">
-                  <span class="code-lang">json</span>
-                  <pre>{
-  <span class="config-key">"host"</span>: <span class="config-val">"localhost"</span>,
-  <span class="config-key">"port"</span>: <span class="config-val">19202</span>,     <span class="config-cm">// must match UE5 plugin setting</span>
-  <span class="config-key">"log_level"</span>: <span class="config-val">"info"</span>
-}</pre>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">6</div>
-              <div class="step-content">
-                <h4>Start the MCP server</h4>
-                <div class="code-block mt-12">
-                  <span class="code-lang">bash</span>
-                  <pre>python Scripts/mcp_server.py
-# Server listening on localhost:19202</pre>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">7</div>
-              <div class="step-content">
-                <h4>Connect your AI client</h4>
-                <p>Add the UMG MCP server to your MCP client configuration. Example for Claude Desktop (<code style="color:var(--accent);background:rgba(6,182,212,0.08);padding:1px 5px;border-radius:3px">claude_desktop_config.json</code>):</p>
-                <div class="code-block mt-12">
-                  <span class="code-lang">json</span>
-                  <pre>{
-  <span class="config-key">"mcpServers"</span>: {
-    <span class="config-key">"umg-mcp"</span>: {
-      <span class="config-key">"command"</span>: <span class="config-val">"python"</span>,
-      <span class="config-key">"args"</span>: [<span class="config-val">"/path/to/Scripts/mcp_server.py"</span>]
+          </li>
+          <li>
+            <div class="setup-number">4</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.oss.4.title">把 UMG MCP 加到客户端配置</h3>
+              <pre><code>{
+  "mcpServers": {
+    "UmgMcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "D:\\UE5Project\\YourProject\\Plugins\\UmgMcp\\Resources\\Python",
+        "UmgMcpServer.py"
+      ]
     }
   }
-}</pre>
-                </div>
-              </div>
+}</code></pre>
+              <p data-i18n="setup.oss.4.note">目录必须指向 Resources/Python；Windows JSON 路径中的反斜杠需要写成双反斜杠。</p>
             </div>
-            <div class="step">
-              <div class="step-num">8</div>
-              <div class="step-content">
-                <h4>Start building!</h4>
-                <p>Open a UMG widget in UE5, then chat with your AI. Try:</p>
-                <div class="prompt-example mt-12" style="background:#0d1117;border:1px solid rgba(6,182,212,0.2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:16px 20px;font-family:var(--mono);font-size:.83rem;color:var(--text);line-height:1.6">
-                  "Create a button in the center of the canvas. Label it 'Start Game', size 200x60px, purple background, white text, size 24."
-                </div>
+          </li>
+          <li>
+            <div class="setup-number">5</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.oss.5.title">完成第一次只读连接</h3>
+              <div class="command-chain">
+                <code>list_umg_mcp_servers</code><i>→</i>
+                <code>connect_umg_mcp</code><i>→</i>
+                <code>set_target_umg_asset</code><i>→</i>
+                <code>get_widget_tree</code>
               </div>
+              <p data-i18n="setup.oss.5.note">先确认返回的是正确项目、正确资产和正确控件树，再执行任何写入。</p>
             </div>
-          </div>
+          </li>
+          <li>
+            <div class="setup-number">6</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.oss.6.title">可选：运行静态协议检查</h3>
+              <pre><code>uv run python APITest\Umg_Widget_Protocol_Static_Check.py
+uv run python APITest\Blueprint_MCP_Schema_Check.py
+uv run python APITest\Material_Protocol_Static_Check.py
+uv run python APITest\Animation_Protocol_Static_Check.py</code></pre>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="fab">
+      <div class="container container-reading">
+        <div class="guide-heading reveal">
+          <span class="badge badge-purple" data-i18n="setup.fab.badge">路线 B · Fab 版</span>
+          <h2 data-i18n="setup.fab.title">Fab / Epic Launcher + 编辑器内 AI</h2>
+          <p data-i18n="setup.fab.subtitle">v1.0.12 发布包覆盖 UE 5.6、5.7、5.8 / Win64。Fab 页面实际显示哪些版本取决于当前审核状态。</p>
         </div>
 
-        <!-- COMMERCIAL TAB -->
-        <div class="tab-pane" id="tab-commercial" role="tabpanel">
+        <ol class="setup-sequence reveal">
+          <li>
+            <div class="setup-number">1</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.fab.1.title">在 Fab 获取插件，并安装匹配的引擎包</h3>
+              <p data-i18n="setup.fab.1.desc">不要把 5.8 包手工复制给 5.6 使用；在 Launcher 中选择与你的 UE 版本一致的插件构建。</p>
+              <a class="btn btn-primary" href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" data-i18n="setup.fab.1.cta">打开 Fab 商品页 →</a>
+            </div>
+          </li>
+          <li>
+            <div class="setup-number">2</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.fab.2.title">启用 UmgMcp 并重启编辑器</h3>
+              <p data-i18n="setup.fab.2.desc">插件包含 UmgMcp、ChatWithUnreal 和 LiteRTLMUnreal 模块；首次启用或切换版本后应完整重启 UE。</p>
+            </div>
+          </li>
+          <li>
+            <div class="setup-number">3</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.fab.3.title">在 Editor Preferences → Plugins → UmgMcp 配置供应商</h3>
+              <div class="provider-grid">
+                <span data-i18n="setup.provider.google">Google 登录 / Gemini API</span>
+                <span data-i18n="setup.provider.zhipu">智谱 AI API</span>
+                <span data-i18n="setup.provider.custom">自定义 Gemini 或 OpenAI-compatible Endpoint</span>
+                <span data-i18n="setup.provider.codex">本地 Codex CLI</span>
+                <span data-i18n="setup.provider.litert">LiteRT-LM 本地模型</span>
+              </div>
+              <p data-i18n="setup.fab.3.note">只配置你准备使用的路线；API 密钥、登录、本地 CLI 和本地模型可以按优先级与失败重试策略组合。</p>
+            </div>
+          </li>
+          <li>
+            <div class="setup-number">4</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.fab.4.title">打开 UMG AI Assistant，并选择 Tool Mode</h3>
+              <p data-i18n="setup.fab.4.desc">UMG、Blueprint、Animation、Material 模式会给内置 Agent 不同的工具白名单；复杂任务也可以由 Task/Agent 层拆分。</p>
+            </div>
+          </li>
+          <li>
+            <div class="setup-number">5</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.fab.5.title">从一个明确、可验证的任务开始</h3>
+              <blockquote data-i18n="setup.fab.prompt">打开 /Game/UI/WBP_LoginPanel。先读取 Widget Tree 和根容器布局，不要修改；告诉我当前结构和你准备使用的工具。</blockquote>
+              <p data-i18n="setup.fab.5.note">确认读取正确后，再发送第二条消息要求增量修改。</p>
+            </div>
+          </li>
+          <li>
+            <div class="setup-number">6</div>
+            <div class="setup-content">
+              <h3 data-i18n="setup.fab.6.title">如果仍想从外部 Codex/Claude 控制 Fab 包</h3>
+              <p data-i18n="setup.fab.6.desc">可以。使用上方路线 A 的 Resources/Python MCP 配置；此时仍需要 uv/Python，因为你选择的是外部 MCP 路线。</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
 
-          <div class="highlight-box green mb-24">
-            <strong style="color:var(--accent2)">Prerequisites</strong>
-            <p style="margin-top:6px;font-size:.9rem">UE5.3+, Epic Games Launcher, API key from Gemini / OpenAI / Anthropic. No Python required.</p>
-          </div>
+    <section class="section" id="troubleshooting">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="setup.trouble.label">故障排查</span>
+          <h2 data-i18n="setup.trouble.title">先确认连接层，再看具体工具</h2>
+        </div>
+        <div class="compare-wrap reveal">
+          <table class="compare-table troubleshooting-table">
+            <thead><tr><th data-i18n="setup.trouble.symptom">现象</th><th data-i18n="setup.trouble.check">检查顺序</th></tr></thead>
+            <tbody>
+              <tr><td><code>ConnectionRefusedError / WinError 10061</code></td><td data-i18n="setup.trouble.connection">确认 UE 已打开且插件启用；重新 list_umg_mcp_servers；连接存活记录中的动态端口，不要依赖旧固定端口。</td></tr>
+              <tr><td data-i18n="setup.trouble.multi.symptom">连接到了错误项目</td><td data-i18n="setup.trouble.multi">列出所有实例，根据 project/path 选择，再使用 exclusive=true 连接并设置 target。</td></tr>
+              <tr><td data-i18n="setup.trouble.target.symptom">工具成功但改错资产</td><td data-i18n="setup.trouble.target">先 get_target_umg_asset / get_target_blueprint_asset；写入前传完整资产路径。</td></tr>
+              <tr><td data-i18n="setup.trouble.compile.symptom">Blueprint 或 HLSL 写入后无效</td><td data-i18n="setup.trouble.compile">执行对应 compile 工具，检查返回诊断，再重新读取图或材质。</td></tr>
+              <tr><td data-i18n="setup.trouble.fab.symptom">Fab 中看不到某个 UE 版本</td><td data-i18n="setup.trouble.fab">确认商品更新审核状态；v1.0.12 包线包含 5.6/5.7/5.8，但买家可见性由 Fab 审核决定。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
-          <div class="req-grid reveal">
-            <div class="req-item">
-              <div class="req-icon">🎮</div>
-              <div>
-                <h5>Unreal Engine</h5>
-                <p>5.3 or newer</p>
-              </div>
-            </div>
-            <div class="req-item">
-              <div class="req-icon">🏪</div>
-              <div>
-                <h5>Epic Launcher</h5>
-                <p>Fab Marketplace</p>
-              </div>
-            </div>
-            <div class="req-item">
-              <div class="req-icon">🔑</div>
-              <div>
-                <h5>API Key</h5>
-                <p>Gemini / GPT / Claude</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="steps mt-48 reveal">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div class="step-content">
-                <h4>Purchase on Fab Marketplace</h4>
-                <p>Visit the UMG MCP listing on Fab and complete the purchase.</p>
-                <div class="mt-12">
-                  <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary">
-                    🛒 Open Fab Listing →
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div class="step-content">
-                <h4>Install from Epic Launcher</h4>
-                <p>Open the Epic Games Launcher → <strong>Library → Vault</strong>. Find UMG MCP and click <strong>"Install to Engine"</strong>.</p>
-                <div class="highlight-box accent mt-12">
-                  <p style="font-size:.85rem">Select the correct UE5 engine version. The plugin installs automatically — no file copying needed.</p>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">3</div>
-              <div class="step-content">
-                <h4>Enable the plugin in your project</h4>
-                <p>Open your project → <strong>Edit → Plugins</strong> → search "UMG MCP" → Enable → Restart.</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">4</div>
-              <div class="step-content">
-                <h4>Configure your API key</h4>
-                <p>In UE5, open <strong>Edit → Project Settings → UMG MCP</strong>. Enter your LLM API key and select your preferred AI model.</p>
-                <div class="highlight-box mt-12">
-                  <p style="font-size:.85rem">The commercial version supports Gemini, OpenAI GPT, and Anthropic Claude. Your API key is stored securely in project settings and never transmitted anywhere except directly to the LLM API.</p>
-                </div>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">5</div>
-              <div class="step-content">
-                <h4>Open the UMG MCP Chat Panel</h4>
-                <p>Go to <strong>Window → UMG MCP</strong> to open the built-in chat panel inside UE5. No external applications needed.</p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">6</div>
-              <div class="step-content">
-                <h4>Start building!</h4>
-                <p>Open a UMG widget blueprint, click into the chat panel, and describe what you want to build. The multi-agent system handles the rest.</p>
-                <div class="prompt-example mt-12" style="background:#0d1117;border:1px solid rgba(124,58,237,0.2);border-left:3px solid var(--primary);border-radius:0 8px 8px 0;padding:16px 20px;font-family:var(--mono);font-size:.83rem;color:var(--text);line-height:1.6">
-                  "Build a complete main menu with a title, Play/Settings/Quit buttons, animated background, and smooth slide-in animations."
-                </div>
-                <p class="mt-12" style="font-size:.85rem">The orchestrator will split this into Layout, Animation, and Style sub-tasks and execute them in parallel.</p>
-              </div>
-            </div>
+    <section class="section section-alt">
+      <div class="container container-sm">
+        <div class="cta-section reveal">
+          <h2 data-i18n="setup.next.title">连接成功后，回到标准编辑闭环</h2>
+          <p data-i18n="setup.next.desc">Target → Read → Plan → Write → Compile/Save → Read Back。</p>
+          <div class="cta-buttons">
+            <a href="index.html#workflow" class="btn btn-primary btn-lg" data-i18n="setup.next.workflow">查看完整工作流</a>
+            <a href="mcp-tools.html" class="btn btn-secondary btn-lg" data-i18n="setup.next.tools">查找具体工具</a>
           </div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- TROUBLESHOOTING -->
-  <section class="section" style="background:var(--surface)">
-    <div class="container container-sm">
-      <div class="section-header reveal">
-        <h2>Common Issues</h2>
-      </div>
-      <div class="faq-list reveal">
-        <div class="faq-item">
-          <button class="faq-question">Plugin not connecting to MCP server <span class="faq-chevron">▼</span></button>
-          <div class="faq-answer"><p>Check that the port in <code style="color:var(--accent)">UmgMcpConfig.json</code> matches the port in the UE5 plugin settings. Default is <strong>19202</strong>. Ensure no firewall is blocking localhost connections. Also verify the Python server is running before launching UE5.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">Rebuild modules prompt on UE5 start <span class="faq-chevron">▼</span></button>
-          <div class="faq-answer"><p>This is normal on first install. Click <strong>Yes</strong> to allow UE5 to compile the C++ plugin for your platform. This may take 2-5 minutes. Ensure you have Visual Studio (Windows) or Xcode (Mac) installed.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">AI returns "tool not found" errors <span class="faq-chevron">▼</span></button>
-          <div class="faq-answer"><p>Make sure the MCP server has been updated to the latest version matching your plugin. Run <code style="color:var(--accent)">git pull</code> and restart the server. Also verify your MCP client has loaded the server correctly.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">Widget changes not showing in UE5 editor <span class="faq-chevron">▼</span></button>
-          <div class="faq-answer"><p>Ensure the UMG widget is open in the UE5 Widget Blueprint Editor. The plugin operates on the currently active widget. If the widget is not open, operations will fail silently.</p></div>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
+  </main>
 
   <footer id="main-footer"></footer>
   <script src="assets/js/main.js" defer></script>

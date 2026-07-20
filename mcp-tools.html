@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>89 个 MCP 工具完整目录 — UMG MCP</title>
+  <meta name="description" content="UMG MCP v1.0.12 的 89 个外部 MCP 工具，按连接、上下文、Widget、资产、BlueCode、动画与材质分组。">
+  <link rel="canonical" href="https://winyunq.github.io/UnrealMotionGraphicsMCP/mcp-tools.html">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <nav id="main-nav" aria-label="Main navigation"></nav>
+
+  <header class="page-hero catalog-hero" id="top">
+    <div class="container">
+      <span class="section-label" data-i18n="catalog.badge">主线第 3 步 · 完整工具目录</span>
+      <h1 class="mt-16" data-i18n="catalog.title">89 个 MCP 工具，从连接到编译逐项列全</h1>
+      <p class="hero-subtitle" data-i18n="catalog.subtitle">清单直接对照 v1.0.12 的 Resources/Python/UmgMcpServer.py：3 个连接工具 + 86 个领域工具。</p>
+      <div class="hero-cta">
+        <a href="index.html#tool-map" class="btn btn-secondary" data-i18n="catalog.back">← 返回线性总览</a>
+        <a href="#catalog" class="btn btn-primary" data-i18n="catalog.jump">开始逐项阅读 ↓</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section-sm">
+      <div class="container">
+        <div class="surface-note reveal">
+          <div>
+            <strong data-i18n="catalog.scope.title">这个数字包含什么？</strong>
+            <p data-i18n="catalog.scope.desc">包含外部 MCP Server 实际注册的 89 个工具。它不把 Fab 内置 Agent 的 task_begin/task_end 编排伪工具，也不把尚未包装为 MCP 的原始 C++ CommandType 混进来。</p>
+          </div>
+          <div class="audit-chip">
+            <span data-i18n="catalog.audit">审计基线</span>
+            <code>v1.0.12 · adab2ea · 2026-07-20</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="catalog">
+      <div class="container catalog-layout">
+        <aside class="catalog-sidebar" aria-label="Tool groups">
+          <div class="catalog-sidebar-inner">
+            <strong data-i18n="catalog.nav">8 个分组</strong>
+            <nav id="mcp-group-nav"></nav>
+            <a class="catalog-back-top" href="#top" data-i18n="catalog.top">回到顶部 ↑</a>
+          </div>
+        </aside>
+
+        <div class="catalog-main">
+          <div class="catalog-controls reveal">
+            <label for="tool-search" data-i18n="catalog.search.label">按工具名称或用途搜索</label>
+            <div class="catalog-search-row">
+              <input id="tool-search" class="catalog-search" type="search" autocomplete="off" data-i18n="catalog.search.placeholder" placeholder="例如：bluecode、delete、keyframe、材质">
+              <output id="tool-search-result" aria-live="polite">89 / 89</output>
+            </div>
+          </div>
+          <div id="mcp-tool-catalog" class="tool-catalog" aria-live="polite">
+            <p data-i18n="catalog.loading">正在加载工具清单……</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="native-surface">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="catalog.native.label">Fab 内置工具面说明</span>
+          <h2 data-i18n="catalog.native.title">Fab 内置 Agent 使用“筛选工具面”，不是另一个 89 项清单</h2>
+          <p data-i18n="catalog.native.subtitle">这是旧文档最容易混淆的地方。</p>
+        </div>
+        <div class="fact-grid reveal">
+          <article class="fact-card">
+            <h3 data-i18n="catalog.native.mode.title">Tool Mode</h3>
+            <p data-i18n="catalog.native.mode.desc">UMG、Blueprint、Animation、Material 模式会按任务选择允许暴露给内置 Agent 的工具，降低误调用和上下文噪声。</p>
+          </article>
+          <article class="fact-card">
+            <h3><code>task_begin</code> / <code>task_end</code></h3>
+            <p data-i18n="catalog.native.task.desc">它们用于 Fab 的 Agent/Task 交接和 UI 展示，是编排伪工具，不属于外部 MCP Server 的 89 工具。</p>
+          </article>
+          <article class="fact-card">
+            <h3 data-i18n="catalog.native.raw.title">原始 C++ CommandType</h3>
+            <p data-i18n="catalog.native.raw.desc">底层派发器可能支持额外帮助命令；只有被 UmgMcpServer.py 注册后，才计入公开 MCP 工具面。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container container-sm">
+        <div class="cta-section reveal">
+          <h2 data-i18n="catalog.next.title">下一步：安装并跑通第一个读取闭环</h2>
+          <p data-i18n="catalog.next.desc">先连接 Unreal、设置 Target、读取 Widget Tree；确认结果正确后再进行写入。</p>
+          <div class="cta-buttons">
+            <a href="getting-started.html" class="btn btn-primary btn-lg" data-i18n="catalog.next.start">安装与连接 →</a>
+            <a href="index.html#workflow" class="btn btn-secondary btn-lg" data-i18n="catalog.next.workflow">查看标准工作流</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="main-footer"></footer>
+  <script src="assets/js/main.js" defer></script>
+  <script src="assets/js/mcp-tools.js" defer></script>
+</body>
+</html>

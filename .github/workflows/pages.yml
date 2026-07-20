@@ -3,7 +3,7 @@ name: Deploy GitHub Pages
 on:
   push:
     branches:
-      - copilot/website
+      - Document
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch current public source
+        run: git fetch origin main:refs/remotes/origin/main
+
+      - name: Validate documentation against current source
+        run: node Scripts/validate-site-docs.mjs --source-ref origin/main
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -32,12 +45,11 @@ jobs:
         run: |
           mkdir _site
           rsync -a --delete \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude '.Doxyfile' \
-            --exclude '.gitignore' \
-            --exclude '_site' \
+            --include '/assets/***' \
+            --include '/*.html' \
+            --exclude '*' \
             ./ _site/
+          git archive origin/main Document Resources/Icon128.png | tar -x -C _site
           touch _site/.nojekyll
 
       - name: Upload static site

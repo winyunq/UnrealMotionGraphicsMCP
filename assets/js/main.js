@@ -65,6 +65,7 @@ const I18n = (() => {
       btn.classList.toggle('active', btn.dataset.lang === lang);
     });
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.dispatchEvent(new CustomEvent('umgmcp:languagechange', { detail: { lang } }));
   }
 
   function getCurrent() { return currentLang; }
@@ -102,12 +103,9 @@ function renderNav() {
   const base = getBase();
   const pages = [
     { key: 'nav.home',         href: `${base}index.html`,         id: 'home' },
-    { key: 'nav.features',     href: `${base}features.html`,      id: 'features' },
-    { key: 'nav.architecture', href: `${base}architecture.html`,  id: 'architecture' },
-    { key: 'nav.workflow',     href: `${base}workflow.html`,       id: 'workflow' },
-    { key: 'nav.roadmap',      href: `${base}roadmap.html`,       id: 'roadmap' },
+    { key: 'nav.tools',        href: `${base}mcp-tools.html`,      id: 'mcp-tools' },
     { key: 'nav.docs',         href: `${base}getting-started.html`, id: 'docs' },
-    { key: 'nav.commercial',   href: `${base}commercial.html`,    id: 'commercial' },
+    { key: 'nav.support',      href: `${base}contact.html`,        id: 'contact' },
   ];
 
   const currentPage = location.pathname.split('/').pop().replace('.html','') || 'index';
@@ -229,17 +227,17 @@ function renderFooter() {
         <div class="footer-col">
           <h4 data-i18n="footer.product">Product</h4>
           <ul>
-            <li><a href="${base}features.html" data-i18n="footer.product.features">Features</a></li>
-            <li><a href="${base}commercial.html" data-i18n="footer.product.commercial">Commercial Version</a></li>
-            <li><a href="${base}roadmap.html" data-i18n="footer.product.roadmap">Roadmap</a></li>
+            <li><a href="${base}mcp-tools.html" data-i18n="footer.product.tools">MCP Tool Catalog</a></li>
+            <li><a href="${base}index.html#editions" data-i18n="footer.product.editions">Edition Comparison</a></li>
+            <li><a href="${base}index.html#status" data-i18n="footer.product.status">Version &amp; Boundaries</a></li>
           </ul>
         </div>
         <div class="footer-col">
           <h4 data-i18n="footer.resources">Resources</h4>
           <ul>
             <li><a href="${base}getting-started.html" data-i18n="footer.resources.docs">Get Started</a></li>
-            <li><a href="${base}architecture.html" data-i18n="footer.resources.architecture">Architecture</a></li>
-            <li><a href="${base}workflow.html" data-i18n="footer.resources.workflow">Workflow</a></li>
+            <li><a href="${base}index.html#architecture" data-i18n="footer.resources.architecture">Architecture</a></li>
+            <li><a href="${base}index.html#workflow" data-i18n="footer.resources.workflow">Workflow</a></li>
             <li><a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" data-i18n="footer.resources.github">GitHub</a></li>
           </ul>
         </div>
@@ -343,8 +341,8 @@ function initTyping() {
 
   const lang = I18n.getCurrent();
   const phrases = lang === 'zh'
-    ? ['操作 UMG', '驱动 UI', '理解蓝图', '生成材质', '制作动画']
-    : ['Speaks UMG', 'Builds UI', 'Edits Blueprints', 'Creates Materials', 'Drives Animations'];
+    ? ['连接 Unreal', '检查控件树', '编辑 BlueCode', '生成材质', '制作动画']
+    : ['Connects Unreal', 'Inspects Widgets', 'Edits BlueCode', 'Builds Materials', 'Drives Animations'];
 
   let phraseIdx = 0;
   let charIdx = 0;

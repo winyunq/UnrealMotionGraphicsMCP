@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "file": "Resources/Python/UmgMcpServer.py",
+    "version": "1.0.12",
+    "commit": "adab2ead1eda523cdeb358e89b5478488551904e",
+    "auditedDate": "2026-07-20",
+    "toolCount": 89
+  },
+  "groups": [
+    {
+      "id": "connection",
+      "icon": "⇄",
+      "title": {"zh": "连接与多编辑器会话", "en": "Connection & multi-editor sessions"},
+      "summary": {"zh": "发现本机 Unreal Editor、选择实例，并查看当前独占连接。", "en": "Discover local Unreal Editors, select one, and inspect the active exclusive session."},
+      "tools": [
+        {"name": "list_umg_mcp_servers", "kind": "read", "zh": "列出发现目录中仍然存活的 UE 编辑器实例及动态端口。", "en": "Lists live UE editor instances and their dynamically assigned ports."},
+        {"name": "connect_umg_mcp", "kind": "session", "zh": "连接指定 host/port；可同时绑定目标资产并申请 exclusive 会话。", "en": "Connects to a host/port, optionally binding a target asset and an exclusive session."},
+        {"name": "get_umg_mcp_connection", "kind": "read", "zh": "返回当前端点、client id、session id 与服务器连接状态。", "en": "Returns the active endpoint, client id, session id, and server-side connection state."}
+      ]
+    },
+    {
+      "id": "context",
+      "icon": "◎",
+      "title": {"zh": "Schema、目标与注意力上下文", "en": "Schemas, targets & attention context"},
+      "summary": {"zh": "先确定能创建什么，再把后续操作限定到明确的 UMG、Blueprint 或控件。", "en": "Learn what can be created, then scope every later operation to an explicit UMG, Blueprint, or widget."},
+      "tools": [
+        {"name": "get_widget_schema", "kind": "read", "zh": "读取某一 Widget 类型支持的属性与结构 Schema。", "en": "Reads the supported property and structure schema for a widget type."},
+        {"name": "get_creatable_widget_types", "kind": "read", "zh": "列出当前版本可以创建的 Widget 类型。", "en": "Lists widget types that can be created by the current build."},
+        {"name": "get_target_umg_asset", "kind": "read", "zh": "读取当前 UMG 目标资产及相关元数据。", "en": "Reads the active UMG target asset and related metadata."},
+        {"name": "get_target_blueprint_asset", "kind": "read", "zh": "读取 BlueCode 当前使用的 Widget 或普通 Blueprint 目标。", "en": "Reads the Widget or general Blueprint currently targeted by BlueCode."},
+        {"name": "get_target_widget", "kind": "read", "zh": "读取当前 UMG 资产内聚焦的具体控件。", "en": "Reads the focused widget inside the active UMG asset."},
+        {"name": "get_last_edited_umg_asset", "kind": "read", "zh": "返回最近一次编辑的 UMG 资产。", "en": "Returns the most recently edited UMG asset."},
+        {"name": "get_recently_edited_umg_assets", "kind": "read", "zh": "按数量上限返回近期编辑过的 UMG 资产。", "en": "Returns recently edited UMG assets up to a requested limit."},
+        {"name": "set_target_umg_asset", "kind": "session", "zh": "设置后续 Widget、动画和保存操作使用的 UMG 资产。", "en": "Sets the UMG asset used by later widget, animation, and save operations."},
+        {"name": "set_target_widget", "kind": "session", "zh": "把读取或写入范围缩小到指定控件或容器。", "en": "Narrows later reads and writes to a specific widget or container."},
+        {"name": "set_target_blueprint_asset", "kind": "session", "zh": "把已有 Widget、Actor、Object 等 Blueprint 设为 BlueCode 目标。", "en": "Targets an existing Widget, Actor, Object, or other Blueprint for BlueCode."}
+      ]
+    },
+    {
+      "id": "widget-read",
+      "icon": "⌕",
+      "title": {"zh": "Widget 检查与布局诊断", "en": "Widget inspection & layout diagnostics"},
+      "summary": {"zh": "读取真实 Widget Tree、指定属性、几何布局与重叠情况。", "en": "Read the real widget tree, selected properties, geometry, and overlap state."},
+      "tools": [
+        {"name": "get_widget_tree", "kind": "read", "zh": "从聚焦控件开始读取紧凑 Widget Tree；未聚焦时从根节点开始。", "en": "Reads a compact widget tree from the focused widget, or from the root when none is focused."},
+        {"name": "query_widget_properties", "kind": "read", "zh": "只查询指定控件的一组属性，避免把整个资产塞进上下文。", "en": "Queries only selected properties on one widget to keep context compact."},
+        {"name": "get_layout_data", "kind": "read", "zh": "读取控件的边界框与布局数据，用于位置和尺寸验证。", "en": "Reads bounding boxes and layout data for position and size verification."},
+        {"name": "check_widget_overlap", "kind": "read", "zh": "诊断控件之间的几何重叠。", "en": "Diagnoses geometric overlap between widgets."}
+      ]
+    },
+    {
+      "id": "widget-write",
+      "icon": "✦",
+      "title": {"zh": "Widget 创建、修改与保存", "en": "Widget creation, editing & saving"},
+      "summary": {"zh": "以增量、可审查的方式创建控件、改属性、调整树结构并保存。", "en": "Create widgets, change properties, adjust hierarchy, and save through reviewable incremental operations."},
+      "tools": [
+        {"name": "create_widget", "kind": "write", "zh": "在指定父控件下创建一个新 Widget，并给出稳定名称。", "en": "Creates a named widget under an explicit parent."},
+        {"name": "set_widget_properties", "kind": "write", "zh": "并集覆盖所提供的属性；未提及属性保持不变。", "en": "Union-updates only the supplied properties and preserves omitted properties."},
+        {"name": "delete_widget", "kind": "delete", "zh": "显式删除控件；必须传入 confirm_delete=true。", "en": "Explicitly deletes a widget and requires confirm_delete=true."},
+        {"name": "reorder_widget_tree", "kind": "write", "zh": "用局部树调整同父级顺序；不创建、不删除未提及 sibling。", "en": "Reorders siblings from a partial tree without creating or deleting omitted siblings."},
+        {"name": "reparent_widget", "kind": "compat", "zh": "兼容型结构操作：用新容器就地包裹或替换目标控件。", "en": "Compatibility structural operation that wraps or replaces a widget in place."},
+        {"name": "save_asset", "kind": "write", "zh": "保存当前目标资产。", "en": "Saves the current target asset."}
+      ]
+    },
+    {
+      "id": "asset-editor",
+      "icon": "◇",
+      "title": {"zh": "资产转换、内容浏览与关卡工具", "en": "Asset transforms, content browsing & level tools"},
+      "summary": {"zh": "让 UMG 可导出、回写，并提供必要的项目资产和关卡操作。", "en": "Round-trip UMG data and perform the project asset and level operations needed around it."},
+      "tools": [
+        {"name": "export_umg_to_json", "kind": "read", "zh": "把指定 UMG 反编译为结构化 JSON，便于审查和版本化。", "en": "Decompiles a UMG asset to structured JSON for review and versioning."},
+        {"name": "apply_layout", "kind": "write", "zh": "首选的结构化布局写入入口，相对当前目标容器应用布局。", "en": "Preferred structured layout writer, applied relative to the active target container."},
+        {"name": "apply_json_to_umg", "kind": "compat", "zh": "兼容型批量 JSON 回写；新流程优先使用 apply_layout。", "en": "Compatibility bulk JSON apply; new workflows should prefer apply_layout."},
+        {"name": "apply_html_to_umg", "kind": "compat", "zh": "兼容型 HTML 到 UMG 转换；新流程优先使用 apply_layout。", "en": "Compatibility HTML-to-UMG conversion; new workflows should prefer apply_layout."},
+        {"name": "refresh_asset_registry", "kind": "write", "zh": "强制刷新资产注册表，使新资产立即可见。", "en": "Refreshes the Asset Registry so newly created assets become visible."},
+        {"name": "get_actors_in_level", "kind": "read", "zh": "列出当前关卡中的 Actor。", "en": "Lists actors in the current level."},
+        {"name": "spawn_actor", "kind": "write", "zh": "在关卡中生成指定类型的 Actor。", "en": "Spawns an actor of a requested type in the level."},
+        {"name": "list_assets", "kind": "read", "zh": "按内容路径浏览项目资产。", "en": "Browses project assets by content path."}
+      ]
+    },
+    {
+      "id": "blueprint",
+      "icon": "⌘",
+      "title": {"zh": "Blueprint 与 BlueCode", "en": "Blueprint & BlueCode"},
+      "summary": {"zh": "BlueCode 是推荐的语义层；节点级命令保留为兼容执行原语。", "en": "BlueCode is the recommended semantic layer; node-level commands remain compatibility primitives."},
+      "tools": [
+        {"name": "compile_blueprint", "kind": "compile", "zh": "编译并保存指定 Blueprint。", "en": "Compiles and saves a Blueprint."},
+        {"name": "bluecode_set_function", "kind": "session", "zh": "设置当前函数、图表或 Widget.Event 编辑范围。", "en": "Selects the active function, graph, or Widget.Event for editing."},
+        {"name": "bluecode_read_function", "kind": "read", "zh": "以 semantic、roundtrip 或 debug 细节层级读取当前图表。", "en": "Reads the active graph at semantic, roundtrip, or debug detail levels."},
+        {"name": "bluecode_read_variables", "kind": "read", "zh": "读取 Blueprint 成员变量的紧凑语义表示。", "en": "Reads Blueprint member variables as compact semantic data."},
+        {"name": "bluecode_read_events", "kind": "read", "zh": "读取可绑定事件候选与当前已绑定事件。", "en": "Reads bindable event candidates and currently bound events."},
+        {"name": "bluecode_apply", "kind": "write", "zh": "以 union 语义规划或原子应用 BlueCode；支持 dry-run、revision 冲突检查、source map 与失败回滚。", "en": "Plans or atomically union-applies BlueCode with dry-run, revision checks, source maps, and rollback."},
+        {"name": "bluecode_apply_variables", "kind": "write", "zh": "仅新增或匹配成员变量，不删除未提及变量。", "en": "Union-adds or matches member variables without deleting omitted variables."},
+        {"name": "bluecode_connect", "kind": "write", "zh": "为复杂节点显式新增 Pin 连接；不会替换既有连接。", "en": "Explicitly adds pin connections for complex nodes without replacing existing links."},
+        {"name": "bluecode_delete", "kind": "delete", "zh": "删除节点、变量或连接；要求 confirm_delete=true 且拒绝歧义目标。", "en": "Deletes nodes, variables, or links with confirm_delete=true and ambiguity checks."},
+        {"name": "bluecode_compile", "kind": "compile", "zh": "编译并保存当前 BlueCode 目标，返回简洁诊断。", "en": "Compiles and saves the active BlueCode target with concise diagnostics."},
+        {"name": "bluecode_search_nodes", "kind": "read", "zh": "搜索当前图表上下文有效的节点，并返回稳定 action handle。", "en": "Searches context-valid nodes and returns stable action handles."},
+        {"name": "add_step", "kind": "compat", "zh": "兼容原语：在程序光标后添加可执行节点。", "en": "Compatibility primitive that adds an executable node after the program cursor."},
+        {"name": "prepare_value", "kind": "compat", "zh": "兼容原语：创建 Getter、Literal 等纯数据节点。", "en": "Compatibility primitive that creates data nodes such as getters or literals."},
+        {"name": "connect_data_to_pin", "kind": "compat", "zh": "兼容原语：把数据节点连接到目标 Pin。", "en": "Compatibility primitive that connects a data node to a target pin."},
+        {"name": "get_function_nodes", "kind": "read", "zh": "列出当前函数图表中的全部节点。", "en": "Lists all nodes in the active function graph."},
+        {"name": "add_variable", "kind": "compat", "zh": "兼容原语：添加成员变量。", "en": "Compatibility primitive that adds a member variable."},
+        {"name": "delete_variable", "kind": "delete", "zh": "兼容原语：删除成员变量。", "en": "Compatibility primitive that deletes a member variable."},
+        {"name": "get_variables", "kind": "read", "zh": "列出 Blueprint 成员变量。", "en": "Lists Blueprint member variables."},
+        {"name": "delete_node", "kind": "delete", "zh": "兼容原语：按节点 ID 删除节点。", "en": "Compatibility primitive that deletes a node by id."},
+        {"name": "set_edit_function", "kind": "compat", "zh": "兼容原语：设置节点级命令使用的函数或图表。", "en": "Compatibility primitive that sets the graph used by node-level commands."},
+        {"name": "set_cursor_node", "kind": "compat", "zh": "兼容原语：显式设置节点级程序光标。", "en": "Compatibility primitive that explicitly sets the node-level program cursor."},
+        {"name": "search_function_library", "kind": "read", "zh": "搜索可调用的 Blueprint 函数库。", "en": "Searches callable Blueprint functions."}
+      ]
+    },
+    {
+      "id": "animation",
+      "icon": "▶",
+      "title": {"zh": "UMG Animation 与 Sequencer", "en": "UMG Animation & Sequencer"},
+      "summary": {"zh": "按动画、控件或时间片读取和写入轨道、属性与关键帧。", "en": "Read and write tracks, properties, and keys by animation, widget, or time slice."},
+      "tools": [
+        {"name": "set_animation_scope", "kind": "session", "zh": "设置当前动画范围。", "en": "Sets the active animation scope."},
+        {"name": "set_widget_scope", "kind": "session", "zh": "设置动画操作使用的控件范围。", "en": "Sets the widget scope used by animation operations."},
+        {"name": "get_all_animations", "kind": "read", "zh": "列出当前 UMG 资产中的所有动画。", "en": "Lists all animations in the active UMG asset."},
+        {"name": "get_animation_keyframes", "kind": "compat", "zh": "兼容读取：返回指定动画的关键帧。", "en": "Compatibility read that returns keyframes for an animation."},
+        {"name": "get_animated_widgets", "kind": "read", "zh": "列出某动画影响到的控件。", "en": "Lists widgets affected by an animation."},
+        {"name": "get_animation_full_data", "kind": "compat", "zh": "兼容读取：返回完整动画数据。", "en": "Compatibility read that returns full animation data."},
+        {"name": "get_widget_animation_data", "kind": "compat", "zh": "兼容读取：返回一个控件在指定动画中的数据。", "en": "Compatibility read for one widget inside an animation."},
+        {"name": "animation_widget_properties", "kind": "read", "zh": "按控件视角读取动画属性时间线。", "en": "Reads animated property timelines from the widget perspective."},
+        {"name": "animation_time_properties", "kind": "read", "zh": "读取指定时间点的属性值。", "en": "Reads property values at requested times."},
+        {"name": "animation_overview", "kind": "read", "zh": "汇总动画轨道与关键帧，适合作为首个读取命令。", "en": "Summarizes tracks and keys and is the preferred first animation read."},
+        {"name": "create_animation", "kind": "write", "zh": "在当前 UMG 资产中创建动画。", "en": "Creates an animation in the active UMG asset."},
+        {"name": "delete_animation", "kind": "delete", "zh": "删除动画；要求 confirm_delete=true。", "en": "Deletes an animation and requires confirm_delete=true."},
+        {"name": "set_property_keys", "kind": "compat", "zh": "兼容写入：设置一个属性轨道的关键帧。", "en": "Compatibility writer for keys on one property track."},
+        {"name": "remove_property_track", "kind": "delete", "zh": "删除属性轨道；要求显式确认。", "en": "Removes a property track with explicit confirmation."},
+        {"name": "remove_keys", "kind": "delete", "zh": "按时间删除指定属性的关键帧；要求显式确认。", "en": "Removes keys at requested times with explicit confirmation."},
+        {"name": "animation_append_widget_tracks", "kind": "write", "zh": "首选写入：从控件视角追加或覆盖提供的属性关键帧。", "en": "Preferred writer that appends or overwrites supplied keys from the widget perspective."},
+        {"name": "animation_append_time_slice", "kind": "write", "zh": "首选写入：在一个时间点为多个控件追加属性切片。", "en": "Preferred writer that appends a multi-widget property slice at one time."},
+        {"name": "animation_delete_widget_keys", "kind": "delete", "zh": "按动画、控件、属性和时间显式删除关键帧。", "en": "Explicitly deletes keys by animation, widget, property, and time."}
+      ]
+    },
+    {
+      "id": "material",
+      "icon": "◐",
+      "title": {"zh": "Material 图与 HLSL", "en": "Material graphs & HLSL"},
+      "summary": {"zh": "既支持材质节点图编辑，也提供更紧凑的 HLSL 参数/输出工作流。", "en": "Edit full material graphs or use the more compact HLSL parameter/output workflow."},
+      "tools": [
+        {"name": "material_set_target", "kind": "session", "zh": "设置材质目标；可在不存在时创建。", "en": "Sets the material target and can create it when missing."},
+        {"name": "material_modify_type", "kind": "write", "zh": "修改 Domain、Blend Mode、Shading Model 与 Two Sided 等类型设置。", "en": "Changes domain, blend mode, shading model, two-sided state, and related material type settings."},
+        {"name": "material_define_variable", "kind": "write", "zh": "定义 Scalar、Vector 或 Texture 外部参数。", "en": "Defines external Scalar, Vector, or Texture parameters."},
+        {"name": "material_add_node", "kind": "write", "zh": "从节点库放置节点并分配唯一 handle。", "en": "Places a node from the library and assigns a unique handle."},
+        {"name": "material_delete", "kind": "delete", "zh": "按唯一 handle 删除材质节点。", "en": "Deletes a material node by its unique handle."},
+        {"name": "material_connect_nodes", "kind": "write", "zh": "使用自然连接规则连接两个节点。", "en": "Connects two nodes using natural connection rules."},
+        {"name": "material_connect_pins", "kind": "write", "zh": "在复杂拓扑中显式连接源 Pin 与目标 Pin。", "en": "Explicitly connects source and target pins for complex topologies."},
+        {"name": "material_set_hlsl_node_io", "kind": "write", "zh": "向 Custom 节点注入 HLSL 并同步输入 Pin。", "en": "Injects HLSL into a Custom node and synchronizes input pins."},
+        {"name": "material_set_node_properties", "kind": "write", "zh": "设置普通材质节点的内部属性。", "en": "Sets internal properties on regular material nodes."},
+        {"name": "material_get_pins", "kind": "read", "zh": "读取指定节点或 Master 输出可用的 Pin。", "en": "Reads available pins for a node or the Master output."},
+        {"name": "material_get_graph", "kind": "read", "zh": "读取完整材质图拓扑。", "en": "Reads the complete material graph topology."},
+        {"name": "hlsl_set_target", "kind": "session", "zh": "设置 HLSL 材质目标；支持创建、覆盖确认与材质类型参数。", "en": "Sets an HLSL material target with create, overwrite confirmation, and material type options."},
+        {"name": "hlsl_get", "kind": "read", "zh": "读取当前 HLSL、参数定义与输出。", "en": "Reads the active HLSL code, parameters, and outputs."},
+        {"name": "hlsl_set", "kind": "write", "zh": "并集更新 HLSL、参数和输出；不会删除未提及项。", "en": "Union-updates HLSL, parameters, and outputs without deleting omitted items."},
+        {"name": "hlsl_delete_parameter", "kind": "delete", "zh": "兼容删除：显式删除命名参数并要求确认。", "en": "Compatibility deletion for named parameters with explicit confirmation."},
+        {"name": "hlsl_delete", "kind": "delete", "zh": "首选删除：按名称删除参数或输出，歧义时可指定 kind。", "en": "Preferred deletion for parameters or outputs, with an optional kind for ambiguous names."},
+        {"name": "hlsl_delete_output", "kind": "delete", "zh": "兼容删除：显式删除命名输出并要求确认。", "en": "Compatibility deletion for named outputs with explicit confirmation."},
+        {"name": "hlsl_compile", "kind": "compile", "zh": "编译并保存当前 HLSL 材质，返回简洁诊断。", "en": "Compiles and saves the active HLSL material with concise diagnostics."}
+      ]
+    }
+  ]
+}

@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UMG MCP — AI-Powered UE5 UMG Editor</title>
-  <meta name="description" content="The first MCP plugin fully focused on UE5 UMG. AI-powered UI creation — describe it, watch it build.">
-  <meta property="og:title" content="UMG MCP — AI-Powered UE5 UMG Editor">
-  <meta property="og:description" content="Native UE5 UMG AI editor. Just describe what you want, watch it build.">
+  <title>UMG MCP — 功能、版本差异与完整阅读指南</title>
+  <meta name="description" content="UMG MCP v1.0.12 完整项目说明：89 个 MCP 工具、Fab 与开源版差异、架构、工作流、安装和已知边界。">
+  <meta property="og:title" content="UMG MCP — 89 个工具，两种使用方式">
+  <meta property="og:description" content="从零理解 UMG MCP：共享核心、Fab 增值层、完整工具目录与线性上手流程。">
   <meta property="og:type" content="website">
+  <link rel="canonical" href="https://winyunq.github.io/UnrealMotionGraphicsMCP/">
   <link rel="stylesheet" href="assets/css/main.css">
 </head>
 <body>
   <nav id="main-nav" aria-label="Main navigation"></nav>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-bg">
+  <header class="hero hero-doc" id="top">
+    <div class="hero-bg" aria-hidden="true">
       <div class="hero-gradient"></div>
       <div class="hero-grid"></div>
       <div class="hero-particles" id="hero-particles"></div>
@@ -23,189 +23,326 @@
     <div class="container hero-content">
       <div class="hero-badge">
         <span class="dot"></span>
-        <span data-i18n="hero.badge">Now Available on Fab Marketplace</span>
+        <span data-i18n="hero.badge">v1.0.12 · UE 5.6 / 5.7 / 5.8 · Win64</span>
       </div>
       <h1>
-        <span data-i18n="hero.headline1">The AI That</span><br>
-        <span class="gradient-text" id="typing-target"></span>
+        <span data-i18n="hero.headline1">一套共享的 UMG MCP 核心</span><br>
+        <span class="gradient-text" id="typing-target">连接 Unreal</span>
       </h1>
       <p class="hero-subtitle" data-i18n="hero.subtitle">
-        Native UE5 UMG AI editor — just describe what you want, watch it build your interface in real time.
+        89 个面向 Unreal Editor 的 MCP 工具，覆盖 Widget、Blueprint、动画、材质和资产工作流；开源版与 Fab 版共享核心，Fab 额外提供编辑器内 AI 工作层。
       </p>
       <div class="hero-cta">
-        <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-          <span data-i18n="hero.cta.github">Get Started Free</span>
-        </a>
-        <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
-          <span data-i18n="hero.cta.fab">Buy on Fab →</span>
-        </a>
+        <a href="#read-order" class="btn btn-primary btn-lg" data-i18n="hero.cta.read">按顺序开始阅读 ↓</a>
+        <a href="mcp-tools.html" class="btn btn-secondary btn-lg" data-i18n="hero.cta.tools">查看 89 个工具</a>
       </div>
 
-      <!-- Stats bar -->
-      <div class="stats-bar">
+      <div class="stats-bar" aria-label="Current audited facts">
         <div class="stat-item">
-          <span class="stat-number" data-counter="40" data-suffix="+">40+</span>
-          <span class="stat-label" data-i18n="hero.stat.apis.label">MCP Tools</span>
+          <span class="stat-number" data-counter="89">89</span>
+          <span class="stat-label" data-i18n="hero.stat.tools">对外 MCP 工具</span>
         </div>
         <div class="stat-item">
-          <span class="stat-number" data-counter="5">5</span>
-          <span class="stat-label" data-i18n="hero.stat.categories.label">Widget / BP / Anim / Material / HLSL</span>
+          <span class="stat-number" data-counter="8">8</span>
+          <span class="stat-label" data-i18n="hero.stat.groups">线性能力分组</span>
         </div>
         <div class="stat-item">
-          <span class="stat-number" data-counter="0">0</span>
-          <span class="stat-label" data-i18n="hero.stat.python.label">Python Not Required (Fab)</span>
+          <span class="stat-number stat-word">CORE</span>
+          <span class="stat-label" data-i18n="hero.stat.core">两版共享核心</span>
         </div>
         <div class="stat-item">
-          <span class="stat-number gradient-text" style="-webkit-text-fill-color:unset">AI</span>
-          <span class="stat-label" data-i18n="hero.stat.agents.label">Multi-Agent Architecture</span>
+          <span class="stat-number stat-word">2×</span>
+          <span class="stat-label" data-i18n="hero.stat.paths">外部 MCP / Fab 内置</span>
         </div>
       </div>
-    </div>
-  </section>
 
-  <!-- FEATURES -->
-  <section class="section">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-label" data-i18n="index.features.label">Core Capabilities</span>
-        <h2 data-i18n="index.features.title">AI That Understands UMG</h2>
-        <p data-i18n="index.features.subtitle">From simple button placement to complex blueprint logic — describe it, and the AI builds it.</p>
-      </div>
-      <div class="card-grid">
-        <div class="card glow-card reveal reveal-delay-1">
-          <div class="card-icon">🎨</div>
-          <h3 data-i18n="index.feat1.title">Conversational UI Creation</h3>
-          <p data-i18n="index.feat1.desc">Talk to your AI in natural language. It reads your intent and directly creates, modifies, or arranges UMG widgets without you touching a single property panel.</p>
-          <div class="mt-16">
-            <span class="badge badge-cyan">Widget API</span>
-            <span class="badge badge-purple" style="margin-left:6px">40+ Tools</span>
-          </div>
-        </div>
-        <div class="card glow-card reveal reveal-delay-2">
-          <div class="card-icon" style="background:rgba(37,99,235,0.15);border-color:rgba(37,99,235,0.25)">⚡</div>
-          <h3 data-i18n="index.feat2.title">Blueprint Logic Generation</h3>
-          <p data-i18n="index.feat2.desc">Describe interactions and behaviors. The AI generates Blueprint nodes, sets variable bindings, creates animation triggers, and wires up your UI logic.</p>
-          <div class="mt-16">
-            <span class="badge badge-blue">Blueprint API</span>
-          </div>
-        </div>
-        <div class="card glow-card reveal reveal-delay-3">
-          <div class="card-icon" style="background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.25)">🌊</div>
-          <h3 data-i18n="index.feat3.title">Material &amp; HLSL Editing</h3>
-          <p data-i18n="index.feat3.desc">Ask for visual effects, shaders, or dynamic materials. The AI creates or modifies UE5 materials and even writes HLSL code for custom shader nodes.</p>
-          <div class="mt-16">
-            <span class="badge badge-cyan">Material API</span>
-            <span class="badge badge-yellow" style="margin-left:6px">HLSL</span>
-          </div>
-        </div>
-        <div class="card glow-card reveal reveal-delay-4">
-          <div class="card-icon" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.25)">🎬</div>
-          <h3 data-i18n="index.feat4.title">Animation &amp; Sequencer</h3>
-          <p data-i18n="index.feat4.desc">Bring your UI to life. Describe entrance animations, idle loops, or state transitions — the AI sets keyframes and configures UMG animation sequences.</p>
-          <div class="mt-16">
-            <span class="badge badge-green">Animation API</span>
-          </div>
-        </div>
+      <div class="truth-baseline">
+        <strong data-i18n="baseline.title">文档事实基线</strong>
+        <span data-i18n="baseline.text">插件 1.0.12（内部版本 8），按公开源码提交 adab2ea 审计于 2026-07-20。</span>
       </div>
     </div>
-  </section>
+  </header>
 
-  <!-- COMPARISON TABLE -->
-  <section class="section" style="background:var(--surface)">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-label" data-i18n="index.compare.label">Two Versions</span>
-        <h2 data-i18n="index.compare.title">Open Source vs. Commercial</h2>
-        <p data-i18n="index.compare.subtitle">Start free on GitHub, or unlock the zero-friction commercial experience on Fab.</p>
+  <main>
+    <section class="section" id="read-order">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="order.label">推荐阅读顺序</span>
+          <h2 data-i18n="order.title">从上到下，只走一条主线</h2>
+          <p data-i18n="order.subtitle">先理解产品边界，再选择版本、认识工具、连接 Unreal，最后进入实际编辑循环。</p>
+        </div>
+        <ol class="read-order reveal">
+          <li><a href="#product"><span>01</span><strong data-i18n="order.1.title">这是什么</strong><small data-i18n="order.1.desc">分清核心、MCP 桥与 Fab 工作层</small></a></li>
+          <li><a href="#editions"><span>02</span><strong data-i18n="order.2.title">选择版本</strong><small data-i18n="order.2.desc">Fab 与开源到底差在哪里</small></a></li>
+          <li><a href="#tool-map"><span>03</span><strong data-i18n="order.3.title">认识工具</strong><small data-i18n="order.3.desc">89 个工具分成 8 组</small></a></li>
+          <li><a href="#architecture"><span>04</span><strong data-i18n="order.4.title">理解连接</strong><small data-i18n="order.4.desc">外部 MCP 与编辑器内直连</small></a></li>
+          <li><a href="#workflow"><span>05</span><strong data-i18n="order.5.title">执行任务</strong><small data-i18n="order.5.desc">目标、读取、写入、验证</small></a></li>
+          <li><a href="#get-started"><span>06</span><strong data-i18n="order.6.title">开始使用</strong><small data-i18n="order.6.desc">按所选版本完成安装</small></a></li>
+        </ol>
       </div>
-      <div class="compare-wrap reveal">
-        <table class="compare-table">
-          <thead>
-            <tr>
-              <th data-i18n="index.compare.feature">Feature</th>
-              <th class="col-oss" data-i18n="index.compare.oss">Open Source (GitHub)</th>
-              <th class="col-fab" data-i18n="index.compare.fab">Commercial (Fab)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td data-i18n="index.compare.core_api">Core Widget API (40+ tools)</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.blueprint">Blueprint Editing</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.anim">Animation/Sequencer API</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.material">Material &amp; HLSL API</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.python">Requires Python</td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
-            <tr><td data-i18n="index.compare.install">One-click UE5 install</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.multiagent">Multi-Agent AI</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.support">Priority Support</td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
-            <tr><td data-i18n="index.compare.license">License</td><td data-i18n="index.compare.license.oss">MIT</td><td data-i18n="index.compare.license.fab">Commercial</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="flex-center gap-16 mt-32 reveal">
-        <a href="open-source.html" class="btn btn-secondary">Learn about OSS →</a>
-        <a href="commercial.html" class="btn btn-primary">Explore Commercial →</a>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- DEMO VIDEOS -->
-  <section class="section">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-label" data-i18n="index.videos.label">See It in Action</span>
-        <h2 data-i18n="index.videos.title">Demo Videos</h2>
-        <p data-i18n="index.videos.subtitle">Watch the AI build real UE5 interfaces from scratch.</p>
+    <section class="section section-alt" id="product">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="product.label">第 1 步 · 理解产品</span>
+          <h2 data-i18n="product.title">UMG MCP 不是单一聊天框，而是三层系统</h2>
+          <p data-i18n="product.subtitle">把三层分开看，Fab、开源、Python 和 C++ 的关系就不会再混乱。</p>
+        </div>
+        <div class="layer-stack reveal">
+          <article class="layer-card layer-shared">
+            <div class="layer-number">01</div>
+            <div>
+              <div class="layer-label" data-i18n="product.layer1.badge">两版共享</div>
+              <h3 data-i18n="product.layer1.title">Unreal C++ 命令核心</h3>
+              <p data-i18n="product.layer1.desc">在 Game Thread 中读取和修改 UMG、Blueprint、Sequencer、Material 与编辑器资产。核心改进会同步到公开仓库。</p>
+            </div>
+          </article>
+          <article class="layer-card layer-shared">
+            <div class="layer-number">02</div>
+            <div>
+              <div class="layer-label" data-i18n="product.layer2.badge">两版共享</div>
+              <h3 data-i18n="product.layer2.title">外部 MCP 接口</h3>
+              <p data-i18n="product.layer2.desc">Resources/Python/UmgMcpServer.py 把 89 个工具暴露给 Codex、Claude、Gemini 等 MCP 客户端，并负责多编辑器发现与连接。</p>
+            </div>
+          </article>
+          <article class="layer-card layer-fab" id="fab">
+            <div class="layer-number">03</div>
+            <div>
+              <div class="layer-label fab" data-i18n="product.layer3.badge">仅 Fab 包含</div>
+              <h3 data-i18n="product.layer3.title">编辑器内 AI 工作层</h3>
+              <p data-i18n="product.layer3.desc">原生 Slate 对话界面、模型供应商配置、Agent/Task 编排、历史记录、上下文压缩、Tool Mode、审批队列和 LiteRT-LM 本地推理。</p>
+            </div>
+          </article>
+        </div>
+        <div class="highlight-box accent reveal">
+          <h4 data-i18n="product.rule.title">最重要的口径</h4>
+          <p data-i18n="product.rule.desc">“89 个工具”指外部 MCP Server 的公开工具面。Fab 内置聊天会按 Tool Mode 向 Agent 暴露经过筛选的原生工具，并另外使用 task_begin / task_end 这类编排伪工具；它不是第二套 89 工具。</p>
+        </div>
       </div>
-      <div class="video-grid">
-        <div class="video-card reveal reveal-delay-1">
-          <iframe src="https://www.youtube.com/embed/O86VCzxyF5o" title="RTS UI Design Demo" allowfullscreen loading="lazy"></iframe>
-          <div class="video-card-info">
-            <h4 data-i18n="index.video1.title">RTS UI Design</h4>
-            <p data-i18n="index.video1.desc">Building a complete RTS game HUD with AI assistance</p>
-          </div>
-        </div>
-        <div class="video-card reveal reveal-delay-2">
-          <iframe src="https://www.youtube.com/embed/h_J70I0m4Ls" title="UE5 Editor Recreation" allowfullscreen loading="lazy"></iframe>
-          <div class="video-card-info">
-            <h4 data-i18n="index.video2.title">UE5 Editor Recreation</h4>
-            <p data-i18n="index.video2.desc">Recreating the UE5 editor UI using only AI commands</p>
-          </div>
-        </div>
-        <div class="video-card reveal reveal-delay-3">
-          <iframe src="https://www.youtube.com/embed/pq12x2MH1L4" title="UMG Editor Demo" allowfullscreen loading="lazy"></iframe>
-          <div class="video-card-info">
-            <h4 data-i18n="index.video3.title">UMG Editor Demo</h4>
-            <p data-i18n="index.video3.desc">Live demonstration of UMG widget editing</p>
-          </div>
-        </div>
-        <div class="video-card reveal reveal-delay-4">
-          <iframe src="https://www.youtube.com/embed/93_Fiil9nd8" title="Multi-Agent Gemini" allowfullscreen loading="lazy"></iframe>
-          <div class="video-card-info">
-            <h4 data-i18n="index.video4.title">Multi-Agent with Gemini</h4>
-            <p data-i18n="index.video4.desc">Multi-agent AI architecture powered by Gemini</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- CTA -->
-  <section class="section">
-    <div class="container">
-      <div class="cta-section reveal">
-        <h2 data-i18n="index.cta.title">Ready to Transform Your UE5 Workflow?</h2>
-        <p data-i18n="index.cta.subtitle">Start with the open source version, or jump straight to the zero-setup commercial release on Fab.</p>
-        <div class="cta-buttons">
-          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
-            ⭐ <span data-i18n="index.cta.github">Star on GitHub</span>
-          </a>
-          <a href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
-            <span data-i18n="index.cta.fab">Buy on Fab →</span>
-          </a>
+    <section class="section" id="editions">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="editions.label">第 2 步 · 选择版本</span>
+          <h2 data-i18n="editions.title">开源版与 Fab 版：核心相同，工作体验不同</h2>
+          <p data-i18n="editions.subtitle">旧文档中“开源 API 更弱”的说法不准确；真正的差异集中在安装、编辑器内 AI 与生产工作层。</p>
+        </div>
+        <div class="compare-wrap reveal">
+          <table class="compare-table edition-table">
+            <thead>
+              <tr>
+                <th data-i18n="editions.feature">能力</th>
+                <th class="col-oss" data-i18n="editions.oss">开源版（GitHub）</th>
+                <th class="col-fab" data-i18n="editions.fab">Fab 版</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="table-section"><td colspan="3" data-i18n="editions.shared">共享核心能力</td></tr>
+              <tr><td data-i18n="editions.row.tools">89 个外部 MCP 工具</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.domains">Widget / BlueCode / Animation / Material / HLSL</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.sessions">动态端口、多编辑器发现、独占会话</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.debug">编辑器内 MCP Debug Console</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+
+              <tr class="table-section"><td colspan="3" data-i18n="editions.delivery">安装与使用入口</td></tr>
+              <tr><td data-i18n="editions.row.install">安装方式</td><td data-i18n="editions.row.install.oss">克隆源码并由 UBT 编译</td><td data-i18n="editions.row.install.fab">Fab / Epic Launcher 安装匹配包</td></tr>
+              <tr><td data-i18n="editions.row.engine">当前发布线</td><td data-i18n="editions.row.engine.oss">源码基线 UE 5.8 / Win64</td><td data-i18n="editions.row.engine.fab">UE 5.6、5.7、5.8 / Win64</td></tr>
+              <tr><td data-i18n="editions.row.external">外部 MCP 客户端</td><td data-i18n="editions.row.external.oss">需要 uv/Python stdio server</td><td data-i18n="editions.row.external.fab">使用外部路线时同样需要 uv/Python</td></tr>
+              <tr><td data-i18n="editions.row.license">代码与许可</td><td data-i18n="editions.row.license.oss">公开核心源码，MIT</td><td data-i18n="editions.row.license.fab">Fab 插件包，遵循 Fab 许可条款</td></tr>
+
+              <tr class="table-section"><td colspan="3" data-i18n="editions.fabextra">Fab 额外工作层</td></tr>
+              <tr><td data-i18n="editions.row.chat">编辑器内原生 AI 对话</td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.direct">内置对话直接执行 C++ 工具，无需 Python</td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.providers">内置模型供应商与路由</td><td data-i18n="editions.row.providers.oss">由外部 MCP 客户端负责</td><td data-i18n="editions.row.providers.fab">Google 登录/API、智谱、自定义 OpenAI-compatible、Codex CLI、LiteRT-LM</td></tr>
+              <tr><td data-i18n="editions.row.agents">Agent/Task 编排、Tool Mode、审批</td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.history">会话历史与可选上下文压缩</td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+              <tr><td data-i18n="editions.row.local">内置 LiteRT-LM 本地推理</td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="decision-grid reveal">
+          <article class="decision-card">
+            <span class="badge badge-green" data-i18n="editions.pick.oss.badge">选择开源版</span>
+            <h3 data-i18n="editions.pick.oss.title">需要审查协议、改源码或接入已有 AI 客户端</h3>
+            <p data-i18n="editions.pick.oss.desc">适合开发者、研究者和愿意自行维护 Python/uv MCP 环境的团队。</p>
+            <a class="btn btn-secondary" href="https://github.com/winyunq/UnrealMotionGraphicsMCP" target="_blank" rel="noopener" data-i18n="editions.pick.oss.cta">打开 GitHub →</a>
+          </article>
+          <article class="decision-card fab-card">
+            <span class="badge badge-purple" data-i18n="editions.pick.fab.badge">选择 Fab 版</span>
+            <h3 data-i18n="editions.pick.fab.title">希望从 Launcher 安装，并直接在 UE 内使用 AI 工作流</h3>
+            <p data-i18n="editions.pick.fab.desc">适合美术、技术美术及希望使用内置供应商、Agent、历史和本地模型的生产团队。</p>
+            <a class="btn btn-primary" href="https://www.fab.com/zh-cn/listings/f70dbcb0-11e4-46bf-b3f7-9f30ba2c9b71" target="_blank" rel="noopener" data-i18n="editions.pick.fab.cta">打开 Fab →</a>
+          </article>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
+
+    <section class="section section-alt" id="tool-map">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="tools.label">第 3 步 · 认识工具</span>
+          <h2 data-i18n="tools.title">89 个 MCP 工具，按使用顺序分为 8 组</h2>
+          <p data-i18n="tools.subtitle">数量来自当前 UmgMcpServer.py：86 个领域工具，加 3 个连接工具。</p>
+        </div>
+        <div class="tool-summary-grid reveal">
+          <a href="mcp-tools.html#group-connection" class="tool-summary-card"><b>3</b><span data-i18n="tools.g1">连接与多编辑器会话</span><code>list / connect / state</code></a>
+          <a href="mcp-tools.html#group-context" class="tool-summary-card"><b>10</b><span data-i18n="tools.g2">Schema、目标与上下文</span><code>schema / target / focus</code></a>
+          <a href="mcp-tools.html#group-widget-read" class="tool-summary-card"><b>4</b><span data-i18n="tools.g3">Widget 检查与诊断</span><code>tree / properties / layout</code></a>
+          <a href="mcp-tools.html#group-widget-write" class="tool-summary-card"><b>6</b><span data-i18n="tools.g4">Widget 创建与修改</span><code>create / union / save</code></a>
+          <a href="mcp-tools.html#group-asset-editor" class="tool-summary-card"><b>8</b><span data-i18n="tools.g5">资产转换与关卡工具</span><code>JSON / assets / actors</code></a>
+          <a href="mcp-tools.html#group-blueprint" class="tool-summary-card"><b>22</b><span data-i18n="tools.g6">Blueprint 与 BlueCode</span><code>semantic / revision / rollback</code></a>
+          <a href="mcp-tools.html#group-animation" class="tool-summary-card"><b>18</b><span data-i18n="tools.g7">Animation 与 Sequencer</span><code>tracks / keys / time slices</code></a>
+          <a href="mcp-tools.html#group-material" class="tool-summary-card"><b>18</b><span data-i18n="tools.g8">Material 与 HLSL</span><code>graph / parameters / compile</code></a>
+        </div>
+        <div class="center-actions reveal">
+          <a href="mcp-tools.html" class="btn btn-primary btn-lg" data-i18n="tools.cta">逐项查看全部 89 个工具 →</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="architecture.label">第 4 步 · 理解连接</span>
+          <h2 data-i18n="architecture.title">两条入口，最终进入同一个 C++ 命令核心</h2>
+          <p data-i18n="architecture.subtitle">“Fab 不需要 Python”只适用于 Fab 的编辑器内对话路线；Fab 也可以走外部 MCP 路线，而那条路线仍使用 Python stdio server。</p>
+        </div>
+        <div class="path-grid reveal">
+          <article class="path-card">
+            <span class="badge badge-green" data-i18n="architecture.external.badge">开源版与 Fab 都可用</span>
+            <h3 data-i18n="architecture.external.title">外部 MCP 路线</h3>
+            <div class="flow-line">
+              <span data-i18n="architecture.external.1">AI 客户端</span><i>→</i>
+              <span data-i18n="architecture.external.2">Python MCP stdio</span><i>→</i>
+              <span data-i18n="architecture.external.3">动态本机端口</span><i>→</i>
+              <span data-i18n="architecture.external.4">UE C++ Bridge</span><i>→</i>
+              <span data-i18n="architecture.external.5">资产</span>
+            </div>
+            <ul class="plain-list">
+              <li data-i18n="architecture.external.a">公开的 89 工具都属于这条 MCP 工具面。</li>
+              <li data-i18n="architecture.external.b">多个 UE 实例通过发现记录和动态端口区分。</li>
+              <li data-i18n="architecture.external.c">写操作串行进入 Game Thread，避免并发修改资产。</li>
+            </ul>
+          </article>
+          <article class="path-card fab-card">
+            <span class="badge badge-purple" data-i18n="architecture.native.badge">仅 Fab 内置</span>
+            <h3 data-i18n="architecture.native.title">编辑器内原生路线</h3>
+            <div class="flow-line">
+              <span data-i18n="architecture.native.1">Slate Chat</span><i>→</i>
+              <span data-i18n="architecture.native.2">Provider / Agent</span><i>→</i>
+              <span data-i18n="architecture.native.3">Tool Mode</span><i>→</i>
+              <span data-i18n="architecture.native.4">C++ Bridge</span><i>→</i>
+              <span data-i18n="architecture.native.5">资产</span>
+            </div>
+            <ul class="plain-list">
+              <li data-i18n="architecture.native.a">不启动 Python server，工具调用在插件内直接派发。</li>
+              <li data-i18n="architecture.native.b">Tool Mode 按任务筛选工具，不等于默认暴露完整 89 工具。</li>
+              <li data-i18n="architecture.native.c">Task、历史、审批、上下文压缩和本地模型属于这一层。</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="workflow">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="workflow.label">第 5 步 · 执行任务</span>
+          <h2 data-i18n="workflow.title">任何可靠的编辑都遵循同一条闭环</h2>
+          <p data-i18n="workflow.subtitle">不要从“生成 UI”直接跳到写入；先连接、定目标、读取真实状态，再做最小修改并验证。</p>
+        </div>
+        <ol class="workflow-steps reveal">
+          <li><span>01</span><div><h3 data-i18n="workflow.1.title">启动与连接</h3><p data-i18n="workflow.1.desc">打开 UE；外部客户端先 list_umg_mcp_servers，再 connect_umg_mcp。Fab 内置路线直接打开 UMG AI Assistant。</p></div></li>
+          <li><span>02</span><div><h3 data-i18n="workflow.2.title">选择目标</h3><p data-i18n="workflow.2.desc">调用 set_target_umg_asset / set_target_blueprint_asset，必要时再聚焦 Widget、函数或动画。</p></div></li>
+          <li><span>03</span><div><h3 data-i18n="workflow.3.title">读取真实状态</h3><p data-i18n="workflow.3.desc">读取 Widget Tree、属性、布局、BlueCode roundtrip、动画 overview 或材质图，而不是根据截图猜测。</p></div></li>
+          <li><span>04</span><div><h3 data-i18n="workflow.4.title">规划最小修改</h3><p data-i18n="workflow.4.desc">优先使用 union 写入；BlueCode 修改已有图时携带 base_revision/source_map，并可先 dry_run。</p></div></li>
+          <li><span>05</span><div><h3 data-i18n="workflow.5.title">显式处理删除</h3><p data-i18n="workflow.5.desc">删除 Widget、节点、变量、动画、轨道、关键帧或 HLSL 项时，使用对应 delete 工具并传 confirm_delete=true。</p></div></li>
+          <li><span>06</span><div><h3 data-i18n="workflow.6.title">编译与保存</h3><p data-i18n="workflow.6.desc">Blueprint 使用 bluecode_compile/compile_blueprint，HLSL 使用 hlsl_compile，其他资产使用 save_asset。</p></div></li>
+          <li><span>07</span><div><h3 data-i18n="workflow.7.title">回读验证</h3><p data-i18n="workflow.7.desc">重新读取刚修改的范围，检查结构、属性、连接、关键帧和编译诊断，再结束任务。</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section" id="get-started">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="start.label">第 6 步 · 开始使用</span>
+          <h2 data-i18n="start.title">按照你的版本完成安装与第一次连接</h2>
+          <p data-i18n="start.subtitle">完整命令、配置文件和验证步骤集中在同一个入门页。</p>
+        </div>
+        <div class="decision-grid reveal">
+          <article class="decision-card">
+            <span class="badge badge-green" data-i18n="start.oss.badge">开源路线</span>
+            <h3 data-i18n="start.oss.title">GitHub 源码 + 外部 MCP 客户端</h3>
+            <ol class="mini-steps">
+              <li data-i18n="start.oss.1">克隆到项目 Plugins/UmgMcp。</li>
+              <li data-i18n="start.oss.2">使用 UE 5.8 Win64 编译并启用插件。</li>
+              <li data-i18n="start.oss.3">用 uv 启动 Resources/Python/UmgMcpServer.py。</li>
+              <li data-i18n="start.oss.4">发现 UE 实例、连接并设置目标。</li>
+            </ol>
+            <a href="getting-started.html#open-source" class="btn btn-secondary" data-i18n="start.oss.cta">查看完整开源安装 →</a>
+          </article>
+          <article class="decision-card fab-card">
+            <span class="badge badge-purple" data-i18n="start.fab.badge">Fab 路线</span>
+            <h3 data-i18n="start.fab.title">Launcher 安装 + 编辑器内 AI</h3>
+            <ol class="mini-steps">
+              <li data-i18n="start.fab.1">安装与你 UE 5.6 / 5.7 / 5.8 匹配的包。</li>
+              <li data-i18n="start.fab.2">启用 UmgMcp，重启编辑器。</li>
+              <li data-i18n="start.fab.3">配置 Google、智谱、自定义 API、Codex CLI 或 LiteRT-LM。</li>
+              <li data-i18n="start.fab.4">打开 UMG AI Assistant 并选择 Tool Mode。</li>
+            </ol>
+            <a href="getting-started.html#fab" class="btn btn-primary" data-i18n="start.fab.cta">查看完整 Fab 安装 →</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="status">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="status.label">版本状态与已知边界</span>
+          <h2 data-i18n="status.title">文档明确写出“现在能做什么，也写出还不能保证什么”</h2>
+        </div>
+        <div class="status-grid reveal">
+          <article class="status-card">
+            <h3 data-i18n="status.release.title">发布线</h3>
+            <p data-i18n="status.release.desc">v1.0.12 / 内部版本 8。Fab 构建覆盖 UE 5.6、5.7、5.8，Win64；买家实际可见版本取决于 Fab 审核状态。</p>
+          </article>
+          <article class="status-card">
+            <h3 data-i18n="status.bluecode.title">BlueCode 仍在过渡期</h3>
+            <p data-i18n="status.bluecode.desc">union、dry-run、revision、source map、右锚点和失败回滚已实现；任意嵌套 CFG、循环、Sequence/Switch、Latent 与不可规约图仍是后续工作。</p>
+          </article>
+          <article class="status-card">
+            <h3 data-i18n="status.surface.title">工具面不是同一个概念</h3>
+            <p data-i18n="status.surface.desc">公开 89 工具、Fab 内置 Agent 的 Tool Mode、以及 C++ 原始 CommandType 是三个层次；本页不会再把它们混算。</p>
+          </article>
+          <article class="status-card">
+            <h3 data-i18n="status.safety.title">安全写入</h3>
+            <p data-i18n="status.safety.desc">增量写入默认保留未提及内容；破坏性操作必须走专用删除工具并显式确认。修改后仍应回读和编译验证。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="reference">
+      <div class="container container-sm">
+        <div class="section-header reveal">
+          <span class="section-label" data-i18n="reference.label">继续深入</span>
+          <h2 data-i18n="reference.title">从概览进入精确协议</h2>
+          <p data-i18n="reference.subtitle">本页负责线性理解；工具目录和协议文档负责精确名称、payload 与边界。</p>
+        </div>
+        <div class="reference-list reveal">
+          <a href="mcp-tools.html"><strong data-i18n="reference.tools.title">89 个 MCP 工具目录</strong><span data-i18n="reference.tools.desc">按 8 组逐项说明用途、写入性质与兼容状态。</span></a>
+          <a href="getting-started.html"><strong data-i18n="reference.start.title">安装与第一次连接</strong><span data-i18n="reference.start.desc">开源和 Fab 两条路线的完整步骤。</span></a>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/blob/main/Document/UmgWidgetMcpProtocol.md" target="_blank" rel="noopener"><strong>Widget Protocol</strong><span data-i18n="reference.widget.desc">目标、读取、union 写入与删除契约。</span></a>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/blob/main/Document/BlueprintBluecodeProtocol.md" target="_blank" rel="noopener"><strong>Blueprint / BlueCode Protocol</strong><span data-i18n="reference.bluecode.desc">语义读取、roundtrip、revision、dry-run 与回滚。</span></a>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/blob/main/Document/AnimationMcpProtocol.md" target="_blank" rel="noopener"><strong>Animation Protocol</strong><span data-i18n="reference.animation.desc">动画范围、时间片、轨道、关键帧与删除。</span></a>
+          <a href="https://github.com/winyunq/UnrealMotionGraphicsMCP/blob/main/Document/MaterialMcpProtocol.md" target="_blank" rel="noopener"><strong>Material / HLSL Protocol</strong><span data-i18n="reference.material.desc">材质图、HLSL、参数、输出和编译。</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
 
   <footer id="main-footer"></footer>
   <script src="assets/js/main.js" defer></script>
