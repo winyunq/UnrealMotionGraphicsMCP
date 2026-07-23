@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "source": {
     "file": "Resources/Python/UmgMcpServer.py",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "commit": "adab2ead1eda523cdeb358e89b5478488551904e",
     "auditedDate": "2026-07-20",
     "toolCount": 89

@@ -1,7 +1,7 @@
 {
-  "version": "1.0.12",
-  "internalVersion": 8,
-  "auditedDate": "2026-07-20",
+  "version": "1.0.13",
+  "internalVersion": 9,
+  "auditedDate": "2026-07-23",
   "sourceCommit": "adab2ead1eda523cdeb358e89b5478488551904e",
   "toolCount": 89,
   "toolGroups": 8,

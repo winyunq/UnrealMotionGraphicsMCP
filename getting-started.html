@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>安装与第一次连接 — UMG MCP</title>
-  <meta name="description" content="UMG MCP v1.0.12 开源版与 Fab 版的线性安装、连接、验证和故障排查指南。">
+  <meta name="description" content="UMG MCP v1.0.13 开源版与 Fab 版的线性安装、连接、验证和故障排查指南。">
   <link rel="canonical" href="https://winyunq.github.io/UnrealMotionGraphicsMCP/getting-started.html">
   <link rel="stylesheet" href="assets/css/main.css">
 </head>
@@ -123,7 +123,7 @@ uv run python APITest\Animation_Protocol_Static_Check.py</code></pre>
         <div class="guide-heading reveal">
           <span class="badge badge-purple" data-i18n="setup.fab.badge">路线 B · Fab 版</span>
           <h2 data-i18n="setup.fab.title">Fab / Epic Launcher + 编辑器内 AI</h2>
-          <p data-i18n="setup.fab.subtitle">v1.0.12 发布包覆盖 UE 5.6、5.7、5.8 / Win64。Fab 页面实际显示哪些版本取决于当前审核状态。</p>
+          <p data-i18n="setup.fab.subtitle">v1.0.13 发布包覆盖 UE 5.6、5.7、5.8 / Win64。三个包均使用全新的下载 URL，并通过禁止可执行文件扫描。</p>
         </div>
 
         <ol class="setup-sequence reveal">
@@ -196,7 +196,7 @@ uv run python APITest\Animation_Protocol_Static_Check.py</code></pre>
               <tr><td data-i18n="setup.trouble.multi.symptom">连接到了错误项目</td><td data-i18n="setup.trouble.multi">列出所有实例，根据 project/path 选择，再使用 exclusive=true 连接并设置 target。</td></tr>
               <tr><td data-i18n="setup.trouble.target.symptom">工具成功但改错资产</td><td data-i18n="setup.trouble.target">先 get_target_umg_asset / get_target_blueprint_asset；写入前传完整资产路径。</td></tr>
               <tr><td data-i18n="setup.trouble.compile.symptom">Blueprint 或 HLSL 写入后无效</td><td data-i18n="setup.trouble.compile">执行对应 compile 工具，检查返回诊断，再重新读取图或材质。</td></tr>
-              <tr><td data-i18n="setup.trouble.fab.symptom">Fab 中看不到某个 UE 版本</td><td data-i18n="setup.trouble.fab">确认商品更新审核状态；v1.0.12 包线包含 5.6/5.7/5.8，但买家可见性由 Fab 审核决定。</td></tr>
+              <tr><td data-i18n="setup.trouble.fab.symptom">Fab 中看不到某个 UE 版本</td><td data-i18n="setup.trouble.fab">确认商品更新审核状态；v1.0.13 包线包含 5.6/5.7/5.8，并使用与旧提交不同的版本号和下载 URL。</td></tr>
             </tbody>
           </table>
         </div>
