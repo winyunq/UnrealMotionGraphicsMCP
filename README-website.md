@@ -17,7 +17,9 @@ product claims across many marketing pages:
 
 The current catalog data is stored in:
 
-- `assets/data/release.json`
+- `assets/data/release.json` — separate `sourceVersion` / `sourceInternalVersion`
+  and `fabVersion` / `fabInternalVersion` fields prevent the two release lines
+  from being conflated.
 - `assets/data/mcp-tools.json`
 
 Every tool entry has Chinese and English descriptions. `assets/js/mcp-tools.js`
@@ -46,7 +48,7 @@ node Scripts/validate-site-docs.mjs --source-ref upstream/main
 It fails when any of these drift:
 
 - public MCP tool names or count
-- plugin version or audited source commit
+- open-source plugin version, Fab release metadata, or audited source commit
 - Chinese/English translation keys
 - internal links
 - known stale claims such as the old tool count or UE 5.3+ requirement

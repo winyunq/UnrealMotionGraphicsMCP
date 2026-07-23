@@ -1,6 +1,8 @@
 {
-  "version": "1.0.13",
-  "internalVersion": 9,
+  "sourceVersion": "1.0.12",
+  "sourceInternalVersion": 8,
+  "fabVersion": "1.0.13",
+  "fabInternalVersion": 9,
   "auditedDate": "2026-07-23",
   "sourceCommit": "adab2ead1eda523cdeb358e89b5478488551904e",
   "toolCount": 89,

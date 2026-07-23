@@ -62,8 +62,11 @@ if (missingFromCatalog.length || missingFromSource.length) {
   fail(`Tool-name drift. Missing from catalog: ${missingFromCatalog.join(', ') || 'none'}. Missing from source: ${missingFromSource.join(', ') || 'none'}.`);
 }
 
-if (sourcePlugin.VersionName !== release.version || sourcePlugin.Version !== release.internalVersion) {
-  fail(`Version drift: source=${sourcePlugin.VersionName}/${sourcePlugin.Version}, docs=${release.version}/${release.internalVersion}.`);
+if (sourcePlugin.VersionName !== release.sourceVersion || sourcePlugin.Version !== release.sourceInternalVersion) {
+  fail(`Source version drift: source=${sourcePlugin.VersionName}/${sourcePlugin.Version}, docs=${release.sourceVersion}/${release.sourceInternalVersion}.`);
+}
+if (typeof release.fabVersion !== 'string' || !Number.isInteger(release.fabInternalVersion)) {
+  fail('Fab release version fields are missing or invalid.');
 }
 if (sourceCommit !== release.sourceCommit || catalog.source.commit !== release.sourceCommit) {
   fail(`Source commit drift: source=${sourceCommit}, release=${release.sourceCommit}, catalog=${catalog.source.commit}.`);
@@ -114,4 +117,4 @@ for (const file of auditedFiles) {
   }
 }
 
-console.log(`Documentation validation passed: ${release.version}, ${release.toolCount} tools, ${release.toolGroups} groups, source ${sourceCommit.slice(0, 7)}.`);
+console.log(`Documentation validation passed: source ${release.sourceVersion}/${release.sourceInternalVersion}, Fab ${release.fabVersion}/${release.fabInternalVersion}, ${release.toolCount} tools, ${release.toolGroups} groups, commit ${sourceCommit.slice(0, 7)}.`);

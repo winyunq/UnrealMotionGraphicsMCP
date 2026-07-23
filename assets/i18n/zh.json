@@ -23,7 +23,7 @@
   "footer.bottom.oss": "开源版",
   "footer.bottom.fab": "Fab 版",
 
-  "hero.badge": "v1.0.13 · UE 5.6 / 5.7 / 5.8 · Win64",
+  "hero.badge": "Fab v1.0.13 · 开源 v1.0.12 · UE 5.6 / 5.7 / 5.8 · Win64",
   "hero.headline1": "一套共享的 UMG MCP 核心",
   "hero.subtitle": "89 个面向 Unreal Editor 的 MCP 工具，覆盖 Widget、Blueprint、动画、材质和资产工作流；开源版与 Fab 版共享核心，Fab 额外提供编辑器内 AI 工作层。",
   "hero.cta.read": "按顺序开始阅读 ↓",
@@ -33,7 +33,7 @@
   "hero.stat.core": "两版共享核心",
   "hero.stat.paths": "外部 MCP / Fab 内置",
   "baseline.title": "文档事实基线",
-  "baseline.text": "插件 1.0.13（内部版本 9），按公开源码提交 adab2ea 审计于 2026-07-23。",
+  "baseline.text": "开源 MCP 基线为 v1.0.12（内部版本 8），按公开源码提交 adab2ea 审计于 2026-07-23；Fab 发布线为 v1.0.13（内部版本 9）。",
 
   "order.label": "推荐阅读顺序",
   "order.title": "从上到下，只走一条主线",
@@ -184,7 +184,7 @@
   "status.label": "版本状态与已知边界",
   "status.title": "文档明确写出“现在能做什么，也写出还不能保证什么”",
   "status.release.title": "发布线",
-  "status.release.desc": "v1.0.13 / 内部版本 9。Fab 构建覆盖 UE 5.6、5.7、5.8，Win64；本次使用全新的制品 URL 触发 Fab 重新扫描。",
+  "status.release.desc": "Fab 为 v1.0.13 / 内部版本 9；开源 MCP 核心为 v1.0.12 / 内部版本 8。Fab 构建覆盖 UE 5.6、5.7、5.8，Win64；本次使用全新的制品 URL 触发 Fab 重新扫描。",
   "status.bluecode.title": "BlueCode 仍在过渡期",
   "status.bluecode.desc": "union、dry-run、revision、source map、右锚点和失败回滚已实现；任意嵌套 CFG、循环、Sequence/Switch、Latent 与不可规约图仍是后续工作。",
   "status.surface.title": "工具面不是同一个概念",
@@ -206,7 +206,7 @@
 
   "catalog.badge": "主线第 3 步 · 完整工具目录",
   "catalog.title": "89 个 MCP 工具，从连接到编译逐项列全",
-  "catalog.subtitle": "清单直接对照 v1.0.13 的 Resources/Python/UmgMcpServer.py：3 个连接工具 + 86 个领域工具。",
+  "catalog.subtitle": "清单直接对照开源 v1.0.12 的 Resources/Python/UmgMcpServer.py：3 个连接工具 + 86 个领域工具。",
   "catalog.back": "← 返回线性总览",
   "catalog.jump": "开始逐项阅读 ↓",
   "catalog.scope.title": "这个数字包含什么？",
