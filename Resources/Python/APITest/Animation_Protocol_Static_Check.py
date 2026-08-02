@@ -72,8 +72,8 @@ def main() -> None:
 
     require_text("Document/AnimationMcpProtocol.md", "animation_append_widget_tracks")
     require_text("Document/AnimationMcpProtocol.md", "confirm_delete=true")
-    require_text("README.md", "Legacy low-level reads/writes")
-    require_text("Readme_zh.md", "旧的底层读写命令")
+    require_text("Document/AnimationMcpProtocol.md", "## 隐藏兼容命令")
+    require_text("Document/AnimationMcpProtocol.md", "旧脚本迁移")
     require_text("Resources/Python/UmgMcpServer.py", "async def delete_animation")
     require_text("Resources/Python/UmgMcpServer.py", "requires confirm_delete=true")
     require_text("Source/UmgMcp/Private/Animation/UmgMcpSequencerCommands.cpp", "Deletion hardened (Issue 15)")

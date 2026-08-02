@@ -99,8 +99,7 @@ def main() -> None:
     require_text("Document/UmgWidgetMcpProtocol.md", "confirm_delete=true")
     require_text("Document/UmgWidgetMcpProtocol.md", "reorder_widget_tree")
     require_text("Document/UmgWidgetMcpProtocol.md", "set_widget_properties")
-    require_text("README.md", "`delete_widget`")
-    require_text("Readme_zh.md", "`delete_widget`")
+    require_text("Document/UmgWidgetMcpProtocol.md", "`delete_widget(widget_name, confirm_delete=true)`")
 
     print("UMG widget protocol static check passed.")
 

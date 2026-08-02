@@ -1,0 +1,35 @@
+name: Check documentation freshness
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch documentation branch
+        run: git fetch origin Document:refs/remotes/origin/Document
+
+      - name: Check documentation against source
+        shell: bash
+        run: |
+          docs_dir="$RUNNER_TEMP/umgmcp-document"
+          git worktree add --detach "$docs_dir" refs/remotes/origin/Document
+          cd "$docs_dir"
+          node Scripts/validate-site-docs.mjs --source-ref "$GITHUB_SHA"
