@@ -26,6 +26,26 @@ function gitShow(relativePath) {
   }
 }
 
+function gitOutput(args) {
+  try {
+    return execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).trim();
+  } catch (error) {
+    fail(`Git command failed (${args.join(' ')}): ${error.stderr || error.message}`);
+  }
+}
+
+function documentationSensitiveChanges(fromRef, toRef) {
+  const changedFiles = gitOutput(['diff', '--name-only', fromRef, toRef, '--'])
+    .split(/\r?\n/)
+    .filter(Boolean);
+  const sensitivePath = /^(?:UmgMcp\.uplugin|Source\/UmgMcp\/|Skills\/|Resources\/(?:Abilities\.json|RecommendedModels\.json|prompts\.json|ToolModes\/|Task\/|BaseAgent\/|global\/|Python\/(?!APITest\/|__pycache__\/)))/;
+  return changedFiles.filter(file => sensitivePath.test(file));
+}
+
 function sortedUnique(values) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
@@ -37,7 +57,7 @@ const en = readJson('assets/i18n/en.json');
 
 const sourceServer = gitShow('Resources/Python/UmgMcpServer.py');
 const sourcePlugin = JSON.parse(gitShow('UmgMcp.uplugin').replace(/^\uFEFF/, ''));
-const sourceCommit = execFileSync('git', ['rev-parse', sourceRef], { cwd: root, encoding: 'utf8' }).trim();
+const sourceCommit = gitOutput(['rev-parse', sourceRef]);
 
 const sourceTools = sortedUnique([
   ...[...sourceServer.matchAll(/@register_tool\("([^"]+)"/g)].map(match => match[1]),
@@ -68,8 +88,26 @@ if (sourcePlugin.VersionName !== release.sourceVersion || sourcePlugin.Version !
 if (typeof release.fabVersion !== 'string' || !Number.isInteger(release.fabInternalVersion)) {
   fail('Fab release version fields are missing or invalid.');
 }
-if (sourceCommit !== release.sourceCommit || catalog.source.commit !== release.sourceCommit) {
-  fail(`Source commit drift: source=${sourceCommit}, release=${release.sourceCommit}, catalog=${catalog.source.commit}.`);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(release.auditedDate)) {
+  fail(`Invalid auditedDate: ${release.auditedDate}. Expected YYYY-MM-DD.`);
+}
+if (!/^[0-9a-f]{40}$/.test(release.sourceCommit)) {
+  fail(`Invalid audited source commit: ${release.sourceCommit}.`);
+}
+if (catalog.source.commit !== release.sourceCommit) {
+  fail(`Catalog audit baseline drift: release=${release.sourceCommit}, catalog=${catalog.source.commit}.`);
+}
+
+const auditedCommitDate = gitOutput(['show', '-s', '--format=%cs', release.sourceCommit]);
+if (release.auditedDate < auditedCommitDate) {
+  fail(`Audit date ${release.auditedDate} predates audited source commit ${release.sourceCommit} (${auditedCommitDate}).`);
+}
+
+if (sourceCommit !== release.sourceCommit) {
+  const sensitiveChanges = documentationSensitiveChanges(release.sourceCommit, sourceCommit);
+  if (sensitiveChanges.length) {
+    fail(`Documentation-sensitive source drift since ${release.sourceCommit.slice(0, 7)} (${release.auditedDate}): ${sensitiveChanges.join(', ')}.`);
+  }
 }
 
 const htmlFiles = readdirSync(root).filter(name => name.endsWith('.html'));
@@ -117,4 +155,7 @@ for (const file of auditedFiles) {
   }
 }
 
-console.log(`Documentation validation passed: source ${release.sourceVersion}/${release.sourceInternalVersion}, Fab ${release.fabVersion}/${release.fabInternalVersion}, ${release.toolCount} tools, ${release.toolGroups} groups, commit ${sourceCommit.slice(0, 7)}.`);
+const auditRange = sourceCommit === release.sourceCommit
+  ? `commit ${sourceCommit.slice(0, 7)}`
+  : `audit ${release.sourceCommit.slice(0, 7)} (${release.auditedDate}) remains valid at ${sourceCommit.slice(0, 7)}`;
+console.log(`Documentation validation passed: source ${release.sourceVersion}/${release.sourceInternalVersion}, Fab ${release.fabVersion}/${release.fabInternalVersion}, ${release.toolCount} tools, ${release.toolGroups} groups, ${auditRange}.`);
